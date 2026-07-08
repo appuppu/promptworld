@@ -1,5 +1,7 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -130,6 +132,44 @@ public class GameManager : MonoBehaviour
         resultText.gameObject.SetActive(true);
         if (retryButton != null) retryButton.gameObject.SetActive(true);
         Debug.Log(message);
+
+        // Creator test session: report the clear so the stage can be published.
+        if (result == GameState.Cleared &&
+            !string.IsNullOrEmpty(GameSession.RemoteStageId) &&
+            !string.IsNullOrEmpty(GameSession.EditKey))
+        {
+            float clearTimeMs = (timeLimit - timeRemaining) * 1000f;
+            StartCoroutine(ReportTestClear(clearTimeMs));
+        }
+    }
+
+    private IEnumerator ReportTestClear(float clearTimeMs)
+    {
+        var payload = JsonUtility.ToJson(new ClearPayload
+        {
+            editKey = GameSession.EditKey,
+            clearTimeMs = Mathf.RoundToInt(clearTimeMs),
+        });
+        string url = $"{GameSession.ApiOrigin}/api/stages/{GameSession.RemoteStageId}/clear";
+        using var request = UnityWebRequest.Post(url, payload, "application/json");
+        yield return request.SendWebRequest();
+
+        if (request.result == UnityWebRequest.Result.Success)
+        {
+            resultText.text += "\n<size=30%>TEST CLEAR RECORDED — READY TO PUBLISH</size>";
+            Debug.Log("[PromptWorld] Test clear recorded.");
+        }
+        else
+        {
+            Debug.LogError($"[PromptWorld] Failed to record clear: {request.error}");
+        }
+    }
+
+    [System.Serializable]
+    private class ClearPayload
+    {
+        public string editKey;
+        public int clearTimeMs;
     }
 
     private void UpdateTimerLabel()

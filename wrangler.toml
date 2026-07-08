@@ -1,0 +1,8 @@
+name = "promptworld"
+compatibility_date = "2026-01-01"
+pages_build_output_dir = "PromptWorld/Builds/WebGL"
+
+[[d1_databases]]
+binding = "promptworld_stages"
+database_name = "promptworld-stages"
+database_id = "18181c1c-e57a-4375-8df9-63de4dd28e1f"

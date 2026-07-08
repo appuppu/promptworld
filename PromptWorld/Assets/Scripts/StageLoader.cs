@@ -18,20 +18,27 @@ public class StageLoader : MonoBehaviour
 
     private IEnumerator Start()
     {
-        // The menu overrides the default; StreamingAssets is a URL on WebGL,
-        // so everything goes through UnityWebRequest.
-        string file = string.IsNullOrEmpty(GameSession.SelectedStageFile)
-            ? stageFile
-            : GameSession.SelectedStageFile;
-        string url = System.IO.Path.Combine(Application.streamingAssetsPath, "Stages", file);
-        if (!url.Contains("://")) url = "file://" + url;
+        // Server stages (?stage=<id>) take priority over built-in files.
+        string url;
+        if (!string.IsNullOrEmpty(GameSession.RemoteStageId))
+        {
+            url = $"{GameSession.ApiOrigin}/api/stages/{GameSession.RemoteStageId}";
+        }
+        else
+        {
+            string file = string.IsNullOrEmpty(GameSession.SelectedStageFile)
+                ? stageFile
+                : GameSession.SelectedStageFile;
+            url = System.IO.Path.Combine(Application.streamingAssetsPath, "Stages", file);
+            if (!url.Contains("://")) url = "file://" + url;
+        }
 
         using var request = UnityWebRequest.Get(url);
         yield return request.SendWebRequest();
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError($"[PromptWorld] Failed to load stage '{file}': {request.error}");
+            Debug.LogError($"[PromptWorld] Failed to load stage from '{url}': {request.error}");
             gameManager.Configure(null, "STAGE NOT FOUND", 60f);
             yield break;
         }
