@@ -38,6 +38,12 @@ promptworld/
 
 ## Dev Log
 
+- **Day 2 (2026-07-08):** Stages became data. Runtime `StageLoader` builds
+  playable worlds from JSON (StreamingAssets, hot-reload with R). Parts
+  toolbox v0.2: solid / hazard / jumpPad / boost / gravityFlip / goal —
+  documented in `docs/parts-catalog.md` as the vocabulary handed to
+  stage-generating AIs. Camera follow, respawns, restart. First
+  AI-designed stage: "First Flight" (stage-001.json).
 - **Day 1 (2026-07-08):** Project kickoff. Core loop scaffold in Unity 6
   (2D): physics-based player (move + single jump), goal trigger with
   "Stage Clear!", 60s countdown with "Game Over" freeze. Stage JSON

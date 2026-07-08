@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "0.2",
+  "id": "stage-001",
+  "name": "First Flight",
+  "timeLimit": 45,
+  "playerStart": { "x": -12, "y": -2.5 },
+  "goal": { "x": 27, "y": -2.3, "w": 1.4, "h": 2.6 },
+  "parts": [
+    { "type": "solid", "x": -12, "y": -4, "w": 8, "h": 1 },
+
+    { "type": "solid", "x": -3.5, "y": -4, "w": 6, "h": 1 },
+    { "type": "hazard", "x": -3.5, "y": -3.1, "w": 0.8, "h": 0.8 },
+
+    { "type": "solid", "x": 2, "y": -4, "w": 4, "h": 1 },
+    { "type": "jumpPad", "x": 2, "y": -3.35, "w": 1.5, "h": 0.3, "power": 22 },
+
+    { "type": "solid", "x": 7, "y": 2.5, "w": 6, "h": 1 },
+    { "type": "gravityFlip", "x": 9.5, "y": 4, "w": 1.2, "h": 1.2 },
+
+    { "type": "solid", "x": 14, "y": 7, "w": 12, "h": 1 },
+    { "type": "hazard", "x": 14.5, "y": 6.1, "w": 0.8, "h": 0.8 },
+    { "type": "gravityFlip", "x": 19, "y": 5.5, "w": 1.2, "h": 1.2 },
+
+    { "type": "solid", "x": 21, "y": -4, "w": 6, "h": 1 },
+    { "type": "boost", "x": 23, "y": -2.6, "w": 0.4, "h": 1.8, "dirX": 1, "power": 10 },
+
+    { "type": "solid", "x": 27.5, "y": -4, "w": 5, "h": 1 }
+  ]
+}
