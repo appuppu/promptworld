@@ -15,3 +15,9 @@ CREATE TABLE IF NOT EXISTS stages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stages_status ON stages(status, published_at DESC);
+
+-- Daily counters for abuse prevention: key = action:ipHash:YYYY-MM-DD
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0
+);

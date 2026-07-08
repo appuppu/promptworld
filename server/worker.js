@@ -90,7 +90,56 @@ function newId() {
   return id;
 }
 
-async function opCreateStage(env, origin, stage) {
+// ------------------------------------------------------------ abuse control
+
+const RATE_LIMITS = {
+  create: 30,         // drafts per IP per day
+  clear: 200,         // clear submissions per IP per day
+  publish: 10,        // publishes per IP per day
+  publishGlobal: 200, // publishes per day platform-wide (circuit breaker)
+};
+const MIN_CLEAR_MS_TO_PUBLISH = 3000; // trivially short stages cannot be published
+const DRAFT_TTL_DAYS = 7;             // unpublished drafts are garbage-collected
+
+async function bumpCounter(env, key) {
+  await env.promptworld_stages
+    .prepare('INSERT INTO rate_limits (key, count) VALUES (?, 1) ON CONFLICT(key) DO UPDATE SET count = count + 1')
+    .bind(key)
+    .run();
+  const row = await env.promptworld_stages
+    .prepare('SELECT count FROM rate_limits WHERE key = ?').bind(key).first();
+  return row ? row.count : 1;
+}
+
+async function overRateLimit(env, request, action, max) {
+  const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
+  const day = new Date().toISOString().slice(0, 10);
+  const data = new TextEncoder().encode(`${ip}|prompt-world`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const hash = [...new Uint8Array(digest).slice(0, 8)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const count = await bumpCounter(env, `${action}:${hash}:${day}`);
+  return count > max;
+}
+
+async function cleanupExpiredDrafts(env) {
+  const cutoff = new Date(Date.now() - DRAFT_TTL_DAYS * 86400000).toISOString();
+  await env.promptworld_stages
+    .prepare("DELETE FROM stages WHERE status = 'draft' AND created_at < ?")
+    .bind(cutoff)
+    .run();
+}
+
+async function opCreateStage(env, origin, stage, request) {
+  if (await overRateLimit(env, request, 'create', RATE_LIMITS.create)) {
+    return { status: 429, body: { error: `Rate limit: at most ${RATE_LIMITS.create} stages may be created per day.` } };
+  }
+  await cleanupExpiredDrafts(env);
+
+  if (stage && typeof stage.name === 'string') {
+    stage.name = stage.name.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  }
   const errors = validateStage(stage);
   if (errors.length > 0) return { status: 422, body: { error: 'Validation failed.', details: errors } };
 
@@ -126,7 +175,10 @@ async function opMarkTestStarted(env, id) {
     .run();
 }
 
-async function opRecordClear(env, row, body) {
+async function opRecordClear(env, row, body, request) {
+  if (await overRateLimit(env, request, 'clear', RATE_LIMITS.clear)) {
+    return { status: 429, body: { error: 'Rate limit: too many clear submissions today.' } };
+  }
   const stage = JSON.parse(row.json);
   const limitQ = Math.fround(stage.timeLimit);
   const maxTicks = Math.trunc(limitQ / 0.02);
@@ -163,7 +215,19 @@ async function opRecordClear(env, row, body) {
   };
 }
 
-async function opPublish(env, origin, row) {
+async function opPublish(env, origin, row, request) {
+  if (await overRateLimit(env, request, 'publish', RATE_LIMITS.publish)) {
+    return { status: 429, body: { error: `Rate limit: at most ${RATE_LIMITS.publish} stages may be published per day.` } };
+  }
+  if (await overRateLimit(env, request, 'publish-global:all', RATE_LIMITS.publishGlobal)) {
+    return { status: 429, body: { error: 'The platform-wide daily publish limit has been reached. Try again tomorrow.' } };
+  }
+  if (row.clear_time_ms !== null && row.clear_time_ms < MIN_CLEAR_MS_TO_PUBLISH) {
+    return {
+      status: 422,
+      body: { error: `Publish blocked: the verified clear took ${row.clear_time_ms}ms — stages clearable in under ${MIN_CLEAR_MS_TO_PUBLISH}ms are too trivial to publish.` },
+    };
+  }
   if (!row.cleared_at) {
     return {
       status: 403,
@@ -206,7 +270,7 @@ async function handleApi(request, env, url) {
     if (raw.length > LIMITS.maxJsonBytes) return json({ error: 'Stage JSON too large.' }, 413);
     let stage;
     try { stage = JSON.parse(raw); } catch { return json({ error: 'Invalid JSON.' }, 400); }
-    const result = await opCreateStage(env, url.origin, stage);
+    const result = await opCreateStage(env, url.origin, stage, request);
     return json(result.body, result.status);
   }
 
@@ -234,11 +298,11 @@ async function handleApi(request, env, url) {
   if (body.editKey !== row.edit_key) return json({ error: 'Invalid editKey.' }, 403);
 
   if (action === 'clear') {
-    const result = await opRecordClear(env, row, body);
+    const result = await opRecordClear(env, row, body, request);
     return json(result.body, result.status);
   }
   if (action === 'publish') {
-    const result = await opPublish(env, url.origin, row);
+    const result = await opPublish(env, url.origin, row, request);
     return json(result.body, result.status);
   }
   return json({ error: 'Not found.' }, 404);
@@ -335,7 +399,7 @@ const MCP_TOOLS = [
   },
 ];
 
-async function mcpCallTool(env, origin, name, args) {
+async function mcpCallTool(env, origin, name, args, request) {
   switch (name) {
     case 'get_toolbox':
       return { text: TOOLBOX_DOC };
@@ -344,7 +408,7 @@ async function mcpCallTool(env, origin, name, args) {
       if (!args || typeof args.stage !== 'object' || args.stage === null) {
         return { text: 'Error: pass the stage JSON document as the "stage" argument.', isError: true };
       }
-      const result = await opCreateStage(env, origin, args.stage);
+      const result = await opCreateStage(env, origin, args.stage, request);
       return { text: JSON.stringify(result.body, null, 2), isError: result.status >= 400 };
     }
 
@@ -367,7 +431,7 @@ async function mcpCallTool(env, origin, name, args) {
       const row = await opGetStage(env, String(args?.id ?? ''));
       if (!row) return { text: 'Error: stage not found.', isError: true };
       if (args?.editKey !== row.edit_key) return { text: 'Error: invalid editKey.', isError: true };
-      const result = await opPublish(env, origin, row);
+      const result = await opPublish(env, origin, row, request);
       return { text: JSON.stringify(result.body, null, 2), isError: result.status >= 400 };
     }
 
@@ -390,7 +454,7 @@ function rpcError(id, code, message) {
   return { jsonrpc: '2.0', id, error: { code, message } };
 }
 
-async function handleMcpMessage(env, origin, msg) {
+async function handleMcpMessage(env, origin, msg, request) {
   if (!msg || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') {
     return rpcError(msg?.id ?? null, -32600, 'Invalid request.');
   }
@@ -415,7 +479,7 @@ async function handleMcpMessage(env, origin, msg) {
       return rpcResult(msg.id, { tools: MCP_TOOLS });
     case 'tools/call': {
       const { name, arguments: args } = msg.params ?? {};
-      const outcome = await mcpCallTool(env, origin, name, args);
+      const outcome = await mcpCallTool(env, origin, name, args, request);
       if (outcome === null) return rpcError(msg.id, -32602, `Unknown tool: ${name}`);
       return rpcResult(msg.id, {
         content: [{ type: 'text', text: outcome.text }],
@@ -449,7 +513,7 @@ async function handleMcp(request, env, url) {
   const messages = Array.isArray(payload) ? payload : [payload];
   const responses = [];
   for (const msg of messages) {
-    const response = await handleMcpMessage(env, url.origin, msg);
+    const response = await handleMcpMessage(env, url.origin, msg, request);
     if (response !== null) responses.push(response);
   }
 
