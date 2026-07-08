@@ -25,5 +25,9 @@ console.log("index.html patched");
 # sim.js (deterministic replay verifier) is concatenated in front.
 cat "$ROOT/server/sim.js" "$ROOT/server/worker.js" > "$OUT/_worker.js"
 
+# Static extras: share card + creator onboarding page.
+cp "$ROOT/server/og-card.png" "$OUT/og-card.png"
+cp "$ROOT/server/create.html" "$OUT/create.html"
+
 cd "$ROOT"
 npx wrangler pages deploy --commit-dirty=true

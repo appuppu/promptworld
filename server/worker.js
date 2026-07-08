@@ -319,16 +319,29 @@ async function opPublish(env, origin, row, request) {
   return { status: 200, body: { id: row.id, status: 'published', playUrl: `${origin}/?stage=${row.id}` } };
 }
 
-async function opListPublished(env) {
+async function opListPublished(env, query) {
   // Banned creators' stages vanish from discovery (legacy NULL-creator
-  // stages stay visible).
-  const rows = await env.promptworld_stages
-    .prepare(`SELECT s.id, s.name, s.published_at, c.name AS creator
-              FROM stages s LEFT JOIN creators c ON c.id = s.creator_id
-              WHERE s.status = 'published' AND (c.banned IS NULL OR c.banned = 0)
-              ORDER BY s.published_at DESC LIMIT 100`)
-    .all();
+  // stages stay visible). Optional ?q= substring search on the name.
+  let sql = `SELECT s.id, s.name, s.published_at, s.clear_time_ms, c.name AS creator
+             FROM stages s LEFT JOIN creators c ON c.id = s.creator_id
+             WHERE s.status = 'published' AND (c.banned IS NULL OR c.banned = 0)`;
+  const binds = [];
+  if (typeof query === 'string' && query.trim().length > 0) {
+    sql += ' AND s.name LIKE ?';
+    binds.push(`%${query.trim().slice(0, 40)}%`);
+  }
+  sql += ' ORDER BY s.published_at DESC LIMIT 100';
+  const rows = await env.promptworld_stages.prepare(sql).bind(...binds).all();
   return rows.results;
+}
+
+async function opGhost(row) {
+  // The creator's verified replay doubles as a ghost + par time.
+  if (!row.clear_replay) return { status: 404, body: { error: 'No verified replay for this stage yet.' } };
+  return {
+    status: 200,
+    body: { id: row.id, clearTimeMs: row.clear_time_ms, replay: JSON.parse(row.clear_replay) },
+  };
 }
 
 // ---------------------------------------------------------------- REST
@@ -355,10 +368,10 @@ async function handleApi(request, env, url) {
   }
 
   if (path === '/api/stages' && method === 'GET') {
-    return json({ stages: await opListPublished(env) });
+    return json({ stages: await opListPublished(env, url.searchParams.get('q')) });
   }
 
-  const stageMatch = path.match(/^\/api\/stages\/([a-z0-9]+)(\/(clear|publish))?$/);
+  const stageMatch = path.match(/^\/api\/stages\/([a-z0-9]+)(\/(clear|publish|ghost))?$/);
   if (!stageMatch) return json({ error: 'Not found.' }, 404);
   const id = stageMatch[1];
   const action = stageMatch[3];
@@ -370,6 +383,11 @@ async function handleApi(request, env, url) {
     // Fetching a draft marks the start of a creator test session.
     if (row.status === 'draft') await opMarkTestStarted(env, id);
     return new Response(row.json, { headers: { 'Content-Type': 'application/json' } });
+  }
+
+  if (action === 'ghost' && method === 'GET') {
+    const result = await opGhost(row);
+    return json(result.body, result.status);
   }
 
   if (method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
@@ -613,12 +631,53 @@ async function handleMcp(request, env, url) {
 
 // ---------------------------------------------------------------- entry
 
+// ---------------------------------------------------------------- OGP
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Shared links unfurl into branded cards (LINE / X / Discord etc.).
+async function serveIndexWithOg(request, env, url) {
+  const res = await env.ASSETS.fetch(request);
+  let title = 'Prompt World';
+  let desc = 'Black & white worlds made of prompts. Describe a stage to your AI, clear it, share the URL — anyone plays instantly in the browser.';
+
+  const stageId = url.searchParams.get('stage');
+  if (stageId && /^[a-z0-9]+$/.test(stageId)) {
+    const row = await opGetStage(env, stageId);
+    if (row) {
+      const stage = JSON.parse(row.json);
+      title = `${row.name} — Prompt World`;
+      desc = `A prompt-built stage. Can you clear it within ${stage.timeLimit} seconds? Play instantly — no install.`;
+    }
+  }
+
+  let html = await res.text();
+  html = html.replace('<title>Prompt World</title>', `<title>${escapeHtml(title)}</title>`);
+  const og = [
+    `<meta property="og:title" content="${escapeHtml(title)}">`,
+    `<meta property="og:description" content="${escapeHtml(desc)}">`,
+    `<meta property="og:image" content="${url.origin}/og-card.png">`,
+    '<meta property="og:type" content="website">',
+    '<meta name="twitter:card" content="summary_large_image">',
+    `<meta name="description" content="${escapeHtml(desc)}">`,
+  ].join('\n    ');
+  html = html.replace('</head>', `    ${og}\n  </head>`);
+  return new Response(html, {
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
       if (url.pathname.startsWith('/api/')) return await handleApi(request, env, url);
       if (url.pathname === '/mcp') return await handleMcp(request, env, url);
+      if ((url.pathname === '/' || url.pathname === '/index.html') && request.method === 'GET') {
+        return await serveIndexWithOg(request, env, url);
+      }
     } catch (err) {
       return json({ error: 'Internal error.', detail: String(err) }, 500);
     }

@@ -31,6 +31,21 @@ public class StageEntry
 }
 
 [Serializable]
+public class GhostData
+{
+    public int clearTimeMs;
+    public ReplayData replay;
+}
+
+[Serializable]
+public class ReplayData
+{
+    public int v;
+    public int ticks;
+    public int[] rle;
+}
+
+[Serializable]
 public class Vec2
 {
     public float x;

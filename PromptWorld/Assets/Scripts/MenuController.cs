@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -6,14 +7,29 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// Title screen. Handles three things:
-/// 1. Deep links (?stage=<id>[&key=<editKey>]) jump straight into the stage.
-/// 2. Built-in stages listed from the StreamingAssets manifest.
-/// 3. Published community stages listed from the server API.
+/// Title screen. Handles:
+/// 1. Deep links (?stage=<id>[&key=<editKey>]) jumping straight into a stage.
+/// 2. Built-in + community stage lists with rendered thumbnails.
+/// 3. Name search filtering.
+/// 4. The creator funnel ("CREATE YOUR OWN WORLD" -> /create).
 /// </summary>
 public class MenuController : MonoBehaviour
 {
     [SerializeField] private RectTransform listRoot;
+    [SerializeField] private TMP_InputField searchInput;
+    [SerializeField] private Button createButton;
+
+    private class Entry
+    {
+        public GameObject Root;
+        public string Title;
+        public bool IsLabel;
+        public RawImage Preview;
+        public string RemoteId; // set for community entries awaiting a thumbnail
+    }
+
+    private readonly List<Entry> entries = new List<Entry>();
+    private static Texture2D placeholderTex;
 
     private IEnumerator Start()
     {
@@ -29,13 +45,19 @@ public class MenuController : MonoBehaviour
             }
         }
 
-        // Arriving at the menu resets any previous selection.
         GameSession.RemoteStageId = null;
         GameSession.EditKey = null;
         GameSession.SelectedStageFile = null;
 
+        if (searchInput != null) searchInput.onValueChanged.AddListener(Filter);
+        if (createButton != null)
+        {
+            createButton.onClick.AddListener(() => WebBridge.OpenUrl($"{GameSession.ApiOrigin}/create"));
+        }
+
         yield return LoadBuiltInStages();
         yield return LoadCommunityStages();
+        yield return FillCommunityPreviews();
     }
 
     private IEnumerator LoadBuiltInStages()
@@ -45,22 +67,27 @@ public class MenuController : MonoBehaviour
 
         using var request = UnityWebRequest.Get(url);
         yield return request.SendWebRequest();
-
-        if (request.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError($"[PromptWorld] Failed to load stage index: {request.error}");
-            yield break;
-        }
+        if (request.result != UnityWebRequest.Result.Success) yield break;
 
         var index = JsonUtility.FromJson<StageIndex>(request.downloadHandler.text);
-        foreach (StageEntry entry in index.stages)
+        foreach (StageEntry stageEntry in index.stages)
         {
-            string file = entry.file;
-            AddButton(entry.title, () =>
+            string file = stageEntry.file;
+            string stageUrl = System.IO.Path.Combine(Application.streamingAssetsPath, "Stages", file);
+            if (!stageUrl.Contains("://")) stageUrl = "file://" + stageUrl;
+
+            using var stageReq = UnityWebRequest.Get(stageUrl);
+            yield return stageReq.SendWebRequest();
+            StageData data = stageReq.result == UnityWebRequest.Result.Success
+                ? JsonUtility.FromJson<StageData>(stageReq.downloadHandler.text)
+                : null;
+
+            Entry entry = AddEntry(stageEntry.title, $"{(data != null ? data.timeLimit : 0):0}s", () =>
             {
                 GameSession.SelectedStageFile = file;
                 SceneManager.LoadScene("Stage");
             });
+            if (data != null) entry.Preview.texture = StagePreview.Render(data);
         }
     }
 
@@ -68,8 +95,6 @@ public class MenuController : MonoBehaviour
     {
         using var request = UnityWebRequest.Get($"{GameSession.ApiOrigin}/api/stages");
         yield return request.SendWebRequest();
-
-        // No server or no published stages — the menu just stays built-in.
         if (request.result != UnityWebRequest.Result.Success) yield break;
 
         var list = JsonUtility.FromJson<PublishedList>(request.downloadHandler.text);
@@ -79,42 +104,138 @@ public class MenuController : MonoBehaviour
         foreach (PublishedStage stage in list.stages)
         {
             string id = stage.id;
-            AddButton(stage.name, () =>
+            string subtitle = string.IsNullOrEmpty(stage.creator) ? "" : $"by {stage.creator}";
+            if (stage.clear_time_ms > 0)
+            {
+                string par = $"PAR {stage.clear_time_ms / 1000f:0.0}s";
+                subtitle = string.IsNullOrEmpty(subtitle) ? par : $"{subtitle}  ·  {par}";
+            }
+            Entry entry = AddEntry(stage.name, subtitle, () =>
             {
                 GameSession.RemoteStageId = id;
                 SceneManager.LoadScene("Stage");
             });
+            entry.RemoteId = id;
         }
     }
 
-    private void AddButton(string title, UnityEngine.Events.UnityAction onClick)
+    /// <summary>Progressively fetches community stage JSONs to render thumbnails.</summary>
+    private IEnumerator FillCommunityPreviews()
     {
-        TextMeshProUGUI tmp = CreateEntry($"Stage_{title}", title, 44, Color.white);
-        var button = tmp.gameObject.AddComponent<Button>();
-        button.targetGraphic = tmp;
+        int fetched = 0;
+        foreach (Entry entry in entries)
+        {
+            if (entry.RemoteId == null || fetched >= 30) continue;
+            fetched++;
+
+            using var request = UnityWebRequest.Get($"{GameSession.ApiOrigin}/api/stages/{entry.RemoteId}");
+            yield return request.SendWebRequest();
+            if (request.result != UnityWebRequest.Result.Success) continue;
+
+            StageData data = JsonUtility.FromJson<StageData>(request.downloadHandler.text);
+            if (data != null && entry.Preview != null)
+            {
+                entry.Preview.texture = StagePreview.Render(data);
+            }
+        }
+    }
+
+    private Entry AddEntry(string title, string subtitle, UnityEngine.Events.UnityAction onClick)
+    {
+        var row = new GameObject($"Stage_{title}", typeof(RectTransform));
+        row.transform.SetParent(listRoot, false);
+        var rowRect = row.GetComponent<RectTransform>();
+        rowRect.sizeDelta = new Vector2(760f, 104f);
+        var layout = row.AddComponent<LayoutElement>();
+        layout.preferredHeight = 104f;
+        layout.preferredWidth = 760f;
+
+        var cardImage = row.AddComponent<Image>();
+        cardImage.color = new Color(1f, 1f, 1f, 0.05f);
+
+        var button = row.AddComponent<Button>();
+        button.targetGraphic = cardImage;
         button.onClick.AddListener(onClick);
+
+        var previewGo = new GameObject("Preview", typeof(RectTransform));
+        previewGo.transform.SetParent(row.transform, false);
+        var previewRect = previewGo.GetComponent<RectTransform>();
+        previewRect.anchorMin = new Vector2(0f, 0.5f);
+        previewRect.anchorMax = new Vector2(0f, 0.5f);
+        previewRect.pivot = new Vector2(0f, 0.5f);
+        previewRect.anchoredPosition = new Vector2(8f, 0f);
+        previewRect.sizeDelta = new Vector2(184f, 92f);
+        var preview = previewGo.AddComponent<RawImage>();
+        preview.texture = Placeholder();
+        preview.raycastTarget = false;
+
+        CreateRowText(row.transform, title, 32, new Vector2(212f, 18f), Color.white);
+        CreateRowText(row.transform, subtitle, 20, new Vector2(212f, -26f), new Color(1f, 1f, 1f, 0.5f));
+
+        var entry = new Entry { Root = row, Title = title, Preview = preview };
+        entries.Add(entry);
+        return entry;
     }
 
     private void AddLabel(string title)
     {
-        CreateEntry($"Label_{title}", title, 26, new Color(1f, 1f, 1f, 0.5f));
+        var go = new GameObject($"Label_{title}", typeof(RectTransform));
+        go.transform.SetParent(listRoot, false);
+        go.GetComponent<RectTransform>().sizeDelta = new Vector2(760f, 46f);
+        var layout = go.AddComponent<LayoutElement>();
+        layout.preferredHeight = 46f;
+        layout.preferredWidth = 760f;
+
+        var tmp = go.AddComponent<TextMeshProUGUI>();
+        tmp.text = title;
+        tmp.fontSize = 24;
+        tmp.characterSpacing = 12f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color = new Color(1f, 1f, 1f, 0.45f);
+
+        entries.Add(new Entry { Root = go, Title = title, IsLabel = true });
     }
 
-    private TextMeshProUGUI CreateEntry(string name, string text, float fontSize, Color color)
+    private void CreateRowText(Transform parent, string text, float size, Vector2 pos, Color color)
     {
-        var go = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(listRoot, false);
-        go.GetComponent<RectTransform>().sizeDelta = new Vector2(700f, 80f);
-
-        var layout = go.AddComponent<LayoutElement>();
-        layout.preferredHeight = fontSize > 30f ? 80f : 50f;
+        var go = new GameObject("Text", typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.5f);
+        rect.anchorMax = new Vector2(0f, 0.5f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.anchoredPosition = pos;
+        rect.sizeDelta = new Vector2(540f, 44f);
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text = text;
-        tmp.fontSize = fontSize;
-        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.fontSize = size;
+        tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.color = color;
-        return tmp;
+        tmp.raycastTarget = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
+        tmp.overflowMode = TextOverflowModes.Ellipsis;
+    }
+
+    private void Filter(string query)
+    {
+        string q = (query ?? "").Trim().ToLowerInvariant();
+        foreach (Entry entry in entries)
+        {
+            bool visible = q.Length == 0
+                ? true
+                : !entry.IsLabel && entry.Title.ToLowerInvariant().Contains(q);
+            entry.Root.SetActive(visible);
+        }
+    }
+
+    private static Texture2D Placeholder()
+    {
+        if (placeholderTex != null) return placeholderTex;
+        placeholderTex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        placeholderTex.SetPixel(0, 0, new Color(0f, 0f, 0f, 1f));
+        placeholderTex.Apply();
+        return placeholderTex;
     }
 
     [System.Serializable]
@@ -128,5 +249,7 @@ public class MenuController : MonoBehaviour
     {
         public string id;
         public string name;
+        public string creator;
+        public int clear_time_ms;
     }
 }

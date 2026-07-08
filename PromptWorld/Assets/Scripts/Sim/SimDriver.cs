@@ -22,6 +22,32 @@ public class SimDriver : MonoBehaviour
     private Vector3 curPos;
     private float lastStepTime;
 
+    private SimWorld ghostWorld;
+    private int[] ghostCodes;
+    private int ghostTick;
+    private Transform ghostView;
+
+    /// <summary>Plays the creator's verified replay alongside the live run.</summary>
+    public void AttachGhost(SimWorld world, int[] rle, Transform view)
+    {
+        ghostWorld = world;
+        ghostView = view;
+        ghostTick = 0;
+
+        var codes = new List<int>();
+        for (int i = 0; i + 1 < rle.Length; i += 2)
+        {
+            int code = rle[i];
+            int count = rle[i + 1];
+            for (int n = 0; n < count; n++)
+            {
+                // jump is an edge: only the first tick of a run carries the press
+                codes.Add(n == 0 ? code : code & ~4);
+            }
+        }
+        ghostCodes = codes.ToArray();
+    }
+
     public void Init(SimWorld simWorld, Transform player, Transform[] movers,
         SpriteRenderer[] crumbles, GameManager gm)
     {
@@ -65,6 +91,7 @@ public class SimDriver : MonoBehaviour
 
         trace.Add(input.Encode());
         SimEvents ev = world.Step(input);
+        StepGhost();
 
         prevPos = curPos;
         curPos = new Vector3((float)world.Px, (float)world.Py, 0f);
@@ -85,6 +112,20 @@ public class SimDriver : MonoBehaviour
             running = false;
             gameManager.GameOverFromSim();
         }
+    }
+
+    private void StepGhost()
+    {
+        if (ghostWorld == null || ghostView == null) return;
+        if (ghostTick >= ghostCodes.Length || ghostWorld.ClearedFlag)
+        {
+            ghostView.gameObject.SetActive(false);
+            return;
+        }
+        SimInput input = SimInput.Decode(ghostCodes[ghostTick]);
+        ghostTick++;
+        ghostWorld.Step(input);
+        ghostView.position = new Vector3((float)ghostWorld.Px, (float)ghostWorld.Py, 0f);
     }
 
     private void SyncViews()

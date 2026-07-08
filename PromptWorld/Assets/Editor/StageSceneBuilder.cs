@@ -31,8 +31,15 @@ public static class StageSceneBuilder
         touchSo.FindProperty("canvas").objectReferenceValue = canvas;
         touchSo.ApplyModifiedPropertiesWithoutUndo();
 
-        Button retryButton = CreateTextButton(canvas.transform, "RetryButton", "RETRY", 48,
-            new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(320f, 90f));
+        Button retryButton = CreateTextButton(canvas.transform, "RetryButton", "RETRY", 44,
+            new Vector2(0.5f, 0.5f), new Vector2(-170f, -190f), new Vector2(300f, 90f));
+        Button nextButton = CreateTextButton(canvas.transform, "NextButton", "NEXT >", 44,
+            new Vector2(0.5f, 0.5f), new Vector2(170f, -190f), new Vector2(300f, 90f));
+        Button shareButton = CreateTextButton(canvas.transform, "ShareButton", "SHARE URL", 34,
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -295f), new Vector2(340f, 70f));
+        Button createLink = CreateTextButton(canvas.transform, "CreateLink", "CREATE YOUR OWN WORLD  >", 24,
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -385f), new Vector2(620f, 50f));
+        createLink.GetComponentInChildren<TMPro.TMP_Text>().color = new Color(1f, 1f, 1f, 0.6f);
         Button menuButton = CreateTextButton(canvas.transform, "MenuButton", "MENU", 30,
             new Vector2(1f, 1f), new Vector2(-110f, -45f), new Vector2(170f, 55f));
 
@@ -44,6 +51,9 @@ public static class StageSceneBuilder
         gmSo.FindProperty("stageNameText").objectReferenceValue = stageNameText;
         gmSo.FindProperty("retryButton").objectReferenceValue = retryButton;
         gmSo.FindProperty("menuButton").objectReferenceValue = menuButton;
+        gmSo.FindProperty("shareButton").objectReferenceValue = shareButton;
+        gmSo.FindProperty("nextButton").objectReferenceValue = nextButton;
+        gmSo.FindProperty("createLinkButton").objectReferenceValue = createLink;
         gmSo.ApplyModifiedPropertiesWithoutUndo();
 
         var loaderGo = new GameObject("StageLoader");

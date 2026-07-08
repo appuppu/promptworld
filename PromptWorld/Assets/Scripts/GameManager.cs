@@ -26,6 +26,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_Text stageNameText;
     [SerializeField] private Button retryButton;
     [SerializeField] private Button menuButton;
+    [SerializeField] private Button shareButton;
+    [SerializeField] private Button nextButton;
+    [SerializeField] private Button createLinkButton;
 
     public GameState State { get; private set; } = GameState.Playing;
 
@@ -66,6 +69,76 @@ public class GameManager : MonoBehaviour
         {
             menuButton.onClick.AddListener(BackToMenu);
         }
+        if (shareButton != null)
+        {
+            shareButton.onClick.AddListener(SharePlayUrl);
+            shareButton.gameObject.SetActive(false);
+        }
+        if (nextButton != null)
+        {
+            nextButton.onClick.AddListener(() => StartCoroutine(NextRandomStage()));
+            nextButton.gameObject.SetActive(false);
+        }
+        if (createLinkButton != null)
+        {
+            createLinkButton.onClick.AddListener(() => WebBridge.OpenUrl($"{GameSession.ApiOrigin}/create"));
+            createLinkButton.gameObject.SetActive(false);
+        }
+    }
+
+    /// <summary>Appends the creator's verified time to the stage label.</summary>
+    public void SetPar(int parMs)
+    {
+        if (stageNameText != null)
+        {
+            stageNameText.text += $"   ·   PAR {parMs / 1000f:0.0}s";
+        }
+    }
+
+    private void SharePlayUrl()
+    {
+        WebBridge.Copy($"{GameSession.ApiOrigin}/?stage={GameSession.RemoteStageId}");
+        var label = shareButton.GetComponentInChildren<TMP_Text>();
+        if (label != null) label.text = "COPIED!";
+    }
+
+    private IEnumerator NextRandomStage()
+    {
+        using var request = UnityWebRequest.Get($"{GameSession.ApiOrigin}/api/stages");
+        yield return request.SendWebRequest();
+        if (request.result == UnityWebRequest.Result.Success)
+        {
+            var list = JsonUtility.FromJson<StageList>(request.downloadHandler.text);
+            if (list?.stages != null && list.stages.Length > 0)
+            {
+                var candidates = new System.Collections.Generic.List<string>();
+                foreach (StageListEntry stage in list.stages)
+                {
+                    if (stage.id != GameSession.RemoteStageId) candidates.Add(stage.id);
+                }
+                if (candidates.Count > 0)
+                {
+                    GameSession.RemoteStageId = candidates[Random.Range(0, candidates.Count)];
+                    GameSession.EditKey = null;
+                    GameSession.SelectedStageFile = null;
+                    SceneManager.LoadScene("Stage");
+                    yield break;
+                }
+            }
+        }
+        BackToMenu();
+    }
+
+    [System.Serializable]
+    private class StageList
+    {
+        public StageListEntry[] stages;
+    }
+
+    [System.Serializable]
+    private class StageListEntry
+    {
+        public string id;
     }
 
     private void Update()
@@ -156,6 +229,15 @@ public class GameManager : MonoBehaviour
         resultText.text = message;
         resultText.gameObject.SetActive(true);
         if (retryButton != null) retryButton.gameObject.SetActive(true);
+        if (result == GameState.Cleared)
+        {
+            if (shareButton != null && !string.IsNullOrEmpty(GameSession.RemoteStageId))
+            {
+                shareButton.gameObject.SetActive(true);
+            }
+            if (nextButton != null) nextButton.gameObject.SetActive(true);
+            if (createLinkButton != null) createLinkButton.gameObject.SetActive(true);
+        }
         Debug.Log(message);
 
         // Creator test session: submit the replay certificate so the stage

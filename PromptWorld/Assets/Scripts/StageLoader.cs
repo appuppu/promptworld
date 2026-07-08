@@ -79,6 +79,31 @@ public class StageLoader : MonoBehaviour
 
         gameManager.ConfigureSim(data.name, data.timeLimit);
         cameraFollow.SetTarget(player.transform);
+
+        if (!string.IsNullOrEmpty(GameSession.RemoteStageId))
+        {
+            StartCoroutine(LoadGhost(driver, data));
+        }
+    }
+
+    /// <summary>The creator's verified replay plays back as a translucent ghost with a par time.</summary>
+    private IEnumerator LoadGhost(SimDriver driver, StageData data)
+    {
+        using var request = UnityWebRequest.Get($"{GameSession.ApiOrigin}/api/stages/{GameSession.RemoteStageId}/ghost");
+        yield return request.SendWebRequest();
+        if (request.result != UnityWebRequest.Result.Success) yield break;
+
+        GhostData ghost = JsonUtility.FromJson<GhostData>(request.downloadHandler.text);
+        if (ghost?.replay?.rle == null || ghost.replay.rle.Length == 0) yield break;
+
+        gameManager.SetPar(ghost.clearTimeMs);
+
+        GameObject ghostGo = CreateRectObject("Ghost", null,
+            new Vector3(data.playerStart.x, data.playerStart.y, 0f), Vector3.one);
+        var renderer = ghostGo.GetComponent<SpriteRenderer>();
+        renderer.color = new Color(1f, 1f, 1f, 0.28f);
+
+        driver.AttachGhost(SimWorld.FromStage(data), ghost.replay.rle, ghostGo.transform);
     }
 
     private void BuildPartVisual(PartData part, Transform parent,

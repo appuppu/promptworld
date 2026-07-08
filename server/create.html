@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create — Prompt World</title>
+<meta property="og:title" content="Create your own world — Prompt World">
+<meta property="og:description" content="Build a playable stage by talking to your AI. No tools, no signup — just a prompt.">
+<meta property="og:image" content="https://promptworld.pages.dev/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; color: #fff; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+         line-height: 1.7; padding: 48px 24px 96px; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 40px; letter-spacing: 2px; margin-bottom: 8px; }
+  .tagline { opacity: .55; margin-bottom: 48px; }
+  h2 { font-size: 15px; letter-spacing: 3px; opacity: .5; margin: 48px 0 12px; }
+  p { margin-bottom: 12px; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14px; }
+  pre { background: #111; border: 1px solid #333; padding: 14px 16px; overflow-x: auto;
+        margin: 12px 0; white-space: pre-wrap; word-break: break-all; }
+  .rule { border-left: 3px solid #fff; padding-left: 14px; margin: 10px 0; }
+  a { color: #fff; }
+  .play { display: inline-block; border: 2px solid #fff; padding: 12px 28px; margin-top: 40px;
+          text-decoration: none; letter-spacing: 2px; }
+  .play:hover { background: #fff; color: #000; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PROMPT WORLD</h1>
+  <p class="tagline">Worlds made of prompts. You describe a stage — your AI builds it — anyone plays it from a URL.</p>
+
+  <h2>STEP 1 — CONNECT YOUR CLAUDE</h2>
+  <p>On <strong>claude.ai</strong>: Settings → Connectors → Add custom connector, and paste:</p>
+  <pre>https://promptworld.pages.dev/mcp</pre>
+  <p>Using <strong>Claude Code</strong> instead? Run:</p>
+  <pre>claude mcp add --transport http promptworld https://promptworld.pages.dev/mcp</pre>
+
+  <h2>STEP 2 — SAY WHAT YOU WANT</h2>
+  <p>Just describe a stage. For example:</p>
+  <pre>Create a Prompt World stage: a gravity-flip corridor
+where I run on the ceiling to dodge spikes, then a big
+boost launch into the goal. Time limit 45 seconds.</pre>
+  <p>Your Claude reads the toolbox, designs the level, and hands you a <strong>test link</strong>.</p>
+
+  <h2>STEP 3 — PROVE IT, THEN PUBLISH</h2>
+  <div class="rule"><strong>The one rule:</strong> a stage can only be published after <em>you</em> clear it in the browser. Your run is recorded and mathematically verified by the server — impossible stages cannot exist here.</div>
+  <p>Clear your test link, tell your Claude to publish, and share the play URL anywhere. Friends tap it and play instantly — no install, no account, free.</p>
+
+  <h2>LIMITS</h2>
+  <p>Time limit 5s–30min · up to 300 parts per stage · 5 publishes per day. Stages that take under 3 seconds are too trivial to publish.</p>
+
+  <a class="play" href="/">PLAY&nbsp;NOW&nbsp;→</a>
+</main>
+</body>
+</html>
