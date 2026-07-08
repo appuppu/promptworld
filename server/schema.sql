@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS stages (
   edit_key TEXT NOT NULL,
   cleared_at TEXT,
   clear_time_ms INTEGER,
+  clear_replay TEXT,
+  test_started_at TEXT,
   created_at TEXT NOT NULL,
   published_at TEXT
 );

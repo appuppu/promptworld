@@ -1,16 +1,18 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
 /// <summary>
-/// The heart of Prompt World: reads a stage JSON (schema v0.2) and builds a
-/// playable world out of it at runtime. The client never executes user code —
-/// it interprets this data. Visual language is strictly white-on-black;
-/// parts are distinguished by shape (see docs/parts-catalog.md).
+/// The heart of Prompt World: reads a stage JSON (schema v0.3) and builds a
+/// playable world out of it at runtime. Gameplay runs inside the
+/// deterministic PromptSim (see Sim/PromptSim.cs); Unity objects here are
+/// pure white-on-black visuals synced by SimDriver. The same sim verifies
+/// replay certificates server-side.
 /// </summary>
 public class StageLoader : MonoBehaviour
 {
-    [SerializeField] private string stageFile = "stage-001.json";
+    [SerializeField] private string stageFile = "stage-002.json";
     [SerializeField] private GameManager gameManager;
     [SerializeField] private CameraFollow cameraFollow;
 
@@ -39,7 +41,7 @@ public class StageLoader : MonoBehaviour
         if (request.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError($"[PromptWorld] Failed to load stage from '{url}': {request.error}");
-            gameManager.Configure(null, "STAGE NOT FOUND", 60f);
+            gameManager.ConfigureSim("STAGE NOT FOUND", 60f);
             yield break;
         }
 
@@ -54,134 +56,84 @@ public class StageLoader : MonoBehaviour
         if (errors.Count > 0)
         {
             foreach (string error in errors) Debug.LogError($"[PromptWorld] Invalid stage: {error}");
-            gameManager.Configure(null, "INVALID STAGE (see Console)", 60f);
+            gameManager.ConfigureSim("INVALID STAGE (see Console)", 60f);
             return;
         }
 
         Debug.Log($"[PromptWorld] Loading stage '{data.name}' ({data.id}), {data.parts.Length} parts, {data.timeLimit}s");
 
         var stageRoot = new GameObject("Stage").transform;
-        foreach (PartData part in data.parts) BuildPart(part, stageRoot);
-        BuildGoal(data.goal, stageRoot);
+        var moverViews = new List<Transform>();
+        var crumbleViews = new List<SpriteRenderer>();
 
-        PlayerController player = SpawnPlayer(new Vector2(data.playerStart.x, data.playerStart.y));
+        // Visual order MUST mirror SimWorld.FromStage's iteration (parts order).
+        foreach (PartData part in data.parts) BuildPartVisual(part, stageRoot, moverViews, crumbleViews);
+        CreateFrame("Goal", stageRoot, data.goal.x, data.goal.y, data.goal.w, data.goal.h, 0.18f);
 
-        gameManager.Configure(player, data.name, data.timeLimit);
+        GameObject player = CreateRectObject("Player", stageRoot,
+            new Vector3(data.playerStart.x, data.playerStart.y, 0f), new Vector3(1f, 1f, 1f));
+
+        SimWorld world = SimWorld.FromStage(data);
+        var driver = gameObject.AddComponent<SimDriver>();
+        driver.Init(world, player.transform, moverViews.ToArray(), crumbleViews.ToArray(), gameManager);
+
+        gameManager.ConfigureSim(data.name, data.timeLimit);
         cameraFollow.SetTarget(player.transform);
     }
 
-    private void BuildPart(PartData part, Transform parent)
+    private void BuildPartVisual(PartData part, Transform parent,
+        List<Transform> moverViews, List<SpriteRenderer> crumbleViews)
     {
+        Vector3 pos = new Vector3(part.x, part.y, 0f);
+        Vector3 scale = new Vector3(part.w, part.h, 1f);
+
         switch (part.type)
         {
             case "solid":
-            {
-                GameObject go = CreateRect("Solid", parent, part);
-                go.layer = LayerMask.NameToLayer("Ground");
-                go.AddComponent<BoxCollider2D>();
+                CreateRectObject("Solid", parent, pos, scale);
                 break;
-            }
-            case "hazard":
-            {
-                GameObject go = CreateRect("Hazard", parent, part);
-                go.transform.rotation = Quaternion.Euler(0f, 0f, 45f); // diamond = danger
-                go.transform.localScale *= 0.75f;
-                var col = go.AddComponent<BoxCollider2D>();
-                col.isTrigger = true;
-                go.AddComponent<Hazard>();
-                break;
-            }
-            case "jumpPad":
-            {
-                GameObject go = CreateRect("JumpPad", parent, part);
-                var col = go.AddComponent<BoxCollider2D>();
-                col.isTrigger = true;
-                col.size = new Vector2(1f, 2.5f); // tall trigger so fast falls can't tunnel past
-                col.offset = new Vector2(0f, 0.75f);
-                go.AddComponent<JumpPad>().power = part.power > 0f ? part.power : 22f;
-                break;
-            }
-            case "boost":
-            {
-                GameObject go = CreateRect("Boost", parent, part);
-                var col = go.AddComponent<BoxCollider2D>();
-                col.isTrigger = true;
-                var boost = go.AddComponent<Boost>();
-                boost.directionX = part.dirX >= 0f ? 1f : -1f;
-                boost.power = part.power > 0f ? part.power : 10f;
-                break;
-            }
             case "movingPlatform":
             {
-                GameObject go = CreateRect("MovingPlatform", parent, part);
-                go.layer = LayerMask.NameToLayer("Ground");
-                var body = go.AddComponent<Rigidbody2D>();
-                body.bodyType = RigidbodyType2D.Kinematic;
-                go.AddComponent<BoxCollider2D>();
-                var mover = go.AddComponent<MovingPlatform>();
-                mover.delta = new Vector2(part.dx, part.dy);
-                mover.period = part.period > 0f ? part.period : 4f;
+                GameObject go = CreateRectObject("MovingPlatform", parent, pos, scale);
+                moverViews.Add(go.transform);
                 break;
             }
             case "crumble":
             {
-                GameObject go = CreateRect("Crumble", parent, part);
-                go.layer = LayerMask.NameToLayer("Ground");
-                go.AddComponent<BoxCollider2D>();
-                go.AddComponent<CrumbleBlock>();
+                GameObject go = CreateRectObject("Crumble", parent, pos, scale);
+                crumbleViews.Add(go.GetComponent<SpriteRenderer>());
                 break;
             }
-            case "gravityFlip":
+            case "hazard":
             {
-                GameObject go = CreateFrame("GravityFlip", parent, part.x, part.y, part.w, part.h, 0.12f);
-                var col = go.AddComponent<BoxCollider2D>();
-                col.isTrigger = true;
-                col.size = new Vector2(part.w, part.h);
-                go.AddComponent<GravityFlipBlock>();
+                GameObject go = CreateRectObject("Hazard", parent, pos, scale * 0.75f);
+                go.transform.rotation = Quaternion.Euler(0f, 0f, 45f); // diamond = danger
                 break;
             }
+            case "jumpPad":
+                CreateRectObject("JumpPad", parent, pos, scale);
+                break;
+            case "boost":
+                CreateRectObject("Boost", parent, pos, scale);
+                break;
+            case "gravityFlip":
+                CreateFrame("GravityFlip", parent, part.x, part.y, part.w, part.h, 0.12f);
+                break;
             default:
                 Debug.LogWarning($"[PromptWorld] Unknown part type '{part.type}' — skipped.");
                 break;
         }
     }
 
-    private void BuildGoal(RectData goal, Transform parent)
-    {
-        GameObject go = CreateFrame("Goal", parent, goal.x, goal.y, goal.w, goal.h, 0.18f);
-        var col = go.AddComponent<BoxCollider2D>();
-        col.isTrigger = true;
-        col.size = new Vector2(goal.w, goal.h);
-        go.AddComponent<Goal>();
-    }
-
-    private PlayerController SpawnPlayer(Vector2 spawn)
-    {
-        var go = new GameObject("Player");
-        go.tag = "Player";
-        go.transform.position = spawn;
-        AddWhiteSpriteRenderer(go);
-
-        var body = go.AddComponent<Rigidbody2D>();
-        body.gravityScale = 3f;
-        body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-        body.interpolation = RigidbodyInterpolation2D.Interpolate;
-        body.freezeRotation = true;
-
-        go.AddComponent<BoxCollider2D>();
-
-        var player = go.AddComponent<PlayerController>();
-        player.Init(LayerMask.GetMask("Ground"), spawn);
-        return player;
-    }
-
-    private GameObject CreateRect(string name, Transform parent, PartData part)
+    private GameObject CreateRectObject(string name, Transform parent, Vector3 position, Vector3 scale)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent);
-        go.transform.position = new Vector3(part.x, part.y, 0f);
-        go.transform.localScale = new Vector3(part.w, part.h, 1f);
-        AddWhiteSpriteRenderer(go);
+        go.transform.position = position;
+        go.transform.localScale = scale;
+        var renderer = go.AddComponent<SpriteRenderer>();
+        renderer.sprite = GetWhiteSprite();
+        renderer.color = Color.white;
         return go;
     }
 
@@ -205,12 +157,7 @@ public class StageLoader : MonoBehaviour
         edge.transform.SetParent(parent);
         edge.transform.localPosition = localPos;
         edge.transform.localScale = new Vector3(size.x, size.y, 1f);
-        AddWhiteSpriteRenderer(edge);
-    }
-
-    private void AddWhiteSpriteRenderer(GameObject go)
-    {
-        var renderer = go.AddComponent<SpriteRenderer>();
+        var renderer = edge.AddComponent<SpriteRenderer>();
         renderer.sprite = GetWhiteSprite();
         renderer.color = Color.white;
     }

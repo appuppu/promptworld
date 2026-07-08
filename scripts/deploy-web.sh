@@ -22,7 +22,8 @@ console.log("index.html patched");
 ' "$OUT/index.html"
 
 # The API worker rides along as a Pages advanced-mode worker.
-cp "$ROOT/server/worker.js" "$OUT/_worker.js"
+# sim.js (deterministic replay verifier) is concatenated in front.
+cat "$ROOT/server/sim.js" "$ROOT/server/worker.js" > "$OUT/_worker.js"
 
 cd "$ROOT"
 npx wrangler pages deploy --commit-dirty=true

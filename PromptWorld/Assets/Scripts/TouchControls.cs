@@ -1,32 +1,23 @@
 using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Gesture-based touch input (no on-screen buttons):
-/// - hold the left / right half of the screen to run that way
-/// - quick tap anywhere to jump
-/// - flick upward (even mid-hold) to jump
+/// Touch input, split-screen scheme:
+/// - LEFT half  = movement stick: touch down, then slide the finger left or
+///   right of the touch point to run that way (small dead zone).
+/// - RIGHT half = jump: fires the instant a finger touches down; tap again
+///   to jump again.
 /// Desktop players never see or feel any of this.
 /// </summary>
 public class TouchControls : MonoBehaviour
 {
     [SerializeField] private Canvas canvas;
 
-    private const float TapMaxDuration = 0.22f;   // s
-    private const float MoveGraceDelay = 0.1f;    // s before a hold starts steering
-    private const float TapMaxMoveDp = 40f;       // density-independent px
-    private const float SwipeJumpDp = 70f;
+    private const float DeadZoneDp = 15f;   // density-independent px
 
-    private class TouchState
-    {
-        public Vector2 startPos;
-        public float startTime;
-        public bool jumped;
-    }
-
-    private readonly Dictionary<int, TouchState> activeTouches = new Dictionary<int, TouchState>();
+    private int moveFingerId = -1;
+    private float moveAnchorX;
     private float dpiScale = 1f;
 
     private void Start()
@@ -43,6 +34,7 @@ public class TouchControls : MonoBehaviour
 
     private void Update()
     {
+        float halfWidth = Screen.width / 2f;
         float axis = 0f;
 
         for (int i = 0; i < Input.touchCount; i++)
@@ -51,44 +43,39 @@ public class TouchControls : MonoBehaviour
             switch (touch.phase)
             {
                 case TouchPhase.Began:
-                    activeTouches[touch.fingerId] = new TouchState
+                    if (touch.position.x < halfWidth)
                     {
-                        startPos = touch.position,
-                        startTime = Time.unscaledTime,
-                    };
-                    break;
-
-                case TouchPhase.Moved:
-                case TouchPhase.Stationary:
-                {
-                    if (!activeTouches.TryGetValue(touch.fingerId, out TouchState state)) break;
-
-                    if (!state.jumped && touch.position.y - state.startPos.y > SwipeJumpDp * dpiScale)
+                        if (moveFingerId == -1)
+                        {
+                            moveFingerId = touch.fingerId;
+                            moveAnchorX = touch.position.x;
+                        }
+                    }
+                    else
                     {
-                        state.jumped = true;
                         MobileInput.QueueJump();
                     }
-                    if (Time.unscaledTime - state.startTime > MoveGraceDelay)
-                    {
-                        axis += touch.position.x < Screen.width / 2f ? -1f : 1f;
-                    }
                     break;
-                }
 
                 case TouchPhase.Ended:
                 case TouchPhase.Canceled:
-                {
-                    if (!activeTouches.TryGetValue(touch.fingerId, out TouchState state)) break;
-
-                    bool quick = Time.unscaledTime - state.startTime < TapMaxDuration;
-                    bool still = (touch.position - state.startPos).magnitude < TapMaxMoveDp * dpiScale;
-                    if (!state.jumped && quick && still)
-                    {
-                        MobileInput.QueueJump();
-                    }
-                    activeTouches.Remove(touch.fingerId);
+                    if (touch.fingerId == moveFingerId) moveFingerId = -1;
                     break;
-                }
+            }
+
+            if (touch.fingerId == moveFingerId &&
+                (touch.phase == TouchPhase.Moved || touch.phase == TouchPhase.Stationary))
+            {
+                float offset = touch.position.x - moveAnchorX;
+                float deadZone = DeadZoneDp * dpiScale;
+                if (offset > deadZone) axis = 1f;
+                else if (offset < -deadZone) axis = -1f;
+
+                // Ratchet: reversing direction shouldn't require dragging all
+                // the way back past the original anchor.
+                float maxLead = deadZone * 2f;
+                if (offset > maxLead) moveAnchorX = touch.position.x - maxLead;
+                else if (offset < -maxLead) moveAnchorX = touch.position.x + maxLead;
             }
         }
 
@@ -105,10 +92,10 @@ public class TouchControls : MonoBehaviour
         rect.anchorMax = new Vector2(0.5f, 0f);
         rect.pivot = new Vector2(0.5f, 0f);
         rect.anchoredPosition = new Vector2(0f, 70f);
-        rect.sizeDelta = new Vector2(1200f, 60f);
+        rect.sizeDelta = new Vector2(1400f, 60f);
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text = "HOLD SIDE TO MOVE  ·  TAP TO JUMP";
+        tmp.text = "LEFT: SLIDE TO MOVE   ·   RIGHT: TAP TO JUMP";
         tmp.fontSize = 32;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = new Color(1f, 1f, 1f, 0.55f);
