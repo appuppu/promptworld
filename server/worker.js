@@ -138,8 +138,16 @@ async function handleApi(request, env, url) {
     .prepare('SELECT * FROM stages WHERE id = ?').bind(id).first();
   if (!row) return json({ error: 'Stage not found.' }, 404);
 
-  // GET /api/stages/:id — fetch stage JSON for the player
+  // GET /api/stages/:id — fetch stage JSON for the player.
+  // Fetching a draft marks the start of a creator test session; the clear
+  // endpoint requires plausible wall-clock time to have passed since then.
   if (!action && method === 'GET') {
+    if (row.status === 'draft') {
+      await env.promptworld_stages
+        .prepare('UPDATE stages SET test_started_at = ? WHERE id = ?')
+        .bind(new Date().toISOString(), id)
+        .run();
+    }
     return new Response(row.json, { headers: { 'Content-Type': 'application/json' } });
   }
 
@@ -154,6 +162,18 @@ async function handleApi(request, env, url) {
     const ms = Number(body.clearTimeMs);
     if (!Number.isFinite(ms) || ms <= 0 || ms > stage.timeLimit * 1000) {
       return json({ error: 'clearTimeMs must be within the stage time limit.' }, 422);
+    }
+
+    // Anti-spoofing: the stage must actually have been loaded, and at least
+    // the claimed clear time must have elapsed in the real world since then
+    // (2s tolerance for network/clock skew). Full replay verification is the
+    // v2 upgrade; this blocks trivial forged clears.
+    if (!row.test_started_at) {
+      return json({ error: 'No test session: load the stage via its testUrl first.' }, 422);
+    }
+    const elapsedMs = Date.now() - Date.parse(row.test_started_at);
+    if (elapsedMs < ms - 2000) {
+      return json({ error: 'Clear rejected: claimed clear time exceeds real elapsed play time.' }, 422);
     }
     await env.promptworld_stages
       .prepare('UPDATE stages SET cleared_at = ?, clear_time_ms = ? WHERE id = ?')

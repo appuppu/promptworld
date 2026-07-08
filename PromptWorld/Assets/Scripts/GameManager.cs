@@ -128,6 +128,7 @@ public class GameManager : MonoBehaviour
         State = result;
         if (player != null) player.Freeze();
         Sfx.Play(result == GameState.Cleared ? SfxId.Clear : SfxId.GameOver);
+        ShowResultOverlay();
         resultText.text = message;
         resultText.gameObject.SetActive(true);
         if (retryButton != null) retryButton.gameObject.SetActive(true);
@@ -175,5 +176,22 @@ public class GameManager : MonoBehaviour
     private void UpdateTimerLabel()
     {
         timerText.text = Mathf.CeilToInt(timeRemaining).ToString();
+    }
+
+    /// <summary>Black full-screen panel behind the result text so it reads clearly over any stage.</summary>
+    private void ShowResultOverlay()
+    {
+        var overlay = new GameObject("ResultOverlay", typeof(RectTransform));
+        overlay.transform.SetParent(resultText.transform.parent, false);
+        overlay.transform.SetSiblingIndex(resultText.transform.GetSiblingIndex());
+
+        var rect = overlay.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.sizeDelta = Vector2.zero;
+
+        var image = overlay.AddComponent<Image>();
+        image.color = new Color(0f, 0f, 0f, 0.92f);
+        image.raycastTarget = false;
     }
 }
