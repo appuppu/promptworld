@@ -93,13 +93,28 @@ function newId() {
 // ------------------------------------------------------------ abuse control
 
 const RATE_LIMITS = {
-  create: 30,         // drafts per IP per day
-  clear: 200,         // clear submissions per IP per day
-  publish: 10,        // publishes per IP per day
-  publishGlobal: 200, // publishes per day platform-wide (circuit breaker)
+  create: 30,           // drafts per IP per day
+  clear: 200,           // clear submissions per IP per day
+  publish: 10,          // publishes per IP per day
+  publishPerCreator: 5, // publishes per creator identity per day
+  publishGlobal: 200,   // publishes per day platform-wide (circuit breaker)
 };
 const MIN_CLEAR_MS_TO_PUBLISH = 3000; // trivially short stages cannot be published
 const DRAFT_TTL_DAYS = 7;             // unpublished drafts are garbage-collected
+
+// Hard capacity ceilings. Stage JSON is a few KB, so even these caps use a
+// fraction of the free tier — they exist to bound worst-case flooding, not
+// storage cost. Raise them when the platform legitimately grows.
+const MAX_TOTAL_STAGES = 20000;
+const MAX_PUBLISHED_STAGES = 5000;
+
+async function countStages(env, publishedOnly) {
+  const sql = publishedOnly
+    ? "SELECT COUNT(*) AS n FROM stages WHERE status = 'published'"
+    : 'SELECT COUNT(*) AS n FROM stages';
+  const row = await env.promptworld_stages.prepare(sql).first();
+  return row ? row.n : 0;
+}
 
 async function bumpCounter(env, key) {
   await env.promptworld_stages
@@ -131,11 +146,55 @@ async function cleanupExpiredDrafts(env) {
     .run();
 }
 
-async function opCreateStage(env, origin, stage, request) {
+// ------------------------------------------------------------ invisible ids
+// Creators get a frictionless identity: the first create_stage silently
+// mints a creator record and hands back a creatorToken for reuse. No signup,
+// no login — but bans and per-creator quotas become enforceable. A real
+// login (Google/Firebase) can later become another issuer of the same ids.
+// PLAYERS NEVER NEED ANY OF THIS.
+
+async function getCreatorByToken(env, token) {
+  if (!token || typeof token !== 'string') return null;
+  return env.promptworld_stages.prepare('SELECT * FROM creators WHERE token = ?').bind(token).first();
+}
+
+async function getCreatorById(env, id) {
+  if (!id) return null;
+  return env.promptworld_stages.prepare('SELECT * FROM creators WHERE id = ?').bind(id).first();
+}
+
+async function mintCreator(env, name) {
+  const token = crypto.randomUUID();
+  const id = newId();
+  let clean = typeof name === 'string' ? name.trim().slice(0, 30) : '';
+  if (clean.length === 0) clean = 'anonymous';
+  await env.promptworld_stages
+    .prepare('INSERT INTO creators (token, id, name, created_at) VALUES (?, ?, ?, ?)')
+    .bind(token, id, clean, new Date().toISOString())
+    .run();
+  return { token, id, name: clean, banned: 0 };
+}
+
+async function opCreateStage(env, origin, stage, request, creatorToken, creatorName) {
   if (await overRateLimit(env, request, 'create', RATE_LIMITS.create)) {
     return { status: 429, body: { error: `Rate limit: at most ${RATE_LIMITS.create} stages may be created per day.` } };
   }
   await cleanupExpiredDrafts(env);
+  if (await countStages(env, false) >= MAX_TOTAL_STAGES) {
+    return { status: 503, body: { error: 'The platform has reached its stage capacity. Please try again later.' } };
+  }
+
+  // Invisible identity: reuse the token if provided, mint silently if not.
+  let creator;
+  let minted = false;
+  if (creatorToken) {
+    creator = await getCreatorByToken(env, creatorToken);
+    if (!creator) return { status: 401, body: { error: 'Invalid creatorToken.' } };
+    if (creator.banned) return { status: 403, body: { error: 'This creator is banned.' } };
+  } else {
+    creator = await mintCreator(env, creatorName);
+    minted = true;
+  }
 
   if (stage && typeof stage.name === 'string') {
     stage.name = stage.name.replace(/[\u0000-\u001f\u007f]/g, '').trim();
@@ -147,21 +206,24 @@ async function opCreateStage(env, origin, stage, request) {
   const editKey = crypto.randomUUID();
   stage.id = id;
   await env.promptworld_stages
-    .prepare('INSERT INTO stages (id, json, name, status, edit_key, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, JSON.stringify(stage), stage.name, 'draft', editKey, new Date().toISOString())
+    .prepare('INSERT INTO stages (id, json, name, status, edit_key, created_at, creator_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, JSON.stringify(stage), stage.name, 'draft', editKey, new Date().toISOString(), creator.id)
     .run();
 
-  return {
-    status: 201,
-    body: {
-      id,
-      editKey,
-      testUrl: `${origin}/?stage=${id}&key=${editKey}`,
-      playUrl: `${origin}/?stage=${id}`,
-      status: 'draft',
-      note: 'A human must clear the stage at testUrl in the browser within its time limit. Publishing stays blocked until that clear is recorded.',
-    },
+  const body = {
+    id,
+    editKey,
+    testUrl: `${origin}/?stage=${id}&key=${editKey}`,
+    playUrl: `${origin}/?stage=${id}`,
+    status: 'draft',
+    creatorId: creator.id,
+    note: 'A human must clear the stage at testUrl in the browser within its time limit. Publishing stays blocked until that clear is recorded.',
   };
+  if (minted) {
+    body.creatorToken = creator.token;
+    body.identityNote = 'A creator identity was minted for you. Pass creatorToken in future create_stage calls to keep all your stages under one identity.';
+  }
+  return { status: 201, body };
 }
 
 async function opGetStage(env, id) {
@@ -216,11 +278,23 @@ async function opRecordClear(env, row, body, request) {
 }
 
 async function opPublish(env, origin, row, request) {
+  if (row.creator_id) {
+    const creator = await getCreatorById(env, row.creator_id);
+    if (creator && creator.banned) {
+      return { status: 403, body: { error: 'This creator is banned.' } };
+    }
+    if (await overRateLimit(env, request, `publish-creator:${row.creator_id}`, RATE_LIMITS.publishPerCreator)) {
+      return { status: 429, body: { error: `Rate limit: at most ${RATE_LIMITS.publishPerCreator} publishes per creator per day.` } };
+    }
+  }
   if (await overRateLimit(env, request, 'publish', RATE_LIMITS.publish)) {
     return { status: 429, body: { error: `Rate limit: at most ${RATE_LIMITS.publish} stages may be published per day.` } };
   }
   if (await overRateLimit(env, request, 'publish-global:all', RATE_LIMITS.publishGlobal)) {
     return { status: 429, body: { error: 'The platform-wide daily publish limit has been reached. Try again tomorrow.' } };
+  }
+  if (await countStages(env, true) >= MAX_PUBLISHED_STAGES) {
+    return { status: 503, body: { error: 'The published-stage capacity has been reached.' } };
   }
   if (row.clear_time_ms !== null && row.clear_time_ms < MIN_CLEAR_MS_TO_PUBLISH) {
     return {
@@ -246,8 +320,13 @@ async function opPublish(env, origin, row, request) {
 }
 
 async function opListPublished(env) {
+  // Banned creators' stages vanish from discovery (legacy NULL-creator
+  // stages stay visible).
   const rows = await env.promptworld_stages
-    .prepare("SELECT id, name, published_at FROM stages WHERE status = 'published' ORDER BY published_at DESC LIMIT 100")
+    .prepare(`SELECT s.id, s.name, s.published_at, c.name AS creator
+              FROM stages s LEFT JOIN creators c ON c.id = s.creator_id
+              WHERE s.status = 'published' AND (c.banned IS NULL OR c.banned = 0)
+              ORDER BY s.published_at DESC LIMIT 100`)
     .all();
   return rows.results;
 }
@@ -270,7 +349,8 @@ async function handleApi(request, env, url) {
     if (raw.length > LIMITS.maxJsonBytes) return json({ error: 'Stage JSON too large.' }, 413);
     let stage;
     try { stage = JSON.parse(raw); } catch { return json({ error: 'Invalid JSON.' }, 400); }
-    const result = await opCreateStage(env, url.origin, stage, request);
+    const result = await opCreateStage(env, url.origin, stage, request,
+      request.headers.get('X-Creator-Token'), request.headers.get('X-Creator-Name'));
     return json(result.body, result.status);
   }
 
@@ -346,8 +426,13 @@ DESIGN RULES:
   prefer discrete floor<->ceiling sections. Never assume clearable from theory alone.
 - The stage MUST be cleared by a human in the browser before it can be published.
 
+IDENTITY: no signup exists. Your first create_stage mints an invisible
+creator identity and returns a creatorToken — remember it and pass it in
+later create_stage calls so all stages share one identity. Players never
+need any identity.
+
 WORKFLOW: create_stage -> give the human the testUrl -> they clear it in the
-browser (auto-recorded) -> publish_stage -> share the playUrl.`;
+browser (auto-recorded, replay-verified) -> publish_stage -> share the playUrl.`;
 
 const MCP_TOOLS = [
   {
@@ -364,6 +449,8 @@ const MCP_TOOLS = [
       type: 'object',
       properties: {
         stage: { type: 'object', description: 'The stage JSON document (see get_toolbox for the schema).' },
+        creatorToken: { type: 'string', description: 'Your creator identity token from a previous create_stage response. Omit on first use — one is minted automatically.' },
+        creatorName: { type: 'string', description: 'Display name for a newly minted creator identity (max 30 chars). Only used when creatorToken is omitted.' },
       },
       required: ['stage'],
     },
@@ -408,7 +495,7 @@ async function mcpCallTool(env, origin, name, args, request) {
       if (!args || typeof args.stage !== 'object' || args.stage === null) {
         return { text: 'Error: pass the stage JSON document as the "stage" argument.', isError: true };
       }
-      const result = await opCreateStage(env, origin, args.stage, request);
+      const result = await opCreateStage(env, origin, args.stage, request, args.creatorToken, args.creatorName);
       return { text: JSON.stringify(result.body, null, 2), isError: result.status >= 400 };
     }
 

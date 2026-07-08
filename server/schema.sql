@@ -21,3 +21,13 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,
   count INTEGER NOT NULL DEFAULT 0
 );
+
+-- Invisible creator identities: minted silently on first create_stage.
+-- No signup, no login — but bans and per-creator quotas are enforceable.
+CREATE TABLE IF NOT EXISTS creators (
+  token TEXT PRIMARY KEY,       -- secret bearer token (returned once)
+  id TEXT UNIQUE NOT NULL,      -- public creator id (stamped on stages)
+  name TEXT NOT NULL,
+  banned INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
