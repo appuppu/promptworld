@@ -5,6 +5,7 @@ PromptWorld/[Oo]bj/
 PromptWorld/[Bb]uild/
 PromptWorld/[Bb]uilds/
 node_modules/
+.wrangler/
 PromptWorld/[Ll]ogs/
 PromptWorld/[Uu]serSettings/
 PromptWorld/[Mm]emoryCaptures/
