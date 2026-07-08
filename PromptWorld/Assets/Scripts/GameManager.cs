@@ -27,6 +27,7 @@ public class GameManager : MonoBehaviour
     public GameState State { get; private set; } = GameState.Playing;
 
     private float timeRemaining;
+    private int lastTickSecond = -1;
 
     private void Awake()
     {
@@ -66,6 +67,13 @@ public class GameManager : MonoBehaviour
         }
         UpdateTimerLabel();
 
+        int second = Mathf.CeilToInt(timeRemaining);
+        if (second != lastTickSecond)
+        {
+            lastTickSecond = second;
+            if (second > 0 && second <= 10) Sfx.Play(SfxId.Tick, 0.35f);
+        }
+
         if (player != null)
         {
             float y = player.transform.position.y;
@@ -95,7 +103,8 @@ public class GameManager : MonoBehaviour
     private void EndGame(GameState result, string message)
     {
         State = result;
-        player.Freeze();
+        if (player != null) player.Freeze();
+        Sfx.Play(result == GameState.Cleared ? SfxId.Clear : SfxId.GameOver);
         resultText.text = $"{message}\n<size=35%>Press R to Restart</size>";
         resultText.gameObject.SetActive(true);
         Debug.Log(message);

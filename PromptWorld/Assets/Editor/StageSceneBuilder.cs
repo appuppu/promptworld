@@ -34,7 +34,7 @@ public static class StageSceneBuilder
         var loaderGo = new GameObject("StageLoader");
         var loader = loaderGo.AddComponent<StageLoader>();
         var loaderSo = new SerializedObject(loader);
-        loaderSo.FindProperty("stageFile").stringValue = "stage-001.json";
+        loaderSo.FindProperty("stageFile").stringValue = "stage-002.json";
         loaderSo.FindProperty("gameManager").objectReferenceValue = gm;
         loaderSo.FindProperty("cameraFollow").objectReferenceValue = cameraFollow;
         loaderSo.ApplyModifiedPropertiesWithoutUndo();

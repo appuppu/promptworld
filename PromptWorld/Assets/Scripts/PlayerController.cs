@@ -5,6 +5,7 @@ using UnityEngine;
 /// All motion goes through Rigidbody2D so stage parts (jump pads, boosts,
 /// gravity flips) act on the same physics body. Gravity direction is a
 /// first-class concept: jumping and ground checks follow the current sign.
+/// Coyote time and jump buffering make the controls feel fair.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(BoxCollider2D))]
@@ -13,6 +14,8 @@ public class PlayerController : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
     [SerializeField] private float jumpForce = 14f;
+    [SerializeField] private float coyoteTime = 0.1f;
+    [SerializeField] private float jumpBufferTime = 0.12f;
 
     [Header("Ground Check")]
     [SerializeField] private LayerMask groundLayer;
@@ -23,9 +26,10 @@ public class PlayerController : MonoBehaviour
     private float baseGravityScale = 3f;
     private float gravityDirection = 1f; // 1 = normal, -1 = inverted
     private float moveInput;
-    private bool jumpQueued;
     private bool frozen;
-    private float controlLockTimer; // while > 0, boosts own the velocity
+    private float controlLockTimer;     // while > 0, boosts own the velocity
+    private float lastGroundedTime = -999f;
+    private float jumpPressedTime = -999f;
     private Vector2 spawnPoint;
 
     public Rigidbody2D Body => body;
@@ -53,15 +57,17 @@ public class PlayerController : MonoBehaviour
 
         moveInput = Input.GetAxisRaw("Horizontal");
 
-        if (Input.GetKeyDown(KeyCode.Space) && IsGrounded())
+        if (Input.GetKeyDown(KeyCode.Space))
         {
-            jumpQueued = true;
+            jumpPressedTime = Time.time;
         }
     }
 
     private void FixedUpdate()
     {
         if (frozen) return;
+
+        if (IsGrounded()) lastGroundedTime = Time.time;
 
         if (controlLockTimer > 0f)
         {
@@ -72,11 +78,15 @@ public class PlayerController : MonoBehaviour
             body.linearVelocity = new Vector2(moveInput * moveSpeed, body.linearVelocity.y);
         }
 
-        if (jumpQueued)
+        bool jumpBuffered = Time.time - jumpPressedTime <= jumpBufferTime;
+        bool groundedRecently = Time.time - lastGroundedTime <= coyoteTime;
+        if (jumpBuffered && groundedRecently)
         {
-            jumpQueued = false;
+            jumpPressedTime = -999f;   // consume the press
+            lastGroundedTime = -999f;  // no air jumps
             body.linearVelocity = new Vector2(body.linearVelocity.x, 0f);
             body.AddForce(Vector2.up * gravityDirection * jumpForce, ForceMode2D.Impulse);
+            Sfx.Play(SfxId.Jump);
         }
     }
 
@@ -113,6 +123,7 @@ public class PlayerController : MonoBehaviour
         transform.position = spawnPoint;
         body.linearVelocity = Vector2.zero;
         controlLockTimer = 0f;
+        Sfx.Play(SfxId.Respawn);
     }
 
     /// <summary>Called by GameManager when the run ends (clear or game over).</summary>

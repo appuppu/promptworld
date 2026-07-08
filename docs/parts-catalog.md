@@ -1,4 +1,4 @@
-# Parts Catalog — The Stage Creator's Toolbox (v0.2)
+# Parts Catalog — The Stage Creator's Toolbox (v0.3)
 
 This is the toolbox handed to any AI (or human) creating a Prompt World
 stage. A stage is a composition of these parts and nothing else — creativity
@@ -49,6 +49,19 @@ another `gravityFlip`. 0.7 s cooldown per block.
 `{ "type": "gravityFlip", "x", "y", "w", "h" }` — typical 1.2 × 1.2,
 floating in the player's path.
 
+### `movingPlatform` — rideable mover
+White rectangle that oscillates smoothly between its position and
+position + (dx, dy), completing a round trip every `period` seconds.
+Players ride it; use horizontally over gaps or vertically as an elevator.
+`{ "type": "movingPlatform", "x", "y", "w", "h", "dx", "dy", "period" }` —
+typical 3 × 0.5, period 4–5.
+
+### `crumble` — vanishing block
+White rectangle that blinks for 0.5 s after the player touches it, then
+disappears for 2.5 s before returning. Hesitation is punished — chain them
+into bridges that force momentum.
+`{ "type": "crumble", "x", "y", "w", "h" }`
+
 ### `goal` — the exit (required, exactly one)
 Tall hollow white frame (door). Touch → Stage Clear.
 Defined at stage top level: `"goal": { "x", "y", "w", "h" }` — typical
@@ -57,6 +70,28 @@ Defined at stage top level: `"goal": { "x", "y", "w", "h" }` — typical
 ### `playerStart` (required)
 Spawn point, also the respawn point for hazards/falls.
 `"playerStart": { "x", "y" }` — place ~1 unit above a solid.
+
+## Hard limits (enforced by StageValidator — client now, server at deploy)
+
+| Value | Min | Max |
+|---|---|---|
+| `timeLimit` | 5 s | 1800 s (no 30-minute-plus stages) |
+| Part count | 1 | 300 |
+| Coordinates (x, y) | −500 | +500 |
+| Sizes (w, h) | 0.05 | 100 |
+| `power` (jumpPad / boost) | 0 | 60 |
+| `period` (movingPlatform) | 0.5 s | 30 s |
+
+A stage that violates any limit is rejected before it loads (and, later,
+before it deploys). Generators should treat these as design constraints,
+not suggestions.
+
+## Sound
+
+Every part has a procedural sound effect synthesized from waveforms at
+runtime (no audio assets): jump blip, pad boing, boost whoosh, gravity-flip
+wobble, respawn fall, clear arpeggio, game-over descent, and a tick during
+the final 10 seconds.
 
 ## World rules
 

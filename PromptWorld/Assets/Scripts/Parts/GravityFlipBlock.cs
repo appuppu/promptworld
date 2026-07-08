@@ -18,5 +18,6 @@ public class GravityFlipBlock : MonoBehaviour
 
         lastTriggerTime = Time.time;
         player.FlipGravity();
+        Sfx.Play(SfxId.Flip);
     }
 }

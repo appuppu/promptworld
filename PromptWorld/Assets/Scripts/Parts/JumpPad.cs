@@ -10,6 +10,8 @@ public class JumpPad : MonoBehaviour
     {
         if (!other.CompareTag("Player")) return;
         var player = other.GetComponent<PlayerController>();
-        if (player != null) player.Bounce(power);
+        if (player == null) return;
+        player.Bounce(power);
+        Sfx.Play(SfxId.Pad);
     }
 }

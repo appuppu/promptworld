@@ -25,6 +25,15 @@ public class StageLoader : MonoBehaviour
         }
 
         StageData data = JsonUtility.FromJson<StageData>(File.ReadAllText(path));
+
+        var errors = StageValidator.Validate(data);
+        if (errors.Count > 0)
+        {
+            foreach (string error in errors) Debug.LogError($"[PromptWorld] Invalid stage: {error}");
+            gameManager.Configure(null, "INVALID STAGE (see Console)", 60f);
+            return;
+        }
+
         Debug.Log($"[PromptWorld] Loading stage '{data.name}' ({data.id}), {data.parts.Length} parts, {data.timeLimit}s");
 
         var stageRoot = new GameObject("Stage").transform;
@@ -76,6 +85,26 @@ public class StageLoader : MonoBehaviour
                 var boost = go.AddComponent<Boost>();
                 boost.directionX = part.dirX >= 0f ? 1f : -1f;
                 boost.power = part.power > 0f ? part.power : 10f;
+                break;
+            }
+            case "movingPlatform":
+            {
+                GameObject go = CreateRect("MovingPlatform", parent, part);
+                go.layer = LayerMask.NameToLayer("Ground");
+                var body = go.AddComponent<Rigidbody2D>();
+                body.bodyType = RigidbodyType2D.Kinematic;
+                go.AddComponent<BoxCollider2D>();
+                var mover = go.AddComponent<MovingPlatform>();
+                mover.delta = new Vector2(part.dx, part.dy);
+                mover.period = part.period > 0f ? part.period : 4f;
+                break;
+            }
+            case "crumble":
+            {
+                GameObject go = CreateRect("Crumble", parent, part);
+                go.layer = LayerMask.NameToLayer("Ground");
+                go.AddComponent<BoxCollider2D>();
+                go.AddComponent<CrumbleBlock>();
                 break;
             }
             case "gravityFlip":

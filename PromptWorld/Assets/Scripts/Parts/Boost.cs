@@ -20,5 +20,6 @@ public class Boost : MonoBehaviour
 
         var velocity = new Vector2(directionX * power, verticalKick * player.GravityDirection);
         player.Launch(velocity, controlLockDuration);
+        Sfx.Play(SfxId.Boost);
     }
 }

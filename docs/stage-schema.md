@@ -1,4 +1,4 @@
-# Stage JSON Schema — v0.2
+# Stage JSON Schema — v0.3
 
 The deployable unit of Prompt World is a single JSON document. The Unity
 client never executes user code — it interprets this data (see
@@ -15,7 +15,7 @@ the companion document handed to stage-generating AIs.
 
 ```json
 {
-  "schemaVersion": "0.2",
+  "schemaVersion": "0.3",
   "id": "stage-001",
   "name": "First Flight",
   "timeLimit": 45,

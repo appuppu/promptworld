@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.3",
+  "id": "stage-003",
+  "name": "Weightless",
+  "timeLimit": 70,
+  "playerStart": { "x": -12, "y": -2.5 },
+  "goal": { "x": 30, "y": -2.3, "w": 1.4, "h": 2.6 },
+  "parts": [
+    { "type": "solid", "x": -10, "y": -4, "w": 8, "h": 1 },
+    { "type": "gravityFlip", "x": -7, "y": -2.6, "w": 1.4, "h": 1.6 },
+
+    { "type": "solid", "x": -4, "y": 3, "w": 10, "h": 1 },
+    { "type": "hazard", "x": -4, "y": 1.9, "w": 0.7, "h": 0.7 },
+    { "type": "gravityFlip", "x": 0, "y": 1.7, "w": 1.4, "h": 1.8 },
+
+    { "type": "solid", "x": 3, "y": -4, "w": 8, "h": 1 },
+    { "type": "hazard", "x": 3, "y": -3.1, "w": 0.7, "h": 0.7 },
+    { "type": "gravityFlip", "x": 6, "y": -2.6, "w": 1.4, "h": 1.6 },
+
+    { "type": "solid", "x": 9, "y": 3, "w": 8, "h": 1 },
+    { "type": "hazard", "x": 10, "y": 1.9, "w": 0.7, "h": 0.7 },
+    { "type": "gravityFlip", "x": 12.5, "y": 1.7, "w": 1.4, "h": 1.8 },
+
+    { "type": "solid", "x": 16, "y": -4, "w": 8, "h": 1 },
+    { "type": "hazard", "x": 15, "y": -3.1, "w": 0.7, "h": 0.7 },
+    { "type": "hazard", "x": 17.5, "y": -3.1, "w": 0.7, "h": 0.7 },
+
+    { "type": "gravityFlip", "x": 22, "y": -0.8, "w": 1.6, "h": 2.0 },
+    { "type": "solid", "x": 25, "y": 2, "w": 6, "h": 1 },
+    { "type": "gravityFlip", "x": 27, "y": 0.3, "w": 1.4, "h": 2.0 },
+
+    { "type": "solid", "x": 28.5, "y": -4, "w": 7, "h": 1 },
+    { "type": "hazard", "x": 25.5, "y": -3.1, "w": 0.7, "h": 0.7 }
+  ]
+}
