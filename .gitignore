@@ -4,6 +4,7 @@ PromptWorld/[Tt]emp/
 PromptWorld/[Oo]bj/
 PromptWorld/[Bb]uild/
 PromptWorld/[Bb]uilds/
+node_modules/
 PromptWorld/[Ll]ogs/
 PromptWorld/[Uu]serSettings/
 PromptWorld/[Mm]emoryCaptures/

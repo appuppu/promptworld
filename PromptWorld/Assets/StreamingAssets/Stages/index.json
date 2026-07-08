@@ -1,0 +1,7 @@
+{
+  "stages": [
+    { "file": "stage-001.json", "title": "01  First Flight" },
+    { "file": "stage-002.json", "title": "02  Shaky Ground" },
+    { "file": "stage-003.json", "title": "03  Weightless" }
+  ]
+}

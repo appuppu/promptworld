@@ -1,5 +1,6 @@
-using System.IO;
+using System.Collections;
 using UnityEngine;
+using UnityEngine.Networking;
 
 /// <summary>
 /// The heart of Prompt World: reads a stage JSON (schema v0.2) and builds a
@@ -15,16 +16,32 @@ public class StageLoader : MonoBehaviour
 
     private static Sprite whiteSprite;
 
-    private void Awake()
+    private IEnumerator Start()
     {
-        string path = Path.Combine(Application.streamingAssetsPath, "Stages", stageFile);
-        if (!File.Exists(path))
+        // The menu overrides the default; StreamingAssets is a URL on WebGL,
+        // so everything goes through UnityWebRequest.
+        string file = string.IsNullOrEmpty(GameSession.SelectedStageFile)
+            ? stageFile
+            : GameSession.SelectedStageFile;
+        string url = System.IO.Path.Combine(Application.streamingAssetsPath, "Stages", file);
+        if (!url.Contains("://")) url = "file://" + url;
+
+        using var request = UnityWebRequest.Get(url);
+        yield return request.SendWebRequest();
+
+        if (request.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError($"[PromptWorld] Stage file not found: {path}");
-            return;
+            Debug.LogError($"[PromptWorld] Failed to load stage '{file}': {request.error}");
+            gameManager.Configure(null, "STAGE NOT FOUND", 60f);
+            yield break;
         }
 
-        StageData data = JsonUtility.FromJson<StageData>(File.ReadAllText(path));
+        BuildFromJson(request.downloadHandler.text);
+    }
+
+    private void BuildFromJson(string json)
+    {
+        StageData data = JsonUtility.FromJson<StageData>(json);
 
         var errors = StageValidator.Validate(data);
         if (errors.Count > 0)

@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public enum GameState { Playing, Cleared, GameOver }
 
@@ -23,6 +24,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_Text timerText;
     [SerializeField] private TMP_Text resultText;
     [SerializeField] private TMP_Text stageNameText;
+    [SerializeField] private Button retryButton;
+    [SerializeField] private Button menuButton;
 
     public GameState State { get; private set; } = GameState.Playing;
 
@@ -39,7 +42,10 @@ public class GameManager : MonoBehaviour
     {
         player = stagePlayer;
         timeLimit = stageTimeLimit;
+        timeRemaining = stageTimeLimit;
+        lastTickSecond = -1;
         if (stageNameText != null) stageNameText.text = stageName;
+        UpdateTimerLabel();
     }
 
     private void Start()
@@ -47,6 +53,16 @@ public class GameManager : MonoBehaviour
         timeRemaining = timeLimit;
         resultText.gameObject.SetActive(false);
         UpdateTimerLabel();
+
+        if (retryButton != null)
+        {
+            retryButton.onClick.AddListener(RestartStage);
+            retryButton.gameObject.SetActive(false);
+        }
+        if (menuButton != null)
+        {
+            menuButton.onClick.AddListener(BackToMenu);
+        }
     }
 
     private void Update()
@@ -100,13 +116,19 @@ public class GameManager : MonoBehaviour
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
+    public void BackToMenu()
+    {
+        SceneManager.LoadScene("Menu");
+    }
+
     private void EndGame(GameState result, string message)
     {
         State = result;
         if (player != null) player.Freeze();
         Sfx.Play(result == GameState.Cleared ? SfxId.Clear : SfxId.GameOver);
-        resultText.text = $"{message}\n<size=35%>Press R to Restart</size>";
+        resultText.text = message;
         resultText.gameObject.SetActive(true);
+        if (retryButton != null) retryButton.gameObject.SetActive(true);
         Debug.Log(message);
     }
 

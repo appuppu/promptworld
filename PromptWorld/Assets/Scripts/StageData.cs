@@ -18,6 +18,19 @@ public class StageData
 }
 
 [Serializable]
+public class StageIndex
+{
+    public StageEntry[] stages;
+}
+
+[Serializable]
+public class StageEntry
+{
+    public string file;
+    public string title;
+}
+
+[Serializable]
 public class Vec2
 {
     public float x;

@@ -55,9 +55,9 @@ public class PlayerController : MonoBehaviour
     {
         if (frozen) return;
 
-        moveInput = Input.GetAxisRaw("Horizontal");
+        moveInput = Mathf.Clamp(Input.GetAxisRaw("Horizontal") + MobileInput.Axis, -1f, 1f);
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Input.GetKeyDown(KeyCode.Space) || MobileInput.ConsumeJump())
         {
             jumpPressedTime = Time.time;
         }
