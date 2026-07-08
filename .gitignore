@@ -1,0 +1,27 @@
+# Unity generated folders (PromptWorld project)
+PromptWorld/[Ll]ibrary/
+PromptWorld/[Tt]emp/
+PromptWorld/[Oo]bj/
+PromptWorld/[Bb]uild/
+PromptWorld/[Bb]uilds/
+PromptWorld/[Ll]ogs/
+PromptWorld/[Uu]serSettings/
+PromptWorld/[Mm]emoryCaptures/
+PromptWorld/[Rr]ecordings/
+
+# Unity IDE/project files (regenerated)
+PromptWorld/*.csproj
+PromptWorld/*.sln
+PromptWorld/.vsconfig
+PromptWorld/.idea/
+PromptWorld/.vscode/
+
+# Unity crash reports & misc
+PromptWorld/[Cc]rashes/
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+
+# macOS
+.DS_Store
