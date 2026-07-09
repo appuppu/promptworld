@@ -65,6 +65,7 @@ public class MenuController : MonoBehaviour
             createButton.onClick.AddListener(() => WebBridge.OpenUrl($"{GameSession.ApiOrigin}/create"));
         }
         BuildSortRow();
+        BuildAudioToggles();
 
         Sfx.StopMusic();
         yield return LoadCommunityStages();
@@ -102,6 +103,51 @@ public class MenuController : MonoBehaviour
             button.targetGraphic = tmp;
             button.onClick.AddListener(() => SetSort(mode));
         }
+    }
+
+    /// <summary>Persistent SFX / MUSIC toggles in the footer corners.</summary>
+    private void BuildAudioToggles()
+    {
+        Canvas canvas = listRoot.GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        CreateToggle(canvas.transform, new Vector2(0f, 0f), new Vector2(160f, 44f),
+            () => Sfx.SoundEnabled, value => Sfx.SetSoundEnabled(value), "SFX");
+        CreateToggle(canvas.transform, new Vector2(1f, 0f), new Vector2(-160f, 44f),
+            () => Sfx.MusicEnabled, value => Sfx.SetMusicEnabled(value), "MUSIC");
+    }
+
+    private void CreateToggle(Transform parent, Vector2 anchor, Vector2 pos,
+        System.Func<bool> get, System.Action<bool> set, string label)
+    {
+        var go = new GameObject($"Toggle_{label}", typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = pos;
+        rect.sizeDelta = new Vector2(240f, 48f);
+
+        var tmp = go.AddComponent<TextMeshProUGUI>();
+        tmp.fontSize = 22;
+        tmp.characterSpacing = 4f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        void Refresh()
+        {
+            bool on = get();
+            tmp.text = $"{label}: {(on ? "ON" : "OFF")}";
+            tmp.color = new Color(1f, 1f, 1f, on ? 0.7f : 0.35f);
+        }
+        Refresh();
+
+        var button = go.AddComponent<Button>();
+        button.targetGraphic = tmp;
+        button.onClick.AddListener(() =>
+        {
+            set(!get());
+            Refresh();
+        });
     }
 
     private void SetSort(string mode)

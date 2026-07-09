@@ -16,8 +16,50 @@ public static class Sfx
     private static AudioSource musicSource;
     private static Dictionary<SfxId, AudioClip> clips;
 
+    private static bool prefsLoaded;
+    private static bool soundEnabled = true;
+    private static bool musicEnabled = true;
+    private static bool musicWanted;
+
+    public static bool SoundEnabled { get { LoadPrefs(); return soundEnabled; } }
+    public static bool MusicEnabled { get { LoadPrefs(); return musicEnabled; } }
+
+    private static void LoadPrefs()
+    {
+        if (prefsLoaded) return;
+        prefsLoaded = true;
+        soundEnabled = PlayerPrefs.GetInt("pw_sfx", 1) == 1;
+        musicEnabled = PlayerPrefs.GetInt("pw_music", 1) == 1;
+    }
+
+    public static void SetSoundEnabled(bool on)
+    {
+        LoadPrefs();
+        soundEnabled = on;
+        PlayerPrefs.SetInt("pw_sfx", on ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    public static void SetMusicEnabled(bool on)
+    {
+        LoadPrefs();
+        musicEnabled = on;
+        PlayerPrefs.SetInt("pw_music", on ? 1 : 0);
+        PlayerPrefs.Save();
+        if (!on)
+        {
+            if (musicSource != null && musicSource.isPlaying) musicSource.Stop();
+        }
+        else if (musicWanted)
+        {
+            StartMusic();
+        }
+    }
+
     public static void Play(SfxId id, float volume = 0.5f)
     {
+        LoadPrefs();
+        if (!soundEnabled) return;
         EnsureInit();
         source.PlayOneShot(clips[id], volume);
     }
@@ -25,6 +67,9 @@ public static class Sfx
     /// <summary>Looping synthesized drum groove — plays only during stage runs.</summary>
     public static void StartMusic()
     {
+        musicWanted = true;
+        LoadPrefs();
+        if (!musicEnabled) return;
         EnsureInit();
         if (musicSource.isPlaying) return;
         if (musicSource.clip == null) musicSource.clip = BuildDrumLoop();
@@ -35,6 +80,7 @@ public static class Sfx
 
     public static void StopMusic()
     {
+        musicWanted = false;
         if (musicSource != null && musicSource.isPlaying) musicSource.Stop();
     }
 
