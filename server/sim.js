@@ -166,7 +166,7 @@ class SimWorld {
     const hw = simQ(w) / 2.0;
     const hh = simQ(h) / 2.0;
     let speed = simQ(power);
-    if (speed <= 0.0) speed = 10.0;
+    if (speed <= 0.0) speed = 7.0;
     let dir = 1.0;
     if (simQ(dirX) < 0.0) dir = -1.0;
     let p = simQ(period);
@@ -287,6 +287,31 @@ class SimWorld {
     }
     for (const f of this.fallers) this.resolveAgainst(f, xAxis, null);
     for (const cn of this.cannons) this.resolveAgainst(cn, xAxis, null);
+  }
+
+  overlapsAnySolid() {
+    for (const s of this.solids) {
+      if (SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, s)) return true;
+    }
+    for (const m of this.movers) {
+      if (SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, m)) return true;
+    }
+    for (const cv of this.conveyors) {
+      if (SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, cv)) return true;
+    }
+    for (const g of this.gates) {
+      if (!this.gateActive(g)) continue;
+      if (SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, g)) return true;
+    }
+    if (!this.doorsOpen()) {
+      for (const d of this.doors) {
+        if (SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, d)) return true;
+      }
+    }
+    for (const cn of this.cannons) {
+      if (SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, cn)) return true;
+    }
+    return false;
   }
 
   resolveAgainst(b, xAxis, crumble) {
@@ -485,6 +510,16 @@ class SimWorld {
     const my = this.vy * SIM.TICK;
     this.py = this.py + my;
     this.resolveAxis(false);
+
+    // 9b. anti-wedge safety net: if the player is still overlapping a solid
+    // after resolution (squeezed between two blocks), lift them out (against
+    // gravity) until clear so they can never get permanently stuck.
+    const lift = 0.12 * -this.gravityDir;
+    for (let guard = 0; guard < 16; guard++) {
+      if (!this.overlapsAnySolid()) break;
+      this.py = this.py + lift;
+      this.vy = 0.0;
+    }
 
     // 10. triggers (edge-based, stage order within kind order)
     let respawned = false;

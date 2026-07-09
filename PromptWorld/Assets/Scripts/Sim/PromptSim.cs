@@ -281,7 +281,7 @@ public class SimWorld
         double hw = Q(w) / 2.0;
         double hh = Q(h) / 2.0;
         double speed = Q(power);
-        if (speed <= 0.0) speed = 10.0;
+        if (speed <= 0.0) speed = 7.0;
         double dir = 1.0;
         if (Q(dirX) < 0.0) dir = -1.0;
         double p = Q(period);
@@ -426,6 +426,39 @@ public class SimWorld
         }
         foreach (SimFaller f in Fallers) ResolveAgainst(f, xAxis, null);
         foreach (SimCannon cn in Cannons) ResolveAgainst(cn, xAxis, null);
+    }
+
+    private bool OverlapsAnySolid()
+    {
+        foreach (SimBox s in Solids)
+        {
+            if (Overlaps(Px, Py, PlayerHalf, PlayerHalf, s)) return true;
+        }
+        foreach (SimMover m in Movers)
+        {
+            if (Overlaps(Px, Py, PlayerHalf, PlayerHalf, m)) return true;
+        }
+        foreach (SimConveyor cv in Conveyors)
+        {
+            if (Overlaps(Px, Py, PlayerHalf, PlayerHalf, cv)) return true;
+        }
+        foreach (SimGate g in Gates)
+        {
+            if (!GateActive(g)) continue;
+            if (Overlaps(Px, Py, PlayerHalf, PlayerHalf, g)) return true;
+        }
+        if (!DoorsOpen())
+        {
+            foreach (SimDoor d in Doors)
+            {
+                if (Overlaps(Px, Py, PlayerHalf, PlayerHalf, d)) return true;
+            }
+        }
+        foreach (SimCannon cn in Cannons)
+        {
+            if (Overlaps(Px, Py, PlayerHalf, PlayerHalf, cn)) return true;
+        }
+        return false;
     }
 
     private void ResolveAgainst(SimBox b, bool xAxis, SimCrumble crumble)
@@ -670,6 +703,17 @@ public class SimWorld
         double my = Vy * Tick;
         Py = Py + my;
         ResolveAxis(false);
+
+        // 9b. anti-wedge safety net: if the player is still overlapping a solid
+        // after resolution (squeezed between two blocks), lift them out (against
+        // gravity) until clear so they can never get permanently stuck.
+        double lift = 0.12 * -GravityDir;
+        for (int guard = 0; guard < 16; guard++)
+        {
+            if (!OverlapsAnySolid()) break;
+            Py = Py + lift;
+            Vy = 0.0;
+        }
 
         // 10. triggers (edge-based, stage order within kind order)
         bool respawned = false;
