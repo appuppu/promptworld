@@ -33,6 +33,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Button voteBadButton;
     [SerializeField] private TMP_Text leaderboardText;
     [SerializeField] private Button homeButton;
+    [SerializeField] private TMP_Text keyText;
 
     public GameState State { get; private set; } = GameState.Playing;
 
@@ -181,6 +182,28 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>Called by SimDriver every fixed step.</summary>
+    /// <summary>Shows a "KEYS n / total — reach the door" prompt when the stage has keys.</summary>
+    public void UpdateKeys(int collected, int total)
+    {
+        if (keyText == null) return;
+        if (total <= 0)
+        {
+            keyText.gameObject.SetActive(false);
+            return;
+        }
+        keyText.gameObject.SetActive(true);
+        if (collected >= total)
+        {
+            keyText.text = $"KEYS {collected}/{total}  —  DOOR OPEN!";
+            keyText.color = new Color(1f, 1f, 1f, 0.95f);
+        }
+        else
+        {
+            keyText.text = $"KEYS {collected}/{total}  —  collect all to open the door";
+            keyText.color = new Color(1f, 1f, 1f, 0.7f);
+        }
+    }
+
     public void OnSimTick(int remainingTicks)
     {
         if (State != GameState.Playing) return;

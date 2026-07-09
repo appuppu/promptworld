@@ -52,6 +52,11 @@ public static class StageSceneBuilder
             new Vector2(1f, 1f), new Vector2(-100f, -40f), new Vector2(150f, 50f));
         homeButton.GetComponentInChildren<TMPro.TMP_Text>().color = new Color(1f, 1f, 1f, 0.45f);
 
+        // Key-quest prompt, top-center under the timer (hidden unless a stage has keys).
+        TMP_Text keyText = CreateText(canvas.transform, "KeyText", "", 30, TextAlignmentOptions.Center,
+            new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(1200f, 46f));
+        keyText.gameObject.SetActive(false);
+
         var gmGo = new GameObject("GameManager");
         var gm = gmGo.AddComponent<GameManager>();
         var gmSo = new SerializedObject(gm);
@@ -67,6 +72,7 @@ public static class StageSceneBuilder
         gmSo.FindProperty("voteBadButton").objectReferenceValue = voteBad;
         gmSo.FindProperty("leaderboardText").objectReferenceValue = leaderboardText;
         gmSo.FindProperty("homeButton").objectReferenceValue = homeButton;
+        gmSo.FindProperty("keyText").objectReferenceValue = keyText;
         gmSo.ApplyModifiedPropertiesWithoutUndo();
 
         var loaderGo = new GameObject("StageLoader");

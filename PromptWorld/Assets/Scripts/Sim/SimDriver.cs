@@ -32,13 +32,31 @@ public class SimDriver : MonoBehaviour
     private GameObject[] gateViews = new GameObject[0];
     private GameObject[] keyViews = new GameObject[0];
     private GameObject[] doorViews = new GameObject[0];
+    private GameObject[] bulletViews = new GameObject[0];
+    private Sprite whiteSprite;
 
-    public void SetPartViews(Transform[] fallers, GameObject[] gates, GameObject[] keys, GameObject[] doors)
+    public void SetPartViews(Transform[] fallers, GameObject[] gates, GameObject[] keys, GameObject[] doors, Sprite white)
     {
         fallerViews = fallers;
         gateViews = gates;
         keyViews = keys;
         doorViews = doors;
+        whiteSprite = white;
+
+        // One reusable bullet square per cannon (deterministic: at most one
+        // live bullet per cannon at a time).
+        bulletViews = new GameObject[world.Cannons.Count];
+        for (int i = 0; i < bulletViews.Length; i++)
+        {
+            var b = new GameObject("Bullet");
+            b.transform.SetParent(transform, false);
+            b.transform.localScale = new Vector3(0.44f, 0.44f, 1f);
+            var sr = b.AddComponent<SpriteRenderer>();
+            sr.sprite = white;
+            sr.color = Color.white;
+            b.SetActive(false);
+            bulletViews[i] = b;
+        }
     }
 
     /// <summary>Plays the creator's verified replay alongside the live run.</summary>
@@ -113,7 +131,12 @@ public class SimDriver : MonoBehaviour
 
         SyncViews();
         PlayEventSounds(ev);
-        if ((ev & SimEvents.Respawned) != 0) deaths++;
+        if ((ev & SimEvents.Respawned) != 0)
+        {
+            deaths++;
+            // Shatter the square where it was destroyed (prevPos = pre-respawn).
+            if (whiteSprite != null) ShatterEffect.Burst(prevPos, whiteSprite);
+        }
         gameManager.OnSimTick(world.MaxTicks - world.TickCount);
 
         if ((ev & SimEvents.Cleared) != 0)
@@ -178,6 +201,20 @@ public class SimDriver : MonoBehaviour
         {
             doorViews[i].SetActive(!doorsOpen);
         }
+        for (int i = 0; i < bulletViews.Length; i++)
+        {
+            SimCannon c = world.Cannons[i];
+            if (c.BulletActive)
+            {
+                bulletViews[i].SetActive(true);
+                bulletViews[i].transform.position = new Vector3((float)c.BulletX, (float)c.BulletY, 0f);
+            }
+            else
+            {
+                bulletViews[i].SetActive(false);
+            }
+        }
+        gameManager.UpdateKeys(world.KeysCollected, world.Keys.Count);
     }
 
     private void PlayEventSounds(SimEvents ev)

@@ -110,6 +110,15 @@ public class SimDoor : SimBox
 {
 }
 
+public class SimCannon : SimBox
+{
+    public double Dir, Speed;
+    public int PeriodTicks, PhaseTicks;
+    // Live bullet, recomputed each fire cycle (no per-bullet objects).
+    public bool BulletActive;
+    public double BulletX, BulletY;
+}
+
 public class SimWorld
 {
     public const double Tick = 0.02;
@@ -143,7 +152,10 @@ public class SimWorld
     public readonly List<SimGate> Gates = new List<SimGate>();
     public readonly List<SimKey> Keys = new List<SimKey>();
     public readonly List<SimDoor> Doors = new List<SimDoor>();
+    public readonly List<SimCannon> Cannons = new List<SimCannon>();
     public int KeysCollected;
+
+    public const double BulletHalf = 0.22;
 
     public double StartX, StartY;
     public double KillBottom = -12.0;
@@ -262,6 +274,29 @@ public class SimWorld
         double hw = Q(w) / 2.0;
         double hh = Q(h) / 2.0;
         Doors.Add(new SimDoor { X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh });
+    }
+
+    public void AddCannon(double x, double y, double w, double h, double dirX, double power, double period, double phase)
+    {
+        double hw = Q(w) / 2.0;
+        double hh = Q(h) / 2.0;
+        double speed = Q(power);
+        if (speed <= 0.0) speed = 10.0;
+        double dir = 1.0;
+        if (Q(dirX) < 0.0) dir = -1.0;
+        double p = Q(period);
+        if (p <= 0.0) p = 2.0;
+        double pt = p / Tick;
+        double ph = Q(phase);
+        double pht = ph / Tick;
+        var cannon = new SimCannon
+        {
+            X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh,
+            Dir = dir, Speed = speed,
+            PeriodTicks = (int)pt, PhaseTicks = (int)pht,
+        };
+        if (cannon.PeriodTicks < 2) cannon.PeriodTicks = 2;
+        Cannons.Add(cannon);
     }
 
     public void AddTrigger(string kind, double x, double y, double w, double h, double power, double dirX)
@@ -707,6 +742,43 @@ public class SimWorld
             }
         }
 
+        // 10c. cannons: each fires one bullet per period; the bullet flies
+        // straight until it hits a solid or leaves the world. Position is
+        // derived from ticks-since-fire (no per-bullet objects).
+        if (!respawned)
+        {
+            foreach (SimCannon c in Cannons)
+            {
+                int phase = TickCount + c.PhaseTicks;
+                int intoCycle = phase % c.PeriodTicks;
+                double perTick = c.Speed * Tick;
+                double traveled = intoCycle * perTick;
+                double signedTravel = c.Dir * traveled;
+                double halfDir = c.Dir * c.HalfW;
+                double muzzle = c.X + halfDir;
+                double bx = muzzle + signedTravel;
+                double by = c.Y;
+
+                // stop the bullet at the first solid in its path
+                bool blocked = false;
+                foreach (SimBox s in Solids)
+                {
+                    if (Overlaps(bx, by, BulletHalf, BulletHalf, s)) { blocked = true; break; }
+                }
+                bool offWorld = bx < -600.0 || bx > 600.0;
+                c.BulletActive = !blocked && !offWorld;
+                c.BulletX = bx;
+                c.BulletY = by;
+
+                if (c.BulletActive && Overlaps(bx, by, BulletHalf, BulletHalf, new SimBox { X = Px, Y = Py, HalfW = PlayerHalf, HalfH = PlayerHalf }))
+                {
+                    Respawn();
+                    respawned = true;
+                    break;
+                }
+            }
+        }
+
         // 11. kill bounds (derived from stage geometry — tall stages welcome)
         if (!respawned)
         {
@@ -760,6 +832,7 @@ public class SimWorld
                 case "timedGate": world.AddGate(p.x, p.y, p.w, p.h, p.period, p.dx); break;
                 case "key": world.AddKey(p.x, p.y, p.w, p.h); break;
                 case "door": world.AddDoor(p.x, p.y, p.w, p.h); break;
+                case "cannon": world.AddCannon(p.x, p.y, p.w, p.h, p.dirX, p.power, p.period, p.dx); break;
                 case "hazard": world.AddTrigger("hazard", p.x, p.y, p.w, p.h, 0, 0); break;
                 case "jumpPad": world.AddTrigger("pad", p.x, p.y, p.w, p.h, p.power, 0); break;
                 case "boost": world.AddTrigger("boost", p.x, p.y, p.w, p.h, p.power, p.dirX); break;
@@ -793,6 +866,7 @@ public class SimWorld
         foreach (SimGate g in Gates) Consider(g);
         foreach (SimKey k in Keys) Consider(k);
         foreach (SimDoor d in Doors) Consider(d);
+        foreach (SimCannon c in Cannons) Consider(c);
         KillBottom = minY - KillMarginBelow;
         KillTop = maxY + KillMarginAbove;
     }

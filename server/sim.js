@@ -21,6 +21,7 @@ const SIM = {
   MOVE_SPEED: 8.0,
   JUMP_SPEED: 14.0,
   PLAYER_HALF: 0.5,
+  BULLET_HALF: 0.22,
   BOOST_KICK: 4.0,
   COYOTE_TICKS: 5,
   BUFFER_TICKS: 6,
@@ -52,6 +53,7 @@ class SimWorld {
     this.gates = [];
     this.keys = [];
     this.doors = [];
+    this.cannons = [];
     this.keysCollected = 0;
 
     this.startX = simQ(startX);
@@ -158,6 +160,28 @@ class SimWorld {
     const hw = simQ(w) / 2.0;
     const hh = simQ(h) / 2.0;
     this.doors.push({ x: simQ(x), y: simQ(y), halfW: hw, halfH: hh });
+  }
+
+  addCannon(x, y, w, h, dirX, power, period, phase) {
+    const hw = simQ(w) / 2.0;
+    const hh = simQ(h) / 2.0;
+    let speed = simQ(power);
+    if (speed <= 0.0) speed = 10.0;
+    let dir = 1.0;
+    if (simQ(dirX) < 0.0) dir = -1.0;
+    let p = simQ(period);
+    if (p <= 0.0) p = 2.0;
+    const pt = p / SIM.TICK;
+    const ph = simQ(phase);
+    const pht = ph / SIM.TICK;
+    const cannon = {
+      x: simQ(x), y: simQ(y), halfW: hw, halfH: hh,
+      dir, speed,
+      periodTicks: Math.trunc(pt), phaseTicks: Math.trunc(pht),
+      bulletActive: false, bulletX: 0.0, bulletY: 0.0,
+    };
+    if (cannon.periodTicks < 2) cannon.periodTicks = 2;
+    this.cannons.push(cannon);
   }
 
   addTrigger(kind, x, y, w, h, power, dirX) {
@@ -520,6 +544,40 @@ class SimWorld {
       }
     }
 
+    // 10c. cannons: each fires one bullet per period; the bullet flies
+    // straight until it hits a solid or leaves the world. Position is
+    // derived from ticks-since-fire (no per-bullet objects).
+    if (!respawned) {
+      for (const c of this.cannons) {
+        const phase = this.tickCount + c.phaseTicks;
+        const intoCycle = phase % c.periodTicks;
+        const perTick = c.speed * SIM.TICK;
+        const traveled = intoCycle * perTick;
+        const signedTravel = c.dir * traveled;
+        const halfDir = c.dir * c.halfW;
+        const muzzle = c.x + halfDir;
+        const bx = muzzle + signedTravel;
+        const by = c.y;
+
+        let blocked = false;
+        for (const s of this.solids) {
+          if (SimWorld.overlaps(bx, by, SIM.BULLET_HALF, SIM.BULLET_HALF, s)) { blocked = true; break; }
+        }
+        const offWorld = bx < -600.0 || bx > 600.0;
+        c.bulletActive = !blocked && !offWorld;
+        c.bulletX = bx;
+        c.bulletY = by;
+
+        if (c.bulletActive &&
+            SimWorld.overlaps(bx, by, SIM.BULLET_HALF, SIM.BULLET_HALF,
+              { x: this.px, y: this.py, halfW: SIM.PLAYER_HALF, halfH: SIM.PLAYER_HALF })) {
+          this.respawn();
+          respawned = true;
+          break;
+        }
+      }
+    }
+
     // 11. kill bounds (derived from stage geometry — tall stages welcome)
     if (!respawned) {
       if (this.py < this.killBottom || this.py > this.killTop) this.respawn();
@@ -563,6 +621,7 @@ class SimWorld {
         case 'timedGate': world.addGate(p.x, p.y, p.w, p.h, p.period || 0, p.dx || 0); break;
         case 'key': world.addKey(p.x, p.y, p.w, p.h); break;
         case 'door': world.addDoor(p.x, p.y, p.w, p.h); break;
+        case 'cannon': world.addCannon(p.x, p.y, p.w, p.h, p.dirX || 0, p.power || 0, p.period || 0, p.dx || 0); break;
         case 'hazard': world.addTrigger('hazard', p.x, p.y, p.w, p.h, 0, 0); break;
         case 'jumpPad': world.addTrigger('pad', p.x, p.y, p.w, p.h, p.power || 0, 0); break;
         case 'boost': world.addTrigger('boost', p.x, p.y, p.w, p.h, p.power || 0, p.dirX || 0); break;
@@ -593,6 +652,7 @@ class SimWorld {
     for (const g of this.gates) consider(g);
     for (const k of this.keys) consider(k);
     for (const d of this.doors) consider(d);
+    for (const c of this.cannons) consider(c);
     this.killBottom = minY - SIM.KILL_MARGIN_BELOW;
     this.killTop = maxY + SIM.KILL_MARGIN_ABOVE;
   }

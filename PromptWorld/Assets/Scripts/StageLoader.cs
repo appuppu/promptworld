@@ -83,7 +83,7 @@ public class StageLoader : MonoBehaviour
         SimWorld world = SimWorld.FromStage(data);
         var driver = gameObject.AddComponent<SimDriver>();
         driver.Init(world, player.transform, moverViews.ToArray(), crumbleViews.ToArray(), gameManager);
-        driver.SetPartViews(fallerViews.ToArray(), gateViews.ToArray(), keyViews.ToArray(), doorViews.ToArray());
+        driver.SetPartViews(fallerViews.ToArray(), gateViews.ToArray(), keyViews.ToArray(), doorViews.ToArray(), GetWhiteSprite());
 
         gameManager.ConfigureSim(data.name, data.timeLimit);
         cameraFollow.SetTarget(player.transform);
@@ -162,6 +162,15 @@ public class StageLoader : MonoBehaviour
                 doorViews.Add(go);
                 break;
             }
+            case "cannon":
+            {
+                GameObject go = CreateRectObject("Cannon", parent, pos, scale);
+                // a black muzzle notch on the firing side
+                float d = part.dirX < 0f ? -1f : 1f;
+                CreateChildRect(go.transform, new Vector2(0.32f * d, 0f), new Vector2(0.3f, 0.5f), Color.black);
+                CreateChildRect(go.transform, new Vector2(0.05f * d, 0f), new Vector2(0.35f, 0.28f), Color.black);
+                break;
+            }
             case "solid":
                 CreateRectObject("Solid", parent, pos, scale);
                 break;
@@ -187,8 +196,20 @@ public class StageLoader : MonoBehaviour
                 CreateRectObject("JumpPad", parent, pos, scale);
                 break;
             case "boost":
-                CreateRectObject("Boost", parent, pos, scale);
+            {
+                // A sideways arrow (shaft + arrowhead) pointing the launch
+                // direction, so "blasts you left/right" reads at a glance.
+                // Drawn as a fixed square (not the thin trigger strip) so the
+                // arrow isn't distorted.
+                float bh = Mathf.Max(part.h, 1.2f);
+                GameObject go = CreateRectObject("Boost", parent, pos, new Vector3(1.2f, bh, 1f));
+                float d = part.dirX < 0f ? -1f : 1f;
+                float xw = 1.2f; // undo horizontal stretch for children
+                CreateChildRect(go.transform, new Vector2(-0.12f * d / xw, 0f), new Vector2(0.55f / xw, 0.16f / bh), Color.black);
+                var head = CreateChildRectGO(go.transform, new Vector2(0.28f * d / xw, 0f), new Vector2(0.3f / xw, 0.3f / bh), Color.black);
+                head.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
                 break;
+            }
             case "launcher":
             {
                 GameObject go = CreateRectObject("Launcher", parent, pos, scale);

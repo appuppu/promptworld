@@ -32,7 +32,7 @@ const LIMITS = {
 
 const KNOWN_TYPES = new Set([
   'solid', 'hazard', 'jumpPad', 'boost', 'gravityFlip', 'movingPlatform', 'crumble',
-  'faller', 'conveyor', 'timedGate', 'key', 'door', 'launcher',
+  'faller', 'conveyor', 'timedGate', 'key', 'door', 'launcher', 'cannon',
 ]);
 
 const SUPPORTED_VERSIONS = new Set(['0.2', '0.3']);
@@ -75,10 +75,10 @@ function validateStage(data) {
     if (!p || !KNOWN_TYPES.has(p.type)) { errors.push(`${label}: unknown type.`); return; }
     if (!inWorld(p.x, p.y)) errors.push(`${label}: outside the world bounds.`);
     if (!sizeOk(p.w, p.h)) errors.push(`${label}: size out of range.`);
-    if ((p.type === 'jumpPad' || p.type === 'boost' || p.type === 'conveyor' || p.type === 'launcher') &&
+    if ((p.type === 'jumpPad' || p.type === 'boost' || p.type === 'conveyor' || p.type === 'launcher' || p.type === 'cannon') &&
         p.power !== undefined && !inRange(p.power, 0, LIMITS.maxPower))
       errors.push(`${label}: power must be within [0, ${LIMITS.maxPower}].`);
-    if ((p.type === 'movingPlatform' || p.type === 'timedGate') && p.period !== undefined && p.period !== 0 &&
+    if ((p.type === 'movingPlatform' || p.type === 'timedGate' || p.type === 'cannon') && p.period !== undefined && p.period !== 0 &&
         !inRange(p.period, LIMITS.minPeriod, LIMITS.maxPeriod))
       errors.push(`${label}: period must be within [${LIMITS.minPeriod}, ${LIMITS.maxPeriod}] seconds.`);
     if (p.type === 'faller' && p.dy !== undefined && p.dy !== 0 && !inRange(p.dy, 0.5, 50))
@@ -685,10 +685,11 @@ PARTS (x,y = center; w,h = size; coords within ±500, sizes 0.05..100):
 - {"type":"jumpPad","x","y","w","h","power"} — vertical relaunch; power<=60, 22 reaches ~8 units up; thin slab h~0.3 on a solid
 - {"type":"boost","x","y","w","h","dirX","power"} — horizontal launch (dirX +1/-1, power<=60, 10 carries ~6 units); thin strip on a solid
 - {"type":"launcher","x","y","w","h","power"} — DEADLY TRAP: touching it flings the player straight up so hard they fly off the top of the world and respawn at the start (losing time). power<=60 (default 40). Float it in mid-air as a hazard to weave around, or hide it as a trap. Control is locked during the launch.
+- {"type":"cannon","x","y","w","h","dirX","power","period","dx"} — fires a bullet horizontally every "period" seconds (0.5..30) in direction dirX (+1 right / -1 left) at speed "power" (default 10, <=60). The bullet flies straight until it hits a solid or leaves the world; touching a bullet = respawn. "dx" is an optional phase offset in seconds (stagger multiple cannons). Place at any height to make timing/dodging puzzles — run past between shots.
 - {"type":"gravityFlip","x","y","w","h"} — hollow square; touch inverts gravity; ~1.2x1.2 floating in the path
 - {"type":"movingPlatform","x","y","w","h","dx","dy","period"} — rideable, oscillates to (x+dx,y+dy) and back every period s (0.5..30). Players stick to it and inherit its velocity when jumping
 - {"type":"crumble","x","y","w","h"} — blinks 0.5s after touch, vanishes 2.5s, returns
-- {"type":"faller","x","y","w","h","dy"} — crusher: a heavy block that hovers low and visible until the player passes below, then shudders and slams down dy units (0.5..50) to crush anything beneath (touch while falling = respawn), rests, then rises back. Hang it LOW so its slam reaches the floor
+- {"type":"faller","x","y","w","h","dy"} — crusher: a heavy block that hovers LOW and VISIBLE until the player passes below, shudders, then slams straight down dy units (0.5..50) to crush anything beneath (contact while falling = respawn), rests, and rises back. CRITICAL sizing: the slam must reach the floor. If the floor top is at Y_floor and the crusher center rests at y with half-height h/2, set dy so that (y - dy - h/2) is at or slightly BELOW Y_floor (i.e. dy >= y - Y_floor - h/2 + 0.3). Keep the resting y around 1..2 so players can SEE it hanging above them before it drops. Example: floor top -3.5, crusher y=1.5 h=1.6 -> need dy >= 1.5-(-3.5)-0.8+0.3 = 4.5+; use dy=6 to be safe.
 - {"type":"conveyor","x","y","w","h","dirX","power"} — belt: standing players drift toward dirX at power u/s (default 3, max 60)
 - {"type":"timedGate","x","y","w","h","period","dx"} — solid that exists for the first half of every period seconds, gone for the second half; dx = phase offset in seconds
 - {"type":"key","x","y","w","h"} — collectible; when ALL keys in the stage are collected, every door opens

@@ -20,7 +20,7 @@ public static class StageValidator
     private static readonly HashSet<string> KnownTypes = new HashSet<string>
     {
         "solid", "hazard", "jumpPad", "boost", "gravityFlip", "movingPlatform", "crumble",
-        "faller", "conveyor", "timedGate", "key", "door", "launcher",
+        "faller", "conveyor", "timedGate", "key", "door", "launcher", "cannon",
     };
 
     private static readonly HashSet<string> SupportedVersions = new HashSet<string> { "0.2", "0.3" };
@@ -74,10 +74,10 @@ public static class StageValidator
             if (!InWorld(p.x, p.y)) errors.Add($"{label}: outside the world bounds.");
             if (!SizeOk(p.w, p.h)) errors.Add($"{label}: size out of range.");
 
-            if ((p.type == "jumpPad" || p.type == "boost" || p.type == "conveyor" || p.type == "launcher") && (p.power < 0f || p.power > MaxPower))
+            if ((p.type == "jumpPad" || p.type == "boost" || p.type == "conveyor" || p.type == "launcher" || p.type == "cannon") && (p.power < 0f || p.power > MaxPower))
                 errors.Add($"{label}: power {p.power} exceeds the maximum of {MaxPower}.");
 
-            if ((p.type == "movingPlatform" || p.type == "timedGate") && p.period != 0f && (p.period < MinPeriod || p.period > MaxPeriod))
+            if ((p.type == "movingPlatform" || p.type == "timedGate" || p.type == "cannon") && p.period != 0f && (p.period < MinPeriod || p.period > MaxPeriod))
                 errors.Add($"{label}: period must be within [{MinPeriod}, {MaxPeriod}] seconds.");
 
             if (p.type == "faller" && p.dy != 0f && (p.dy < 0.5f || p.dy > 50f))

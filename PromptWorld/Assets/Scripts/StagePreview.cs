@@ -62,6 +62,7 @@ public static class StagePreview
                 case "timedGate": Frame(p.x, p.y, p.w, p.h); break;
                 case "hazard": Fill(p.x, p.y, p.w * 0.6f, p.h * 0.6f); break;
                 case "key": Fill(p.x, p.y, p.w * 0.5f, p.h * 0.5f); break;
+                case "cannon": Fill(p.x, p.y, p.w, p.h); break;
                 default: Fill(p.x, p.y, p.w, p.h); break;
             }
         }
