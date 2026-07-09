@@ -76,7 +76,7 @@ public class SimCrumble : SimBox
 
 public class SimTrigger : SimBox
 {
-    public string Kind;      // hazard | pad | boost | flip | goal
+    public string Kind;      // hazard | pad | boost | flip | goal | launcher
     public double Power;
     public double DirX;
     public int LastFlipTick = -1000000;
@@ -655,6 +655,17 @@ public class SimWorld
                 LockTicks = BoostLockTicks;
                 Events |= SimEvents.Boosted;
             }
+            else if (tr.Kind == "launcher")
+            {
+                // Flings the player straight up hard; they sail off the top
+                // of the world and respawn. A deadly floating trap.
+                double p = tr.Power;
+                if (p <= 0.0) p = 40.0;
+                Vx = 0.0;
+                Vy = p * GravityDir;
+                LockTicks = BoostLockTicks * 3;
+                Events |= SimEvents.Boosted;
+            }
             else if (tr.Kind == "flip")
             {
                 int since = TickCount - tr.LastFlipTick;
@@ -743,6 +754,7 @@ public class SimWorld
                 case "hazard": world.AddTrigger("hazard", p.x, p.y, p.w, p.h, 0, 0); break;
                 case "jumpPad": world.AddTrigger("pad", p.x, p.y, p.w, p.h, p.power, 0); break;
                 case "boost": world.AddTrigger("boost", p.x, p.y, p.w, p.h, p.power, p.dirX); break;
+                case "launcher": world.AddTrigger("launcher", p.x, p.y, p.w, p.h, p.power, 0); break;
                 case "gravityFlip": world.AddTrigger("flip", p.x, p.y, p.w, p.h, 0, 0); break;
             }
         }

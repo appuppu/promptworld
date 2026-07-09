@@ -17,6 +17,7 @@
     { "type": "crumble", "x": 12, "y": -2.5, "w": 2, "h": 0.5 },
     { "type": "jumpPad", "x": 14, "y": -3.15, "w": 1.5, "h": 0.3, "power": 20 },
     { "type": "gravityFlip", "x": 16, "y": 1, "w": 1.2, "h": 1.2 },
-    { "type": "solid", "x": 16, "y": 6, "w": 8, "h": 1 }
+    { "type": "solid", "x": 16, "y": 6, "w": 8, "h": 1 },
+    { "type": "launcher", "x": 4, "y": 0, "w": 1, "h": 1, "power": 40 }
   ]
 }

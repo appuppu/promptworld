@@ -187,6 +187,16 @@ public class StageLoader : MonoBehaviour
             case "boost":
                 CreateRectObject("Boost", parent, pos, scale);
                 break;
+            case "launcher":
+            {
+                GameObject go = CreateRectObject("Launcher", parent, pos, scale);
+                // A hollow black up-chevron so it reads as "flings you skyward".
+                CreateChildRect(go.transform, new Vector2(0f, 0.22f), new Vector2(0.5f, 0.14f), Color.black);
+                CreateChildRect(go.transform, new Vector2(-0.16f, 0.02f), new Vector2(0.18f, 0.14f), Color.black);
+                CreateChildRect(go.transform, new Vector2(0.16f, 0.02f), new Vector2(0.18f, 0.14f), Color.black);
+                CreateChildRect(go.transform, new Vector2(0f, -0.2f), new Vector2(0.5f, 0.14f), Color.black);
+                break;
+            }
             case "gravityFlip":
                 CreateFrame("GravityFlip", parent, part.x, part.y, part.w, part.h, 0.12f);
                 break;

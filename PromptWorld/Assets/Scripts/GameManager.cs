@@ -221,8 +221,9 @@ public class GameManager : MonoBehaviour
     private void ReportPlayOutcome(int deaths, bool cleared)
     {
         if (!IsPublicRemoteSession()) return;
-        int attempts = deaths + 1;
-        string payload = $"{{\"attempts\":{attempts},\"clears\":{(cleared ? 1 : 0)}}}";
+        // The server deduplicates per device: this play counts once no matter
+        // how many times the same player retries.
+        string payload = $"{{\"playerId\":\"{PlayerIdentity.Id}\",\"cleared\":{(cleared ? "true" : "false")}}}";
         StartCoroutine(PostJson($"{GameSession.ApiOrigin}/api/stages/{GameSession.RemoteStageId}/stats", payload, null));
 
         if (cleared) StartCoroutine(SubmitScore());

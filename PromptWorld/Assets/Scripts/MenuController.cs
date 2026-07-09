@@ -194,7 +194,11 @@ public class MenuController : MonoBehaviour
                 int pct = stage.goods * 100 / (stage.goods + stage.bads);
                 parts.Add($"GOOD {pct}%");
             }
-            if (stage.attempts >= 10) parts.Add($"CLEAR {stage.clears * 100 / stage.attempts}%");
+            if (stage.attempts > 0)
+            {
+                parts.Add($"{stage.attempts} PLAYS");
+                parts.Add($"CLEAR {stage.clears} ({stage.clears * 100 / stage.attempts}%)");
+            }
 
             Entry entry = AddEntry(stage.name, string.Join("  ·  ", parts), () =>
             {
@@ -299,6 +303,7 @@ public class MenuController : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.color = color;
         tmp.raycastTarget = false;
+        tmp.richText = false; // user-supplied names must never inject tags
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
     }

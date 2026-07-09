@@ -32,27 +32,33 @@ const LIMITS = {
 
 const KNOWN_TYPES = new Set([
   'solid', 'hazard', 'jumpPad', 'boost', 'gravityFlip', 'movingPlatform', 'crumble',
-  'faller', 'conveyor', 'timedGate', 'key', 'door',
+  'faller', 'conveyor', 'timedGate', 'key', 'door', 'launcher',
 ]);
 
 const SUPPORTED_VERSIONS = new Set(['0.2', '0.3']);
 
 function validateStage(data) {
   const errors = [];
+  // Every numeric field must be a finite number — this rejects NaN and
+  // Infinity, which would otherwise slip past range comparisons and poison
+  // the physics simulation.
+  const finite = (v) => typeof v === 'number' && Number.isFinite(v);
   const inWorld = (x, y) =>
+    finite(x) && finite(y) &&
     x >= -LIMITS.maxCoord && x <= LIMITS.maxCoord && y >= -LIMITS.maxCoord && y <= LIMITS.maxCoord;
   const sizeOk = (w, h) =>
+    finite(w) && finite(h) &&
     w >= LIMITS.minSize && w <= LIMITS.maxSize && h >= LIMITS.minSize && h <= LIMITS.maxSize;
+  const inRange = (v, lo, hi) => finite(v) && v >= lo && v <= hi;
 
   if (!data || typeof data !== 'object') return ['Stage JSON could not be parsed.'];
   if (!SUPPORTED_VERSIONS.has(data.schemaVersion)) errors.push(`Unsupported schemaVersion '${data.schemaVersion}'.`);
   if (typeof data.name !== 'string' || data.name.length < 1 || data.name.length > 60)
     errors.push('name must be a string of 1-60 characters.');
-  if (typeof data.timeLimit !== 'number' || data.timeLimit < LIMITS.minTimeLimit || data.timeLimit > LIMITS.maxTimeLimit)
+  if (!inRange(data.timeLimit, LIMITS.minTimeLimit, LIMITS.maxTimeLimit))
     errors.push(`timeLimit must be within [${LIMITS.minTimeLimit}, ${LIMITS.maxTimeLimit}] seconds.`);
-  if (!data.playerStart || typeof data.playerStart.x !== 'number' || typeof data.playerStart.y !== 'number')
-    errors.push('playerStart is required.');
-  else if (!inWorld(data.playerStart.x, data.playerStart.y)) errors.push('playerStart is outside the world bounds.');
+  if (!data.playerStart || !inWorld(data.playerStart.x, data.playerStart.y))
+    errors.push('playerStart is required and must be within the world bounds.');
   if (!data.goal) errors.push('goal is required.');
   else {
     if (!inWorld(data.goal.x, data.goal.y)) errors.push('goal is outside the world bounds.');
@@ -67,17 +73,23 @@ function validateStage(data) {
   data.parts.forEach((p, i) => {
     const label = `parts[${i}] (${p && p.type})`;
     if (!p || !KNOWN_TYPES.has(p.type)) { errors.push(`${label}: unknown type.`); return; }
-    if (typeof p.x !== 'number' || typeof p.y !== 'number' || !inWorld(p.x, p.y)) errors.push(`${label}: outside the world bounds.`);
-    if (typeof p.w !== 'number' || typeof p.h !== 'number' || !sizeOk(p.w, p.h)) errors.push(`${label}: size out of range.`);
-    if ((p.type === 'jumpPad' || p.type === 'boost' || p.type === 'conveyor') && p.power !== undefined &&
-        (typeof p.power !== 'number' || p.power < 0 || p.power > LIMITS.maxPower))
-      errors.push(`${label}: power exceeds the maximum of ${LIMITS.maxPower}.`);
+    if (!inWorld(p.x, p.y)) errors.push(`${label}: outside the world bounds.`);
+    if (!sizeOk(p.w, p.h)) errors.push(`${label}: size out of range.`);
+    if ((p.type === 'jumpPad' || p.type === 'boost' || p.type === 'conveyor' || p.type === 'launcher') &&
+        p.power !== undefined && !inRange(p.power, 0, LIMITS.maxPower))
+      errors.push(`${label}: power must be within [0, ${LIMITS.maxPower}].`);
     if ((p.type === 'movingPlatform' || p.type === 'timedGate') && p.period !== undefined && p.period !== 0 &&
-        (typeof p.period !== 'number' || p.period < LIMITS.minPeriod || p.period > LIMITS.maxPeriod))
+        !inRange(p.period, LIMITS.minPeriod, LIMITS.maxPeriod))
       errors.push(`${label}: period must be within [${LIMITS.minPeriod}, ${LIMITS.maxPeriod}] seconds.`);
-    if (p.type === 'faller' && p.dy !== undefined && p.dy !== 0 &&
-        (typeof p.dy !== 'number' || p.dy < 0.5 || p.dy > 50))
+    if (p.type === 'faller' && p.dy !== undefined && p.dy !== 0 && !inRange(p.dy, 0.5, 50))
       errors.push(`${label}: dy (fall distance) must be within [0.5, 50].`);
+    // Movement offsets and direction fields feed the sim — bound them all.
+    if (p.dx !== undefined && !inRange(p.dx, -LIMITS.maxCoord, LIMITS.maxCoord))
+      errors.push(`${label}: dx out of range.`);
+    if (p.dy !== undefined && p.type !== 'faller' && !inRange(p.dy, -LIMITS.maxCoord, LIMITS.maxCoord))
+      errors.push(`${label}: dy out of range.`);
+    if (p.dirX !== undefined && !inRange(p.dirX, -1e6, 1e6))
+      errors.push(`${label}: dirX out of range.`);
   });
 
   return errors;
@@ -93,6 +105,21 @@ function newId() {
   for (const b of bytes) id += alphabet[b % alphabet.length];
   return id;
 }
+
+// Strips control characters and angle brackets from user-supplied names —
+// they are rendered in HTML (OGP) and in TextMeshPro (rich-text tags).
+function sanitizeName(value, maxLen) {
+  if (typeof value !== 'string') return '';
+  let out = '';
+  for (const ch of value) {
+    const c = ch.codePointAt(0);
+    if (c < 32 || c === 127) continue;
+    if (ch === '<' || ch === '>') continue;
+    out += ch;
+  }
+  return out.trim().slice(0, maxLen);
+}
+
 
 // ------------------------------------------------------------ abuse control
 
@@ -173,7 +200,7 @@ async function getCreatorById(env, id) {
 async function mintCreator(env, name) {
   const token = crypto.randomUUID();
   const id = newId();
-  let clean = typeof name === 'string' ? name.trim().slice(0, 30) : '';
+  let clean = sanitizeName(name, 30);
   if (clean.length === 0) clean = 'anonymous';
   await env.promptworld_stages
     .prepare('INSERT INTO creators (token, id, name, created_at) VALUES (?, ?, ?, ?)')
@@ -191,23 +218,31 @@ async function opCreateStage(env, origin, stage, request, creatorToken, creatorN
     return { status: 503, body: { error: 'The platform has reached its stage capacity. Please try again later.' } };
   }
 
+  // Validate BEFORE touching the database, so a rejected stage never leaves
+  // an orphan creator row behind.
+  if (stage && typeof stage.name === 'string') {
+    stage.name = sanitizeName(stage.name, 60);
+  }
+  const errors = validateStage(stage);
+  if (errors.length > 0) return { status: 422, body: { error: 'Validation failed.', details: errors } };
+
+  // A provided token must be valid and un-banned before we mint or write.
+  let existingCreator = null;
+  if (creatorToken) {
+    existingCreator = await getCreatorByToken(env, creatorToken);
+    if (!existingCreator) return { status: 401, body: { error: 'Invalid creatorToken.' } };
+    if (existingCreator.banned) return { status: 403, body: { error: 'This creator is banned.' } };
+  }
+
   // Invisible identity: reuse the token if provided, mint silently if not.
   let creator;
   let minted = false;
-  if (creatorToken) {
-    creator = await getCreatorByToken(env, creatorToken);
-    if (!creator) return { status: 401, body: { error: 'Invalid creatorToken.' } };
-    if (creator.banned) return { status: 403, body: { error: 'This creator is banned.' } };
+  if (existingCreator) {
+    creator = existingCreator;
   } else {
     creator = await mintCreator(env, creatorName);
     minted = true;
   }
-
-  if (stage && typeof stage.name === 'string') {
-    stage.name = stage.name.replace(/[\u0000-\u001f\u007f]/g, '').trim();
-  }
-  const errors = validateStage(stage);
-  if (errors.length > 0) return { status: 422, body: { error: 'Validation failed.', details: errors } };
 
   const id = newId();
   const editKey = crypto.randomUUID();
@@ -244,22 +279,37 @@ async function opMarkTestStarted(env, id) {
     .run();
 }
 
+// Verifies a replay certificate against a stage with hard work bounds, so a
+// single request can never become a CPU bomb. Returns { ok, result?, error }.
+function verifyReplay(stage, replay) {
+  if (!replay || replay.v !== 1 || !Array.isArray(replay.rle) ||
+      replay.rle.length === 0 || replay.rle.length > 400000) {
+    return { ok: false, error: 'A replay certificate is required.' };
+  }
+  const maxTicks = Math.trunc(Math.fround(stage.timeLimit) / 0.02);
+  // Cap the worst-case work (ticks × parts). Legit stages stay well under
+  // this; it only stops pathological max-time × max-parts submissions.
+  const parts = Array.isArray(stage.parts) ? stage.parts.length : 0;
+  const WORK_BUDGET = 6000000; // ~6M step-part ops per request
+  const workCap = Math.max(1, Math.floor(WORK_BUDGET / Math.max(1, parts)));
+  const effectiveCap = Math.min(maxTicks, workCap);
+  const result = simRunReplay(stage, replay.rle, effectiveCap);
+  return { ok: true, result };
+}
+
 async function opRecordClear(env, row, body, request) {
   if (await overRateLimit(env, request, 'clear', RATE_LIMITS.clear)) {
     return { status: 429, body: { error: 'Rate limit: too many clear submissions today.' } };
   }
   const stage = JSON.parse(row.json);
-  const limitQ = Math.fround(stage.timeLimit);
-  const maxTicks = Math.trunc(limitQ / 0.02);
 
   // Level 3: a clear only counts if its replay certificate re-simulates to
   // the goal. simRunReplay runs the exact deterministic sim the client used.
-  const replay = body.replay;
-  if (!replay || replay.v !== 1 || !Array.isArray(replay.rle) ||
-      replay.rle.length === 0 || replay.rle.length > 400000) {
-    return { status: 422, body: { error: 'A replay certificate is required to record a clear.' } };
+  const check = verifyReplay(stage, body.replay);
+  if (!check.ok) {
+    return { status: 422, body: { error: check.error } };
   }
-  const result = simRunReplay(stage, replay.rle, maxTicks);
+  const result = check.result;
   if (!result.cleared) {
     return { status: 422, body: { error: `Replay verification failed: ${result.error || 'goal not reached'}` } };
   }
@@ -412,26 +462,46 @@ async function opVote(env, row, body, request) {
   return { status: 200, body: { id: row.id, goods: agg.goods, bads: agg.bads } };
 }
 
-// Clear rate = clears / attempts, reported automatically by the client
-// (each death, timeout or clear ends one attempt). Deltas are capped so a
-// hostile client can only nudge, not swamp, the statistics.
+// Play stats are deduplicated per device: attempts = distinct devices that
+// played, clears = distinct devices that cleared. One device can never
+// inflate the numbers by reporting repeatedly — the worst it can do is flip
+// its own single row. The stages.attempts/clears counters are maintained as
+// exact deltas from that per-device state.
 async function opStats(env, row, body, request) {
   if (row.status !== 'published') return { status: 200, body: { ok: true } };
+  if (!validPlayerId(body.playerId)) return { status: 200, body: { ok: true } };
   if (await overRateLimit(env, request, 'stats', RATE_LIMITS.stats)) {
     return { status: 429, body: { error: 'Rate limit.' } };
   }
-  let attempts = Number(body.attempts);
-  let clears = Number(body.clears);
-  if (!Number.isInteger(attempts) || !Number.isInteger(clears)) {
-    return { status: 422, body: { error: 'attempts and clears must be integers.' } };
+  const cleared = body.cleared === true ? 1 : 0;
+
+  const prev = await env.promptworld_stages
+    .prepare('SELECT cleared FROM plays WHERE stage_id = ? AND player_id = ?')
+    .bind(row.id, body.playerId)
+    .first();
+
+  let dAttempts = 0;
+  let dClears = 0;
+  if (!prev) {
+    dAttempts = 1;           // first time this device played
+    dClears = cleared;
+  } else if (cleared === 1 && prev.cleared === 0) {
+    dClears = 1;             // this device cleared for the first time
   }
-  attempts = Math.max(0, Math.min(attempts, 30));
-  clears = Math.max(0, Math.min(clears, 1));
-  if (clears > attempts) attempts = clears;
+
   await env.promptworld_stages
-    .prepare('UPDATE stages SET attempts = attempts + ?, clears = clears + ? WHERE id = ?')
-    .bind(attempts, clears, row.id)
+    .prepare(`INSERT INTO plays (stage_id, player_id, cleared, updated_at) VALUES (?, ?, ?, ?)
+              ON CONFLICT(stage_id, player_id) DO UPDATE SET
+                cleared = MAX(plays.cleared, excluded.cleared), updated_at = excluded.updated_at`)
+    .bind(row.id, body.playerId, cleared, new Date().toISOString())
     .run();
+
+  if (dAttempts !== 0 || dClears !== 0) {
+    await env.promptworld_stages
+      .prepare('UPDATE stages SET attempts = attempts + ?, clears = clears + ? WHERE id = ?')
+      .bind(dAttempts, dClears, row.id)
+      .run();
+  }
   return { status: 200, body: { ok: true } };
 }
 
@@ -445,19 +515,17 @@ async function opScore(env, row, body, request) {
   }
 
   const stage = JSON.parse(row.json);
-  const maxTicks = Math.trunc(Math.fround(stage.timeLimit) / 0.02);
-  const replay = body.replay;
-  if (!replay || replay.v !== 1 || !Array.isArray(replay.rle) ||
-      replay.rle.length === 0 || replay.rle.length > 400000) {
-    return { status: 422, body: { error: 'A replay certificate is required.' } };
+  const check = verifyReplay(stage, body.replay);
+  if (!check.ok) {
+    return { status: 422, body: { error: check.error } };
   }
-  const result = simRunReplay(stage, replay.rle, maxTicks);
+  const result = check.result;
   if (!result.cleared) {
     return { status: 422, body: { error: `Replay verification failed: ${result.error || 'goal not reached'}` } };
   }
   const timeMs = result.ticks * 20;
 
-  let name = typeof body.name === 'string' ? body.name.replace(/[ -]/g, '').trim().slice(0, 16) : '';
+  let name = sanitizeName(body.name, 16);
   if (name.length === 0) name = 'anonymous';
 
   const existing = await env.promptworld_stages
@@ -519,6 +587,11 @@ async function handleApi(request, env, url) {
   if (!row) return json({ error: 'Stage not found.' }, 404);
 
   if (!action && method === 'GET') {
+    // A published stage from a since-banned creator is treated as gone.
+    if (row.status === 'published' && row.creator_id) {
+      const creator = await getCreatorById(env, row.creator_id);
+      if (creator && creator.banned) return json({ error: 'Stage not found.' }, 404);
+    }
     // Fetching a draft marks the start of a creator test session.
     if (row.status === 'draft') await opMarkTestStarted(env, id);
     return new Response(row.json, { headers: { 'Content-Type': 'application/json' } });
@@ -595,6 +668,7 @@ PARTS (x,y = center; w,h = size; coords within ±500, sizes 0.05..100):
 - {"type":"hazard","x","y","w","h"} — spike diamond; touch = respawn to start. ~0.8x0.8, rest on a solid (y = solidTop + ~0.6)
 - {"type":"jumpPad","x","y","w","h","power"} — vertical relaunch; power<=60, 22 reaches ~8 units up; thin slab h~0.3 on a solid
 - {"type":"boost","x","y","w","h","dirX","power"} — horizontal launch (dirX +1/-1, power<=60, 10 carries ~6 units); thin strip on a solid
+- {"type":"launcher","x","y","w","h","power"} — DEADLY TRAP: touching it flings the player straight up so hard they fly off the top of the world and respawn at the start (losing time). power<=60 (default 40). Float it in mid-air as a hazard to weave around, or hide it as a trap. Control is locked during the launch.
 - {"type":"gravityFlip","x","y","w","h"} — hollow square; touch inverts gravity; ~1.2x1.2 floating in the path
 - {"type":"movingPlatform","x","y","w","h","dx","dy","period"} — rideable, oscillates to (x+dx,y+dy) and back every period s (0.5..30). Players stick to it and inherit its velocity when jumping
 - {"type":"crumble","x","y","w","h"} — blinks 0.5s after touch, vanishes 2.5s, returns
@@ -707,9 +781,7 @@ async function mcpCallTool(env, origin, name, args, request) {
       if (args?.editKey !== row.edit_key) return { text: 'Error: invalid editKey.', isError: true };
 
       // The human must approve the final name before anything goes public.
-      const confirmed = typeof args?.confirmedName === 'string'
-        ? args.confirmedName.replace(/[\u0000-\u001f\u007f]/g, '').trim()
-        : '';
+      const confirmed = sanitizeName(args?.confirmedName, 60);
       if (confirmed.length < 1 || confirmed.length > 60) {
         return {
           text: `Publish paused: ask the human creator to confirm the stage name first (current name: "${row.name}"). Then call publish_stage again with confirmedName set to exactly what they approved.`,
@@ -862,6 +934,10 @@ async function serveIndexWithOg(request, env, url) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const bodySize = Number(request.headers.get('content-length') || 0);
+    if (request.method === 'POST' && bodySize > 524288) {
+      return json({ error: 'Payload too large.' }, 413);
+    }
     try {
       if (url.pathname.startsWith('/api/')) return await handleApi(request, env, url);
       if (url.pathname === '/mcp') return await handleMcp(request, env, url);

@@ -481,6 +481,15 @@ class SimWorld {
         this.vy = SIM.BOOST_KICK * this.gravityDir;
         this.lockTicks = SIM.BOOST_LOCK_TICKS;
         this.events.boosted = true;
+      } else if (tr.kind === 'launcher') {
+        // Flings the player straight up hard; they sail off the top
+        // of the world and respawn. A deadly floating trap.
+        let p = tr.power;
+        if (p <= 0.0) p = 40.0;
+        this.vx = 0.0;
+        this.vy = p * this.gravityDir;
+        this.lockTicks = SIM.BOOST_LOCK_TICKS * 3;
+        this.events.boosted = true;
       } else if (tr.kind === 'flip') {
         const since = this.tickCount - tr.lastFlipTick;
         if (since >= SIM.FLIP_COOLDOWN_TICKS) {
@@ -553,6 +562,7 @@ class SimWorld {
         case 'hazard': world.addTrigger('hazard', p.x, p.y, p.w, p.h, 0, 0); break;
         case 'jumpPad': world.addTrigger('pad', p.x, p.y, p.w, p.h, p.power || 0, 0); break;
         case 'boost': world.addTrigger('boost', p.x, p.y, p.w, p.h, p.power || 0, p.dirX || 0); break;
+        case 'launcher': world.addTrigger('launcher', p.x, p.y, p.w, p.h, p.power || 0, 0); break;
         case 'gravityFlip': world.addTrigger('flip', p.x, p.y, p.w, p.h, 0, 0); break;
       }
     }
@@ -586,23 +596,43 @@ class SimWorld {
 
 /// Runs an RLE-encoded replay ([code,count,...]) against a stage.
 /// Returns { cleared, ticks } — ticks is the tick at which the goal was hit.
+///
+/// Hardened against CPU-exhaustion: the total simulated tick count is bounded
+/// up front (a replay can never run longer than the stage's own time limit),
+/// every element is validated, and empty (count===0) padding is rejected — so
+/// the amount of work is provably capped no matter what an attacker sends.
 function simRunReplay(stageData, rle, hardTickCap) {
-  const world = SimWorld.fromStage(stageData);
-  let ticks = 0;
+  if (rle.length % 2 !== 0) {
+    return { cleared: false, ticks: 0, error: 'Malformed replay.' };
+  }
+  // Pre-flight: validate every element and bound the total work before we
+  // build a world or run a single step.
+  let totalTicks = 0;
   for (let i = 0; i < rle.length; i += 2) {
     const code = rle[i];
     const count = rle[i + 1];
-    if (!Number.isInteger(code) || !Number.isInteger(count) || count < 0) {
-      return { cleared: false, ticks, error: 'Malformed replay.' };
+    if (!Number.isInteger(code) || code < 0 || code > 7) {
+      return { cleared: false, ticks: 0, error: 'Malformed replay.' };
     }
+    if (!Number.isInteger(count) || count < 1) {
+      return { cleared: false, ticks: 0, error: 'Malformed replay.' };
+    }
+    totalTicks += count;
+    if (totalTicks > hardTickCap) {
+      return { cleared: false, ticks: 0, error: 'Replay exceeds time limit.' };
+    }
+  }
+
+  const world = SimWorld.fromStage(stageData);
+  for (let i = 0; i < rle.length; i += 2) {
+    const code = rle[i];
+    const count = rle[i + 1];
     const input = {
       left: (code & 1) !== 0,
       right: (code & 2) !== 0,
       jump: (code & 4) !== 0,
     };
     for (let n = 0; n < count; n++) {
-      ticks++;
-      if (ticks > hardTickCap) return { cleared: false, ticks, error: 'Replay exceeds time limit.' };
       // jump is an edge: only the first tick of a run-length carries the press
       const stepInput = n === 0 ? input : { left: input.left, right: input.right, jump: false };
       const ev = world.step(stepInput);

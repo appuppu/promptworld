@@ -11,7 +11,7 @@ const fs = require("fs");
 const p = process.argv[1];
 let s = fs.readFileSync(p, "utf8");
 s = s.replace("<title>Unity Web Player | Prompt World</title>", "<title>Prompt World</title>");
-if (!s.includes("body { background: #000; }")) {
+if (!s.includes("#unity-footer { display: none; }")) {
   s = s.replace(
     "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">",
     "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">\n    <style>body { background: #000; margin: 0; overflow: hidden; } #unity-footer { display: none; }</style>"
