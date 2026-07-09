@@ -124,13 +124,14 @@ public class SimWorld
     public const int FlipCooldownTicks = 35;
     public const int CrumbleDelayTicks = 25;
     public const int CrumbleRespawnTicks = 125;
-    public const double KillBottom = -12.0;
-    public const double KillTop = 15.0;
+    public const double KillMarginBelow = 8.0;
+    public const double KillMarginAbove = 12.0;
     public const double GroundProbe = 0.06;
     public const double FallerFallSpeed = 22.0;
     public const double FallerRiseSpeed = 3.0;
     public const int FallerWaitTicks = 25;
     public const double FallerMargin = 0.6;
+    public const double AirDamping = 0.86;
 
     public readonly List<SimBox> Solids = new List<SimBox>();
     public readonly List<SimMover> Movers = new List<SimMover>();
@@ -144,6 +145,8 @@ public class SimWorld
     public int KeysCollected;
 
     public double StartX, StartY;
+    public double KillBottom = -12.0;
+    public double KillTop = 15.0;
     public double Px, Py, Vx, Vy;
     public double GravityDir = 1.0;
     public int LockTicks;
@@ -151,6 +154,7 @@ public class SimWorld
     public int JumpPressedTick = -1000000;
     public int GroundMover = -1;
     public int GroundConveyor = -1;
+    public double AirCarryVx;
     public int TickCount;
     public int MaxTicks;
     public bool ClearedFlag;
@@ -431,6 +435,7 @@ public class SimWorld
         LockTicks = 0;
         GroundMover = -1;
         GroundConveyor = -1;
+        AirCarryVx = 0.0;
         LastGroundedTick = -1000000;
         JumpPressedTick = -1000000;
         Events |= SimEvents.Respawned;
@@ -553,20 +558,29 @@ public class SimWorld
         // 5. grounded
         if (ProbeGround()) LastGroundedTick = TickCount;
 
-        // 6. control: direct while steering; on the ground releasing stops you,
-        // in the air momentum is preserved (so moving floors don't leave you behind)
+        // 6. control: direct while steering; releasing decays air speed
+        // quickly (controllable), but ride-inherited velocity persists so
+        // moving floors don't leave you behind
         bool groundedNow = LastGroundedTick == TickCount;
+        if (groundedNow) AirCarryVx = 0.0;
         if (LockTicks > 0)
         {
             LockTicks = LockTicks - 1;
         }
         else if (axis != 0.0)
         {
-            Vx = axis * MoveSpeed;
+            double steer = axis * MoveSpeed;
+            Vx = steer + AirCarryVx;
         }
         else if (groundedNow)
         {
             Vx = 0.0;
+        }
+        else
+        {
+            double rel = Vx - AirCarryVx;
+            double damped = rel * AirDamping;
+            Vx = AirCarryVx + damped;
         }
 
         // 7. jump (coyote + buffer); inherits the velocity of whatever you
@@ -580,12 +594,14 @@ public class SimWorld
             {
                 SimMover jm = Movers[GroundMover];
                 double mv = jm.DeltaX / Tick;
+                AirCarryVx = mv;
                 Vx = Vx + mv;
             }
             if (GroundConveyor >= 0)
             {
                 SimConveyor jc = Conveyors[GroundConveyor];
                 double cv = jc.Speed * jc.Dir;
+                AirCarryVx = cv;
                 Vx = Vx + cv;
             }
             JumpPressedTick = -1000000;
@@ -671,7 +687,7 @@ public class SimWorld
             }
         }
 
-        // 11. kill zones
+        // 11. kill bounds (derived from stage geometry — tall stages welcome)
         if (!respawned)
         {
             if (Py < KillBottom || Py > KillTop) Respawn();
@@ -731,6 +747,32 @@ public class SimWorld
             }
         }
         world.AddTrigger("goal", data.goal.x, data.goal.y, data.goal.w, data.goal.h, 0, 0);
+        world.ComputeKillBounds();
         return world;
+    }
+
+    /// <summary>Kill bounds follow the stage's vertical extent so stages can climb arbitrarily high.</summary>
+    public void ComputeKillBounds()
+    {
+        double minY = StartY;
+        double maxY = StartY;
+        void Consider(SimBox b)
+        {
+            double lo = b.Y - b.HalfH;
+            double hi = b.Y + b.HalfH;
+            if (lo < minY) minY = lo;
+            if (hi > maxY) maxY = hi;
+        }
+        foreach (SimBox s in Solids) Consider(s);
+        foreach (SimMover m in Movers) Consider(m);
+        foreach (SimCrumble c in Crumbles) Consider(c);
+        foreach (SimTrigger t in Triggers) Consider(t);
+        foreach (SimFaller f in Fallers) Consider(f);
+        foreach (SimConveyor cv in Conveyors) Consider(cv);
+        foreach (SimGate g in Gates) Consider(g);
+        foreach (SimKey k in Keys) Consider(k);
+        foreach (SimDoor d in Doors) Consider(d);
+        KillBottom = minY - KillMarginBelow;
+        KillTop = maxY + KillMarginAbove;
     }
 }

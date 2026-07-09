@@ -4,7 +4,9 @@
 
 const fs = require('fs');
 
-const stage = {
+// Pass STAGE_JSON=/path/to/stage.json to solve an arbitrary stage; policy
+// probabilities tune via RIGHT_P / LEFT_P / JUMP_P.
+const stage = process.env.STAGE_JSON ? JSON.parse(fs.readFileSync(process.env.STAGE_JSON, 'utf8')) : {
   schemaVersion: '0.3',
   name: 'Crossfire',
   timeLimit: 40,
@@ -47,28 +49,54 @@ function mulberry32(seed) {
 
 const maxTicks = stage.timeLimit * 50;
 let best = -999;
+let bestY = -999;
 let solution = null;
 
-for (let seed = 1; seed <= 40000 && !solution; seed++) {
+const ATTEMPTS = Number(process.env.ATTEMPTS || 40000);
+for (let seed = 1; seed <= ATTEMPTS && !solution; seed++) {
   const rnd = mulberry32(seed);
   const world = SimWorld.fromStage(stage);
   const codes = [];
+  const RIGHT_P = Number(process.env.RIGHT_P || 0.92);
+  const LEFT_P = Number(process.env.LEFT_P || 0);
+  const JUMP_P = Number(process.env.JUMP_P || 0.12);
+  const STICKY = process.env.STICKY === '1';
+  let heldLeft = false;
+  let heldRight = false;
   for (let t = 0; t < maxTicks; t++) {
-    const right = rnd() < 0.92;
-    const jump = rnd() < 0.12;
+    let left;
+    let right;
+    if (STICKY) {
+      // re-roll the held direction occasionally — lets the bot ride
+      // elevators and wait out gates instead of jittering
+      if (t === 0 || rnd() < 0.06) {
+        const roll = rnd();
+        heldRight = roll < RIGHT_P;
+        heldLeft = !heldRight && roll < RIGHT_P + LEFT_P;
+      }
+      left = heldLeft;
+      right = heldRight;
+    } else {
+      const roll = rnd();
+      right = roll < RIGHT_P;
+      left = !right && roll < RIGHT_P + LEFT_P;
+    }
+    const jump = rnd() < JUMP_P;
     let code = 0;
+    if (left) code |= 1;
     if (right) code |= 2;
     if (jump) code |= 4;
     codes.push(code);
-    const ev = world.step({ left: false, right, jump });
+    const ev = world.step({ left, right, jump });
     if (world.px > best) best = world.px;
+    if (world.py > bestY) bestY = world.py;
     if (ev.cleared) { solution = { codes: codes, ticks: world.tickCount, seed }; break; }
     if (ev.timedOut) break;
   }
 }
 
 if (!solution) {
-  console.log(`UNSOLVED after 40000 attempts. Best x reached: ${best.toFixed(2)}`);
+  console.log(`UNSOLVED after ${ATTEMPTS} attempts. Best x: ${best.toFixed(2)} bestY: ${bestY.toFixed(2)}`);
   process.exit(1);
 }
 

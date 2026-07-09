@@ -22,14 +22,17 @@ public class TouchControls : MonoBehaviour
 
     private void Start()
     {
-        if (!Application.isMobilePlatform && !Input.touchSupported)
+        if (canvas == null) canvas = GetComponent<Canvas>();
+        bool touch = Application.isMobilePlatform || Input.touchSupported;
+        StartCoroutine(ShowHint(touch
+            ? "LEFT: SLIDE TO MOVE   ·   RIGHT: TAP TO JUMP"
+            : "MOVE: A/D or ARROWS   ·   JUMP: SPACE   ·   RETRY: R"));
+        if (!touch)
         {
-            enabled = false;
+            enabled = false; // keyboard players need no touch polling (coroutine keeps running)
             return;
         }
         dpiScale = Screen.dpi > 0f ? Screen.dpi / 160f : 2f;
-        if (canvas == null) canvas = GetComponent<Canvas>();
-        StartCoroutine(ShowHint());
     }
 
     private void Update()
@@ -83,7 +86,7 @@ public class TouchControls : MonoBehaviour
         MobileInput.RightHeld = axis > 0f;
     }
 
-    private IEnumerator ShowHint()
+    private IEnumerator ShowHint(string hintText)
     {
         var go = new GameObject("GestureHint", typeof(RectTransform));
         go.transform.SetParent(canvas.transform, false);
@@ -95,7 +98,7 @@ public class TouchControls : MonoBehaviour
         rect.sizeDelta = new Vector2(1400f, 60f);
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text = "LEFT: SLIDE TO MOVE   ·   RIGHT: TAP TO JUMP";
+        tmp.text = hintText;
         tmp.fontSize = 32;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = new Color(1f, 1f, 1f, 0.55f);

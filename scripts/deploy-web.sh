@@ -14,7 +14,7 @@ s = s.replace("<title>Unity Web Player | Prompt World</title>", "<title>Prompt W
 if (!s.includes("body { background: #000; }")) {
   s = s.replace(
     "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">",
-    "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">\n    <style>body { background: #000; margin: 0; overflow: hidden; }</style>"
+    "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">\n    <style>body { background: #000; margin: 0; overflow: hidden; } #unity-footer { display: none; }</style>"
   );
 }
 // Desktop: fill the whole window instead of a small fixed canvas.

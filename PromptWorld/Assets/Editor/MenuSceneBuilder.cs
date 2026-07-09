@@ -41,12 +41,12 @@ public static class MenuSceneBuilder
         new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
 
         CreateText(canvasGo.transform, "Title", "PROMPT WORLD", 76,
-            new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(1400f, 110f));
+            new Vector2(0.5f, 1f), new Vector2(0f, -95f), new Vector2(1400f, 110f));
 
-        TMP_InputField searchInput = CreateInputField(canvasGo.transform, "Search", "SEARCH STAGES",
-            new Vector2(0.5f, 1f), new Vector2(0f, -190f), new Vector2(680f, 58f), 28);
         TMP_InputField nameInput = CreateInputField(canvasGo.transform, "PlayerName", "PLAYER NAME",
-            new Vector2(1f, 1f), new Vector2(-30f, -28f), new Vector2(300f, 48f), 22);
+            new Vector2(0.5f, 1f), new Vector2(-300f, -235f), new Vector2(280f, 58f), 24);
+        TMP_InputField searchInput = CreateInputField(canvasGo.transform, "Search", "SEARCH STAGES",
+            new Vector2(0.5f, 1f), new Vector2(150f, -235f), new Vector2(600f, 58f), 28);
         RectTransform content = CreateScrollList(canvasGo.transform);
         Button createButton = CreateFooterButton(canvasGo.transform);
 
@@ -125,8 +125,8 @@ public static class MenuSceneBuilder
         scrollRect.anchorMin = new Vector2(0.5f, 0f);
         scrollRect.anchorMax = new Vector2(0.5f, 1f);
         scrollRect.pivot = new Vector2(0.5f, 0.5f);
-        scrollRect.sizeDelta = new Vector2(800f, -470f);
-        scrollRect.anchoredPosition = new Vector2(0f, -85f);
+        scrollRect.sizeDelta = new Vector2(800f, -530f);
+        scrollRect.anchoredPosition = new Vector2(0f, -115f);
         scrollGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f);
 
         var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));

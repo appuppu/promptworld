@@ -32,6 +32,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Button voteGoodButton;
     [SerializeField] private Button voteBadButton;
     [SerializeField] private TMP_Text leaderboardText;
+    [SerializeField] private Button homeButton;
 
     public GameState State { get; private set; } = GameState.Playing;
 
@@ -100,6 +101,7 @@ public class GameManager : MonoBehaviour
             voteBadButton.gameObject.SetActive(false);
         }
         if (leaderboardText != null) leaderboardText.text = "";
+        if (homeButton != null) homeButton.onClick.AddListener(BackToMenu);
     }
 
     /// <summary>Appends the current world-best time to the stage label.</summary>

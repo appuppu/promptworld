@@ -28,13 +28,14 @@ const SIM = {
   FLIP_COOLDOWN_TICKS: 35,
   CRUMBLE_DELAY_TICKS: 25,
   CRUMBLE_RESPAWN_TICKS: 125,
-  KILL_BOTTOM: -12.0,
-  KILL_TOP: 15.0,
+  KILL_MARGIN_BELOW: 8.0,
+  KILL_MARGIN_ABOVE: 12.0,
   GROUND_PROBE: 0.06,
   FALLER_FALL_SPEED: 22.0,
   FALLER_RISE_SPEED: 3.0,
   FALLER_WAIT_TICKS: 25,
   FALLER_MARGIN: 0.6,
+  AIR_DAMPING: 0.86,
 };
 
 function simQ(v) { return Math.fround(v); }
@@ -54,6 +55,8 @@ class SimWorld {
 
     this.startX = simQ(startX);
     this.startY = simQ(startY);
+    this.killBottom = -12.0;
+    this.killTop = 15.0;
     this.px = this.startX;
     this.py = this.startY;
     this.vx = 0.0;
@@ -64,6 +67,7 @@ class SimWorld {
     this.jumpPressedTick = -1000000;
     this.groundMover = -1;
     this.groundConveyor = -1;
+    this.airCarryVx = 0.0;
     this.tickCount = 0;
     this.clearedFlag = false;
     this.timedOutFlag = false;
@@ -292,6 +296,7 @@ class SimWorld {
     this.lockTicks = 0;
     this.groundMover = -1;
     this.groundConveyor = -1;
+    this.airCarryVx = 0.0;
     this.lastGroundedTick = -1000000;
     this.jumpPressedTick = -1000000;
     this.events.respawned = true;
@@ -395,15 +400,22 @@ class SimWorld {
     // 5. grounded
     if (this.probeGround()) this.lastGroundedTick = this.tickCount;
 
-    // 6. control: direct while steering; on the ground releasing stops you,
-    // in the air momentum is preserved (so moving floors don't leave you behind)
+    // 6. control: direct while steering; releasing decays air speed
+    // quickly (controllable), but ride-inherited velocity persists so
+    // moving floors don't leave you behind
     const groundedNow = this.lastGroundedTick === this.tickCount;
+    if (groundedNow) this.airCarryVx = 0.0;
     if (this.lockTicks > 0) {
       this.lockTicks = this.lockTicks - 1;
     } else if (axis !== 0.0) {
-      this.vx = axis * SIM.MOVE_SPEED;
+      const steer = axis * SIM.MOVE_SPEED;
+      this.vx = steer + this.airCarryVx;
     } else if (groundedNow) {
       this.vx = 0.0;
+    } else {
+      const rel = this.vx - this.airCarryVx;
+      const damped = rel * SIM.AIR_DAMPING;
+      this.vx = this.airCarryVx + damped;
     }
 
     // 7. jump (coyote + buffer); inherits the velocity of whatever you
@@ -415,11 +427,13 @@ class SimWorld {
       if (this.groundMover >= 0) {
         const jm = this.movers[this.groundMover];
         const mv = jm.deltaX / SIM.TICK;
+        this.airCarryVx = mv;
         this.vx = this.vx + mv;
       }
       if (this.groundConveyor >= 0) {
         const jc = this.conveyors[this.groundConveyor];
         const cv = jc.speed * jc.dir;
+        this.airCarryVx = cv;
         this.vx = this.vx + cv;
       }
       this.jumpPressedTick = -1000000;
@@ -493,9 +507,9 @@ class SimWorld {
       }
     }
 
-    // 11. kill zones
+    // 11. kill bounds (derived from stage geometry — tall stages welcome)
     if (!respawned) {
-      if (this.py < SIM.KILL_BOTTOM || this.py > SIM.KILL_TOP) this.respawn();
+      if (this.py < this.killBottom || this.py > this.killTop) this.respawn();
     }
 
     // 12. ground mover / conveyor for next tick's carry
@@ -543,7 +557,30 @@ class SimWorld {
       }
     }
     world.addTrigger('goal', data.goal.x, data.goal.y, data.goal.w, data.goal.h, 0, 0);
+    world.computeKillBounds();
     return world;
+  }
+
+  computeKillBounds() {
+    let minY = this.startY;
+    let maxY = this.startY;
+    const consider = (b) => {
+      const lo = b.y - b.halfH;
+      const hi = b.y + b.halfH;
+      if (lo < minY) minY = lo;
+      if (hi > maxY) maxY = hi;
+    };
+    for (const s of this.solids) consider(s);
+    for (const m of this.movers) consider(m);
+    for (const c of this.crumbles) consider(c);
+    for (const t of this.triggers) consider(t);
+    for (const f of this.fallers) consider(f);
+    for (const cv of this.conveyors) consider(cv);
+    for (const g of this.gates) consider(g);
+    for (const k of this.keys) consider(k);
+    for (const d of this.doors) consider(d);
+    this.killBottom = minY - SIM.KILL_MARGIN_BELOW;
+    this.killTop = maxY + SIM.KILL_MARGIN_ABOVE;
   }
 }
 

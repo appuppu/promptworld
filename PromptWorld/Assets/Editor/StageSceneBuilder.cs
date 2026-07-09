@@ -48,6 +48,9 @@ public static class StageSceneBuilder
         Button createLink = CreateTextButton(canvas.transform, "CreateLink", "CREATE YOUR OWN WORLD  >", 24,
             new Vector2(0.5f, 0.5f), new Vector2(0f, -405f), new Vector2(620f, 50f));
         createLink.GetComponentInChildren<TMPro.TMP_Text>().color = new Color(1f, 1f, 1f, 0.6f);
+        Button homeButton = CreateTextButton(canvas.transform, "HomeButton", "MENU", 26,
+            new Vector2(1f, 1f), new Vector2(-100f, -40f), new Vector2(150f, 50f));
+        homeButton.GetComponentInChildren<TMPro.TMP_Text>().color = new Color(1f, 1f, 1f, 0.45f);
 
         var gmGo = new GameObject("GameManager");
         var gm = gmGo.AddComponent<GameManager>();
@@ -63,6 +66,7 @@ public static class StageSceneBuilder
         gmSo.FindProperty("voteGoodButton").objectReferenceValue = voteGood;
         gmSo.FindProperty("voteBadButton").objectReferenceValue = voteBad;
         gmSo.FindProperty("leaderboardText").objectReferenceValue = leaderboardText;
+        gmSo.FindProperty("homeButton").objectReferenceValue = homeButton;
         gmSo.ApplyModifiedPropertiesWithoutUndo();
 
         var loaderGo = new GameObject("StageLoader");

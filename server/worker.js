@@ -574,7 +574,11 @@ Strictly black & white minimalism. The player is a 1x1 white square.
 PLAYER PHYSICS (design around these):
 - run speed 8 units/s; jump apex ~3.3 units; max safe jump gap ~5 units
 - gravity can be inverted by gravityFlip parts (everything mirrors)
-- falling below y=-12 or above y=+15 respawns at playerStart (timer keeps running)
+- kill bounds follow the stage: falling 8 below the lowest part or flying 12
+  above the highest part respawns at playerStart (timer keeps running)
+- VERTICAL STAGES ARE ENCOURAGED: the camera follows everywhere — build
+  towers to climb (pads, vertical movers, wall-step ledges), descents,
+  or mixed shapes. Coordinates may span ±500 in both axes
 
 STAGE JSON SHAPE:
 {
@@ -613,7 +617,8 @@ later create_stage calls so all stages share one identity. Players never
 need any identity.
 
 WORKFLOW: create_stage -> give the human the testUrl -> they clear it in the
-browser (auto-recorded, replay-verified) -> publish_stage -> share the playUrl.`;
+browser (auto-recorded, replay-verified) -> ASK THE HUMAN to confirm the
+stage's final name -> publish_stage with confirmedName -> share the playUrl.`;
 
 const MCP_TOOLS = [
   {
@@ -649,14 +654,15 @@ const MCP_TOOLS = [
   {
     name: 'publish_stage',
     title: 'Publish a cleared stage',
-    description: 'Publishes a stage so it appears in the community list. BLOCKED (403) until a browser clear has been recorded for it — have the human clear the testUrl first.',
+    description: 'Publishes a stage so it appears in the community list. BLOCKED until a verified clear exists — have the human clear the testUrl first. IMPORTANT: before calling this, ASK THE HUMAN to confirm the stage name; pass what they approved as confirmedName (if they choose a different name, pass that — the stage is renamed to it). Never invent confirmedName yourself.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string' },
         editKey: { type: 'string' },
+        confirmedName: { type: 'string', description: 'The stage name as explicitly confirmed by the human creator (1-60 chars). The stage is renamed to this if it differs.' },
       },
-      required: ['id', 'editKey'],
+      required: ['id', 'editKey', 'confirmedName'],
     },
   },
   {
@@ -699,6 +705,27 @@ async function mcpCallTool(env, origin, name, args, request) {
       const row = await opGetStage(env, String(args?.id ?? ''));
       if (!row) return { text: 'Error: stage not found.', isError: true };
       if (args?.editKey !== row.edit_key) return { text: 'Error: invalid editKey.', isError: true };
+
+      // The human must approve the final name before anything goes public.
+      const confirmed = typeof args?.confirmedName === 'string'
+        ? args.confirmedName.replace(/[\u0000-\u001f\u007f]/g, '').trim()
+        : '';
+      if (confirmed.length < 1 || confirmed.length > 60) {
+        return {
+          text: `Publish paused: ask the human creator to confirm the stage name first (current name: "${row.name}"). Then call publish_stage again with confirmedName set to exactly what they approved.`,
+          isError: true,
+        };
+      }
+      if (confirmed !== row.name) {
+        const stage = JSON.parse(row.json);
+        stage.name = confirmed;
+        await env.promptworld_stages
+          .prepare('UPDATE stages SET name = ?, json = ? WHERE id = ?')
+          .bind(confirmed, JSON.stringify(stage), row.id)
+          .run();
+        row.name = confirmed;
+      }
+
       const result = await opPublish(env, origin, row, request);
       return { text: JSON.stringify(result.body, null, 2), isError: result.status >= 400 };
     }
