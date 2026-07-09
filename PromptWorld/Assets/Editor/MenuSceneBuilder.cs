@@ -42,7 +42,10 @@ public static class MenuSceneBuilder
         CreateText(canvasGo.transform, "Title", "PROMPT WORLD", 76,
             new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(1400f, 110f));
 
-        TMP_InputField searchInput = CreateSearchField(canvasGo.transform);
+        TMP_InputField searchInput = CreateInputField(canvasGo.transform, "Search", "SEARCH STAGES",
+            new Vector2(0.5f, 1f), new Vector2(0f, -190f), new Vector2(680f, 58f), 28);
+        TMP_InputField nameInput = CreateInputField(canvasGo.transform, "PlayerName", "PLAYER NAME",
+            new Vector2(1f, 1f), new Vector2(-30f, -28f), new Vector2(300f, 48f), 22);
         RectTransform content = CreateScrollList(canvasGo.transform);
         Button createButton = CreateFooterButton(canvasGo.transform);
 
@@ -51,6 +54,7 @@ public static class MenuSceneBuilder
         var so = new SerializedObject(controller);
         so.FindProperty("listRoot").objectReferenceValue = content;
         so.FindProperty("searchInput").objectReferenceValue = searchInput;
+        so.FindProperty("nameInput").objectReferenceValue = nameInput;
         so.FindProperty("createButton").objectReferenceValue = createButton;
         so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -59,16 +63,17 @@ public static class MenuSceneBuilder
         Debug.Log($"[PromptWorld] Menu scene built: {ScenePath}");
     }
 
-    private static TMP_InputField CreateSearchField(Transform parent)
+    private static TMP_InputField CreateInputField(Transform parent, string name, string placeholderText,
+        Vector2 anchor, Vector2 anchoredPos, Vector2 size, float fontSize)
     {
-        var go = new GameObject("Search", typeof(RectTransform), typeof(Image));
+        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
         go.transform.SetParent(parent, false);
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 1f);
-        rect.anchorMax = new Vector2(0.5f, 1f);
-        rect.pivot = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -190f);
-        rect.sizeDelta = new Vector2(680f, 58f);
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = anchor;
+        rect.anchoredPosition = anchoredPos;
+        rect.sizeDelta = size;
         go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.08f);
 
         var input = go.AddComponent<TMP_InputField>();
@@ -81,8 +86,8 @@ public static class MenuSceneBuilder
         areaRect.offsetMin = new Vector2(20f, 6f);
         areaRect.offsetMax = new Vector2(-20f, -6f);
 
-        TextMeshProUGUI text = CreateInputText(areaGo.transform, "Text", "", 1f);
-        TextMeshProUGUI placeholder = CreateInputText(areaGo.transform, "Placeholder", "SEARCH STAGES", 0.35f);
+        TextMeshProUGUI text = CreateInputText(areaGo.transform, "Text", "", 1f, fontSize);
+        TextMeshProUGUI placeholder = CreateInputText(areaGo.transform, "Placeholder", placeholderText, 0.35f, fontSize);
 
         input.textViewport = areaRect;
         input.textComponent = text;
@@ -93,7 +98,7 @@ public static class MenuSceneBuilder
         return input;
     }
 
-    private static TextMeshProUGUI CreateInputText(Transform parent, string name, string content, float alpha)
+    private static TextMeshProUGUI CreateInputText(Transform parent, string name, string content, float alpha, float fontSize = 28)
     {
         var go = new GameObject(name, typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -105,7 +110,7 @@ public static class MenuSceneBuilder
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text = content;
-        tmp.fontSize = 28;
+        tmp.fontSize = fontSize;
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.color = new Color(1f, 1f, 1f, alpha);
         return tmp;
@@ -119,8 +124,8 @@ public static class MenuSceneBuilder
         scrollRect.anchorMin = new Vector2(0.5f, 0f);
         scrollRect.anchorMax = new Vector2(0.5f, 1f);
         scrollRect.pivot = new Vector2(0.5f, 0.5f);
-        scrollRect.sizeDelta = new Vector2(800f, -430f);
-        scrollRect.anchoredPosition = new Vector2(0f, -65f);
+        scrollRect.sizeDelta = new Vector2(800f, -470f);
+        scrollRect.anchoredPosition = new Vector2(0f, -85f);
         scrollGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f);
 
         var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));

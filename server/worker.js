@@ -98,6 +98,9 @@ const RATE_LIMITS = {
   publish: 10,          // publishes per IP per day
   publishPerCreator: 5, // publishes per creator identity per day
   publishGlobal: 200,   // publishes per day platform-wide (circuit breaker)
+  vote: 300,            // vote writes per IP per day
+  score: 300,           // leaderboard submissions per IP per day
+  stats: 2000,          // play-stat reports per IP per day
 };
 const MIN_CLEAR_MS_TO_PUBLISH = 3000; // trivially short stages cannot be published
 const DRAFT_TTL_DAYS = 7;             // unpublished drafts are garbage-collected
@@ -319,18 +322,42 @@ async function opPublish(env, origin, row, request) {
   return { status: 200, body: { id: row.id, status: 'published', playUrl: `${origin}/?stage=${row.id}` } };
 }
 
-async function opListPublished(env, query) {
+async function opListPublished(env, query, sort) {
   // Banned creators' stages vanish from discovery (legacy NULL-creator
   // stages stay visible). Optional ?q= substring search on the name.
-  let sql = `SELECT s.id, s.name, s.published_at, s.clear_time_ms, c.name AS creator
-             FROM stages s LEFT JOIN creators c ON c.id = s.creator_id
+  // Sorts: new (default) | top (good ratio) | hard / easy (clear rate).
+  let sql = `SELECT s.id, s.name, s.published_at, s.clear_time_ms, s.attempts, s.clears,
+                    c.name AS creator,
+                    COALESCE(SUM(CASE WHEN v.good = 1 THEN 1 END), 0) AS goods,
+                    COALESCE(SUM(CASE WHEN v.good = 0 THEN 1 END), 0) AS bads
+             FROM stages s
+             LEFT JOIN creators c ON c.id = s.creator_id
+             LEFT JOIN votes v ON v.stage_id = s.id
              WHERE s.status = 'published' AND (c.banned IS NULL OR c.banned = 0)`;
   const binds = [];
   if (typeof query === 'string' && query.trim().length > 0) {
     sql += ' AND s.name LIKE ?';
     binds.push(`%${query.trim().slice(0, 40)}%`);
   }
-  sql += ' ORDER BY s.published_at DESC LIMIT 100';
+  sql += ' GROUP BY s.id';
+
+  // Unrated stages sit in the middle (0.5) so sorting stays meaningful.
+  const clearRate = 'CASE WHEN s.attempts >= 10 THEN s.clears * 1.0 / s.attempts ELSE 0.5 END';
+  switch (sort) {
+    case 'top':
+      sql += ' ORDER BY (goods + 1.0) / (goods + bads + 2.0) DESC, s.published_at DESC';
+      break;
+    case 'hard':
+      sql += ` ORDER BY ${clearRate} ASC, s.published_at DESC`;
+      break;
+    case 'easy':
+      sql += ` ORDER BY ${clearRate} DESC, s.published_at DESC`;
+      break;
+    default:
+      sql += ' ORDER BY s.published_at DESC';
+      break;
+  }
+  sql += ' LIMIT 100';
   const rows = await env.promptworld_stages.prepare(sql).bind(...binds).all();
   return rows.results;
 }
@@ -342,6 +369,107 @@ async function opGhost(row) {
     status: 200,
     body: { id: row.id, clearTimeMs: row.clear_time_ms, replay: JSON.parse(row.clear_replay) },
   };
+}
+
+// ------------------------------------------------------------ player feedback
+// Players stay anonymous: a device-local playerId (random GUID in the
+// browser's storage) deduplicates votes and leaderboard entries. Re-voting
+// UPDATES the same row — spamming a button can never inflate counts.
+
+function validPlayerId(id) {
+  return typeof id === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(id);
+}
+
+async function opVote(env, row, body, request) {
+  if (row.status !== 'published') return { status: 403, body: { error: 'Votes are only accepted on published stages.' } };
+  if (!validPlayerId(body.playerId)) return { status: 422, body: { error: 'playerId required.' } };
+  if (typeof body.good !== 'boolean') return { status: 422, body: { error: 'good must be true or false.' } };
+  if (await overRateLimit(env, request, 'vote', RATE_LIMITS.vote)) {
+    return { status: 429, body: { error: 'Rate limit: too many votes today.' } };
+  }
+  await env.promptworld_stages
+    .prepare(`INSERT INTO votes (stage_id, player_id, good, updated_at) VALUES (?, ?, ?, ?)
+              ON CONFLICT(stage_id, player_id) DO UPDATE SET good = excluded.good, updated_at = excluded.updated_at`)
+    .bind(row.id, body.playerId, body.good ? 1 : 0, new Date().toISOString())
+    .run();
+  const agg = await env.promptworld_stages
+    .prepare(`SELECT COALESCE(SUM(CASE WHEN good = 1 THEN 1 END), 0) AS goods,
+                     COALESCE(SUM(CASE WHEN good = 0 THEN 1 END), 0) AS bads
+              FROM votes WHERE stage_id = ?`)
+    .bind(row.id)
+    .first();
+  return { status: 200, body: { id: row.id, goods: agg.goods, bads: agg.bads } };
+}
+
+// Clear rate = clears / attempts, reported automatically by the client
+// (each death, timeout or clear ends one attempt). Deltas are capped so a
+// hostile client can only nudge, not swamp, the statistics.
+async function opStats(env, row, body, request) {
+  if (row.status !== 'published') return { status: 200, body: { ok: true } };
+  if (await overRateLimit(env, request, 'stats', RATE_LIMITS.stats)) {
+    return { status: 429, body: { error: 'Rate limit.' } };
+  }
+  let attempts = Number(body.attempts);
+  let clears = Number(body.clears);
+  if (!Number.isInteger(attempts) || !Number.isInteger(clears)) {
+    return { status: 422, body: { error: 'attempts and clears must be integers.' } };
+  }
+  attempts = Math.max(0, Math.min(attempts, 30));
+  clears = Math.max(0, Math.min(clears, 1));
+  if (clears > attempts) attempts = clears;
+  await env.promptworld_stages
+    .prepare('UPDATE stages SET attempts = attempts + ?, clears = clears + ? WHERE id = ?')
+    .bind(attempts, clears, row.id)
+    .run();
+  return { status: 200, body: { ok: true } };
+}
+
+// Leaderboard entries require a replay certificate — the server re-simulates
+// it, so times cannot be forged. Best time per (stage, device) is kept.
+async function opScore(env, row, body, request) {
+  if (row.status !== 'published') return { status: 403, body: { error: 'Leaderboards exist only on published stages.' } };
+  if (!validPlayerId(body.playerId)) return { status: 422, body: { error: 'playerId required.' } };
+  if (await overRateLimit(env, request, 'score', RATE_LIMITS.score)) {
+    return { status: 429, body: { error: 'Rate limit: too many submissions today.' } };
+  }
+
+  const stage = JSON.parse(row.json);
+  const maxTicks = Math.trunc(Math.fround(stage.timeLimit) / 0.02);
+  const replay = body.replay;
+  if (!replay || replay.v !== 1 || !Array.isArray(replay.rle) ||
+      replay.rle.length === 0 || replay.rle.length > 400000) {
+    return { status: 422, body: { error: 'A replay certificate is required.' } };
+  }
+  const result = simRunReplay(stage, replay.rle, maxTicks);
+  if (!result.cleared) {
+    return { status: 422, body: { error: `Replay verification failed: ${result.error || 'goal not reached'}` } };
+  }
+  const timeMs = result.ticks * 20;
+
+  let name = typeof body.name === 'string' ? body.name.replace(/[ -]/g, '').trim().slice(0, 16) : '';
+  if (name.length === 0) name = 'anonymous';
+
+  const existing = await env.promptworld_stages
+    .prepare('SELECT time_ms FROM scores WHERE stage_id = ? AND player_id = ?')
+    .bind(row.id, body.playerId)
+    .first();
+  if (!existing || timeMs < existing.time_ms) {
+    await env.promptworld_stages
+      .prepare(`INSERT INTO scores (stage_id, player_id, name, time_ms, created_at) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(stage_id, player_id) DO UPDATE SET name = excluded.name, time_ms = excluded.time_ms, created_at = excluded.created_at`)
+      .bind(row.id, body.playerId, name, timeMs, new Date().toISOString())
+      .run();
+  }
+  const top = await opTopScores(env, row.id);
+  return { status: 200, body: { id: row.id, verified: true, timeMs, top } };
+}
+
+async function opTopScores(env, stageId) {
+  const rows = await env.promptworld_stages
+    .prepare('SELECT name, time_ms FROM scores WHERE stage_id = ? ORDER BY time_ms ASC LIMIT 5')
+    .bind(stageId)
+    .all();
+  return rows.results;
 }
 
 // ---------------------------------------------------------------- REST
@@ -368,10 +496,10 @@ async function handleApi(request, env, url) {
   }
 
   if (path === '/api/stages' && method === 'GET') {
-    return json({ stages: await opListPublished(env, url.searchParams.get('q')) });
+    return json({ stages: await opListPublished(env, url.searchParams.get('q'), url.searchParams.get('sort')) });
   }
 
-  const stageMatch = path.match(/^\/api\/stages\/([a-z0-9]+)(\/(clear|publish|ghost))?$/);
+  const stageMatch = path.match(/^\/api\/stages\/([a-z0-9]+)(\/(clear|publish|ghost|vote|stats|score|scores))?$/);
   if (!stageMatch) return json({ error: 'Not found.' }, 404);
   const id = stageMatch[1];
   const action = stageMatch[3];
@@ -389,10 +517,29 @@ async function handleApi(request, env, url) {
     const result = await opGhost(row);
     return json(result.body, result.status);
   }
+  if (action === 'scores' && method === 'GET') {
+    return json({ id: row.id, top: await opTopScores(env, row.id) });
+  }
 
   if (method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
   let body = {};
   try { body = await request.json(); } catch { /* handled below */ }
+
+  // Player endpoints (no editKey — anonymous device ids instead).
+  if (action === 'vote') {
+    const result = await opVote(env, row, body, request);
+    return json(result.body, result.status);
+  }
+  if (action === 'stats') {
+    const result = await opStats(env, row, body, request);
+    return json(result.body, result.status);
+  }
+  if (action === 'score') {
+    const result = await opScore(env, row, body, request);
+    return json(result.body, result.status);
+  }
+
+  // Creator endpoints (editKey required).
   if (body.editKey !== row.edit_key) return json({ error: 'Invalid editKey.' }, 403);
 
   if (action === 'clear') {

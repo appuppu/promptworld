@@ -31,14 +31,20 @@ public static class StageSceneBuilder
         touchSo.FindProperty("canvas").objectReferenceValue = canvas;
         touchSo.ApplyModifiedPropertiesWithoutUndo();
 
-        Button retryButton = CreateTextButton(canvas.transform, "RetryButton", "RETRY", 44,
-            new Vector2(0.5f, 0.5f), new Vector2(-170f, -190f), new Vector2(300f, 90f));
-        Button nextButton = CreateTextButton(canvas.transform, "NextButton", "NEXT >", 44,
-            new Vector2(0.5f, 0.5f), new Vector2(170f, -190f), new Vector2(300f, 90f));
-        Button shareButton = CreateTextButton(canvas.transform, "ShareButton", "SHARE URL", 34,
-            new Vector2(0.5f, 0.5f), new Vector2(0f, -295f), new Vector2(340f, 70f));
+        TMP_Text leaderboardText = CreateText(canvas.transform, "LeaderboardText", "", 24, TextAlignmentOptions.Center,
+            anchor: new Vector2(0.5f, 0.5f), anchoredPos: new Vector2(0f, -25f), size: new Vector2(760f, 200f));
+        Button voteGood = CreateTextButton(canvas.transform, "VoteGood", "GOOD", 26,
+            new Vector2(0.5f, 0.5f), new Vector2(-100f, -150f), new Vector2(170f, 54f));
+        Button voteBad = CreateTextButton(canvas.transform, "VoteBad", "BAD", 26,
+            new Vector2(0.5f, 0.5f), new Vector2(100f, -150f), new Vector2(170f, 54f));
+        Button retryButton = CreateTextButton(canvas.transform, "RetryButton", "RETRY", 42,
+            new Vector2(0.5f, 0.5f), new Vector2(-170f, -240f), new Vector2(300f, 84f));
+        Button nextButton = CreateTextButton(canvas.transform, "NextButton", "NEXT >", 42,
+            new Vector2(0.5f, 0.5f), new Vector2(170f, -240f), new Vector2(300f, 84f));
+        Button shareButton = CreateTextButton(canvas.transform, "ShareButton", "SHARE URL", 32,
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -330f), new Vector2(340f, 64f));
         Button createLink = CreateTextButton(canvas.transform, "CreateLink", "CREATE YOUR OWN WORLD  >", 24,
-            new Vector2(0.5f, 0.5f), new Vector2(0f, -385f), new Vector2(620f, 50f));
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -405f), new Vector2(620f, 50f));
         createLink.GetComponentInChildren<TMPro.TMP_Text>().color = new Color(1f, 1f, 1f, 0.6f);
         Button menuButton = CreateTextButton(canvas.transform, "MenuButton", "MENU", 30,
             new Vector2(1f, 1f), new Vector2(-110f, -45f), new Vector2(170f, 55f));
@@ -54,6 +60,9 @@ public static class StageSceneBuilder
         gmSo.FindProperty("shareButton").objectReferenceValue = shareButton;
         gmSo.FindProperty("nextButton").objectReferenceValue = nextButton;
         gmSo.FindProperty("createLinkButton").objectReferenceValue = createLink;
+        gmSo.FindProperty("voteGoodButton").objectReferenceValue = voteGood;
+        gmSo.FindProperty("voteBadButton").objectReferenceValue = voteBad;
+        gmSo.FindProperty("leaderboardText").objectReferenceValue = leaderboardText;
         gmSo.ApplyModifiedPropertiesWithoutUndo();
 
         var loaderGo = new GameObject("StageLoader");
@@ -123,8 +132,8 @@ public static class StageSceneBuilder
 
         timerText = CreateText(canvasGo.transform, "TimerText", "60", 48, TextAlignmentOptions.Center,
             anchor: new Vector2(0.5f, 1f), anchoredPos: new Vector2(0f, -40f), size: new Vector2(400f, 100f));
-        resultText = CreateText(canvasGo.transform, "ResultText", "", 72, TextAlignmentOptions.Center,
-            anchor: new Vector2(0.5f, 0.5f), anchoredPos: Vector2.zero, size: new Vector2(1200f, 260f));
+        resultText = CreateText(canvasGo.transform, "ResultText", "", 68, TextAlignmentOptions.Center,
+            anchor: new Vector2(0.5f, 0.5f), anchoredPos: new Vector2(0f, 165f), size: new Vector2(1200f, 240f));
         stageNameText = CreateText(canvasGo.transform, "StageNameText", "", 28, TextAlignmentOptions.Left,
             anchor: new Vector2(0f, 1f), anchoredPos: new Vector2(40f, -40f), size: new Vector2(600f, 60f));
         return canvas;

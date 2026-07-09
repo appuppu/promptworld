@@ -26,6 +26,7 @@ public class SimDriver : MonoBehaviour
     private int[] ghostCodes;
     private int ghostTick;
     private Transform ghostView;
+    private int deaths;
 
     /// <summary>Plays the creator's verified replay alongside the live run.</summary>
     public void AttachGhost(SimWorld world, int[] rle, Transform view)
@@ -99,18 +100,19 @@ public class SimDriver : MonoBehaviour
 
         SyncViews();
         PlayEventSounds(ev);
+        if ((ev & SimEvents.Respawned) != 0) deaths++;
         gameManager.OnSimTick(world.MaxTicks - world.TickCount);
 
         if ((ev & SimEvents.Cleared) != 0)
         {
             running = false;
             playerView.position = curPos;
-            gameManager.StageClearFromSim(world.TickCount * 20, EncodeTrace());
+            gameManager.StageClearFromSim(world.TickCount * 20, EncodeTrace(), deaths);
         }
         else if ((ev & SimEvents.TimedOut) != 0)
         {
             running = false;
-            gameManager.GameOverFromSim();
+            gameManager.GameOverFromSim(deaths);
         }
     }
 

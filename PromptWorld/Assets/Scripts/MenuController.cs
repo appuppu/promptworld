@@ -17,7 +17,12 @@ public class MenuController : MonoBehaviour
 {
     [SerializeField] private RectTransform listRoot;
     [SerializeField] private TMP_InputField searchInput;
+    [SerializeField] private TMP_InputField nameInput;
     [SerializeField] private Button createButton;
+
+    private static readonly string[] SortModes = { "new", "top", "hard", "easy" };
+    private string currentSort = "new";
+    private readonly List<TMP_Text> sortLabels = new List<TMP_Text>();
 
     private class Entry
     {
@@ -50,14 +55,81 @@ public class MenuController : MonoBehaviour
         GameSession.SelectedStageFile = null;
 
         if (searchInput != null) searchInput.onValueChanged.AddListener(Filter);
+        if (nameInput != null)
+        {
+            nameInput.text = PlayerIdentity.Name;
+            nameInput.onValueChanged.AddListener(value => PlayerIdentity.Name = value);
+        }
         if (createButton != null)
         {
             createButton.onClick.AddListener(() => WebBridge.OpenUrl($"{GameSession.ApiOrigin}/create"));
         }
+        BuildSortRow();
 
         yield return LoadBuiltInStages();
         yield return LoadCommunityStages();
         yield return FillCommunityPreviews();
+    }
+
+    /// <summary>NEW / TOP / HARD / EASY — community list sort modes.</summary>
+    private void BuildSortRow()
+    {
+        Canvas canvas = listRoot.GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        float[] xs = { -270f, -90f, 90f, 270f };
+        for (int i = 0; i < SortModes.Length; i++)
+        {
+            string mode = SortModes[i];
+            var go = new GameObject($"Sort_{mode}", typeof(RectTransform));
+            go.transform.SetParent(canvas.transform, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(xs[i], -258f);
+            rect.sizeDelta = new Vector2(170f, 44f);
+
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.text = mode.ToUpperInvariant();
+            tmp.fontSize = 24;
+            tmp.characterSpacing = 6f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = new Color(1f, 1f, 1f, mode == currentSort ? 1f : 0.35f);
+            sortLabels.Add(tmp);
+
+            var button = go.AddComponent<Button>();
+            button.targetGraphic = tmp;
+            button.onClick.AddListener(() => SetSort(mode));
+        }
+    }
+
+    private void SetSort(string mode)
+    {
+        if (mode == currentSort) return;
+        currentSort = mode;
+        for (int i = 0; i < sortLabels.Count; i++)
+        {
+            sortLabels[i].color = new Color(1f, 1f, 1f, SortModes[i] == currentSort ? 1f : 0.35f);
+        }
+        StartCoroutine(ReloadCommunity());
+    }
+
+    private IEnumerator ReloadCommunity()
+    {
+        for (int i = entries.Count - 1; i >= 0; i--)
+        {
+            Entry entry = entries[i];
+            bool isCommunity = entry.RemoteId != null || (entry.IsLabel && entry.Title == "COMMUNITY");
+            if (isCommunity)
+            {
+                Destroy(entry.Root);
+                entries.RemoveAt(i);
+            }
+        }
+        yield return LoadCommunityStages();
+        yield return FillCommunityPreviews();
+        Filter(searchInput != null ? searchInput.text : "");
     }
 
     private IEnumerator LoadBuiltInStages()
@@ -93,7 +165,7 @@ public class MenuController : MonoBehaviour
 
     private IEnumerator LoadCommunityStages()
     {
-        using var request = UnityWebRequest.Get($"{GameSession.ApiOrigin}/api/stages");
+        using var request = UnityWebRequest.Get($"{GameSession.ApiOrigin}/api/stages?sort={currentSort}");
         yield return request.SendWebRequest();
         if (request.result != UnityWebRequest.Result.Success) yield break;
 
@@ -104,13 +176,13 @@ public class MenuController : MonoBehaviour
         foreach (PublishedStage stage in list.stages)
         {
             string id = stage.id;
-            string subtitle = string.IsNullOrEmpty(stage.creator) ? "" : $"by {stage.creator}";
-            if (stage.clear_time_ms > 0)
-            {
-                string par = $"PAR {stage.clear_time_ms / 1000f:0.0}s";
-                subtitle = string.IsNullOrEmpty(subtitle) ? par : $"{subtitle}  ·  {par}";
-            }
-            Entry entry = AddEntry(stage.name, subtitle, () =>
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(stage.creator)) parts.Add($"by {stage.creator}");
+            if (stage.clear_time_ms > 0) parts.Add($"PAR {stage.clear_time_ms / 1000f:0.0}s");
+            if (stage.goods + stage.bads > 0) parts.Add($"+{stage.goods} / -{stage.bads}");
+            if (stage.attempts >= 10) parts.Add($"CLEAR {stage.clears * 100 / stage.attempts}%");
+
+            Entry entry = AddEntry(stage.name, string.Join("  ·  ", parts), () =>
             {
                 GameSession.RemoteStageId = id;
                 SceneManager.LoadScene("Stage");
@@ -251,5 +323,9 @@ public class MenuController : MonoBehaviour
         public string name;
         public string creator;
         public int clear_time_ms;
+        public int goods;
+        public int bads;
+        public int attempts;
+        public int clears;
     }
 }

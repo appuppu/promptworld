@@ -29,6 +29,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Button shareButton;
     [SerializeField] private Button nextButton;
     [SerializeField] private Button createLinkButton;
+    [SerializeField] private Button voteGoodButton;
+    [SerializeField] private Button voteBadButton;
+    [SerializeField] private TMP_Text leaderboardText;
 
     public GameState State { get; private set; } = GameState.Playing;
 
@@ -84,6 +87,17 @@ public class GameManager : MonoBehaviour
             createLinkButton.onClick.AddListener(() => WebBridge.OpenUrl($"{GameSession.ApiOrigin}/create"));
             createLinkButton.gameObject.SetActive(false);
         }
+        if (voteGoodButton != null)
+        {
+            voteGoodButton.onClick.AddListener(() => StartCoroutine(SubmitVote(true)));
+            voteGoodButton.gameObject.SetActive(false);
+        }
+        if (voteBadButton != null)
+        {
+            voteBadButton.onClick.AddListener(() => StartCoroutine(SubmitVote(false)));
+            voteBadButton.gameObject.SetActive(false);
+        }
+        if (leaderboardText != null) leaderboardText.text = "";
     }
 
     /// <summary>Appends the creator's verified time to the stage label.</summary>
@@ -183,18 +197,103 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>Called by SimDriver when the sim reaches the goal.</summary>
-    public void StageClearFromSim(int clearTimeMs, string replayJson)
+    public void StageClearFromSim(int clearTimeMs, string replayJson, int deaths)
     {
         if (State != GameState.Playing) return;
         pendingClearMs = clearTimeMs;
         pendingReplay = replayJson;
-        EndGame(GameState.Cleared, "Stage Clear!");
+        EndGame(GameState.Cleared, $"Stage Clear!\n<size=45%>{clearTimeMs / 1000f:0.00}s</size>");
+        ReportPlayOutcome(deaths, true);
     }
 
-    public void GameOverFromSim()
+    public void GameOverFromSim(int deaths)
     {
         if (State != GameState.Playing) return;
         EndGame(GameState.GameOver, "Game Over");
+        ReportPlayOutcome(deaths, false);
+    }
+
+    /// <summary>Anonymous play stats feed each stage's public clear rate.</summary>
+    private void ReportPlayOutcome(int deaths, bool cleared)
+    {
+        if (!IsPublicRemoteSession()) return;
+        int attempts = deaths + 1;
+        string payload = $"{{\"attempts\":{attempts},\"clears\":{(cleared ? 1 : 0)}}}";
+        StartCoroutine(PostJson($"{GameSession.ApiOrigin}/api/stages/{GameSession.RemoteStageId}/stats", payload, null));
+
+        if (cleared) StartCoroutine(SubmitScore());
+    }
+
+    private bool IsPublicRemoteSession()
+    {
+        return !string.IsNullOrEmpty(GameSession.RemoteStageId) && string.IsNullOrEmpty(GameSession.EditKey);
+    }
+
+    private IEnumerator SubmitScore()
+    {
+        if (string.IsNullOrEmpty(pendingReplay)) yield break;
+        string name = JsonEscape(PlayerIdentity.DisplayName);
+        string payload = $"{{\"playerId\":\"{PlayerIdentity.Id}\",\"name\":\"{name}\",\"replay\":{pendingReplay}}}";
+        yield return PostJson($"{GameSession.ApiOrigin}/api/stages/{GameSession.RemoteStageId}/score", payload, response =>
+        {
+            var result = JsonUtility.FromJson<ScoreResponse>(response);
+            if (result?.top == null || result.top.Length == 0 || leaderboardText == null) return;
+            var sb = new System.Text.StringBuilder("<size=75%>BEST TIMES</size>\n");
+            for (int i = 0; i < result.top.Length; i++)
+            {
+                sb.Append($"{i + 1}.  {result.top[i].name}   {result.top[i].time_ms / 1000f:0.00}s\n");
+            }
+            leaderboardText.text = sb.ToString();
+        });
+    }
+
+    private IEnumerator SubmitVote(bool good)
+    {
+        SetVoteVisual(good);
+        string payload = $"{{\"playerId\":\"{PlayerIdentity.Id}\",\"good\":{(good ? "true" : "false")}}}";
+        yield return PostJson($"{GameSession.ApiOrigin}/api/stages/{GameSession.RemoteStageId}/vote", payload, null);
+    }
+
+    private void SetVoteVisual(bool good)
+    {
+        SetButtonAlpha(voteGoodButton, good ? 1f : 0.35f);
+        SetButtonAlpha(voteBadButton, good ? 0.35f : 1f);
+    }
+
+    private static void SetButtonAlpha(Button button, float alpha)
+    {
+        if (button == null) return;
+        var label = button.GetComponentInChildren<TMP_Text>();
+        if (label != null) label.color = new Color(1f, 1f, 1f, alpha);
+    }
+
+    private IEnumerator PostJson(string url, string payload, System.Action<string> onSuccess)
+    {
+        using var request = UnityWebRequest.Post(url, payload, "application/json");
+        yield return request.SendWebRequest();
+        if (request.result == UnityWebRequest.Result.Success)
+        {
+            onSuccess?.Invoke(request.downloadHandler.text);
+        }
+    }
+
+    private static string JsonEscape(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    [System.Serializable]
+    private class ScoreResponse
+    {
+        public int timeMs;
+        public ScoreEntry[] top;
+    }
+
+    [System.Serializable]
+    private class ScoreEntry
+    {
+        public string name;
+        public int time_ms;
     }
 
     /// <summary>Legacy path (Goal component in non-sim scenes).</summary>
@@ -237,6 +336,11 @@ public class GameManager : MonoBehaviour
             }
             if (nextButton != null) nextButton.gameObject.SetActive(true);
             if (createLinkButton != null) createLinkButton.gameObject.SetActive(true);
+        }
+        if (IsPublicRemoteSession())
+        {
+            if (voteGoodButton != null) voteGoodButton.gameObject.SetActive(true);
+            if (voteBadButton != null) voteBadButton.gameObject.SetActive(true);
         }
         Debug.Log(message);
 
