@@ -28,6 +28,19 @@ public class SimDriver : MonoBehaviour
     private Transform ghostView;
     private int deaths;
 
+    private Transform[] fallerViews = new Transform[0];
+    private GameObject[] gateViews = new GameObject[0];
+    private GameObject[] keyViews = new GameObject[0];
+    private GameObject[] doorViews = new GameObject[0];
+
+    public void SetPartViews(Transform[] fallers, GameObject[] gates, GameObject[] keys, GameObject[] doors)
+    {
+        fallerViews = fallers;
+        gateViews = gates;
+        keyViews = keys;
+        doorViews = doors;
+    }
+
     /// <summary>Plays the creator's verified replay alongside the live run.</summary>
     public void AttachGhost(SimWorld world, int[] rle, Transform view)
     {
@@ -145,6 +158,24 @@ public class SimDriver : MonoBehaviour
             bool blinkOff = !intact && !vanished && (world.TickCount / 4) % 2 == 1;
             crumbleViews[i].enabled = !vanished && !blinkOff;
         }
+        for (int i = 0; i < fallerViews.Length; i++)
+        {
+            SimFaller f = world.Fallers[i];
+            fallerViews[i].position = new Vector3((float)f.X, (float)f.Y, 0f);
+        }
+        for (int i = 0; i < gateViews.Length; i++)
+        {
+            gateViews[i].SetActive(world.GateActive(world.Gates[i]));
+        }
+        for (int i = 0; i < keyViews.Length; i++)
+        {
+            keyViews[i].SetActive(!world.Keys[i].Collected);
+        }
+        bool doorsOpen = world.DoorsOpen();
+        for (int i = 0; i < doorViews.Length; i++)
+        {
+            doorViews[i].SetActive(!doorsOpen);
+        }
     }
 
     private void PlayEventSounds(SimEvents ev)
@@ -154,6 +185,9 @@ public class SimDriver : MonoBehaviour
         if ((ev & SimEvents.Boosted) != 0) Sfx.Play(SfxId.Boost);
         if ((ev & SimEvents.Flipped) != 0) Sfx.Play(SfxId.Flip);
         if ((ev & SimEvents.Respawned) != 0) Sfx.Play(SfxId.Respawn);
+        if ((ev & SimEvents.Slammed) != 0) Sfx.Play(SfxId.Boost, 0.7f);
+        if ((ev & SimEvents.KeyPickup) != 0) Sfx.Play(SfxId.Tick, 0.9f);
+        if ((ev & SimEvents.DoorOpened) != 0) Sfx.Play(SfxId.Flip, 0.8f);
     }
 
     /// <summary>

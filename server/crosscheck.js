@@ -25,11 +25,14 @@ function eventBits(ev) {
   if (ev.crumbled) bits += 32;
   if (ev.cleared) bits += 64;
   if (ev.timedOut) bits += 128;
+  if (ev.slammed) bits += 256;
+  if (ev.key) bits += 512;
+  if (ev.door) bits += 1024;
   return bits;
 }
 
 const dir = path.join('PromptWorld', 'Assets', 'StreamingAssets', 'Stages');
-const files = ['stage-001.json', 'stage-002.json', 'stage-003.json'];
+const files = ['stage-001.json', 'stage-002.json', 'stage-003.json', 'stage-test-parts.json'];
 const lines = [];
 
 for (const file of files) {

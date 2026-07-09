@@ -55,6 +55,7 @@ public class GameManager : MonoBehaviour
         lastTickSecond = -1;
         if (stageNameText != null) stageNameText.text = stageName;
         UpdateTimerLabel();
+        Sfx.StartMusic();
     }
 
     private void Start()
@@ -71,6 +72,7 @@ public class GameManager : MonoBehaviour
         if (menuButton != null)
         {
             menuButton.onClick.AddListener(BackToMenu);
+            menuButton.gameObject.SetActive(false);
         }
         if (shareButton != null)
         {
@@ -100,12 +102,12 @@ public class GameManager : MonoBehaviour
         if (leaderboardText != null) leaderboardText.text = "";
     }
 
-    /// <summary>Appends the creator's verified time to the stage label.</summary>
-    public void SetPar(int parMs)
+    /// <summary>Appends the current world-best time to the stage label.</summary>
+    public void SetPar(int bestMs)
     {
         if (stageNameText != null)
         {
-            stageNameText.text += $"   ·   PAR {parMs / 1000f:0.0}s";
+            stageNameText.text += $"   ·   BEST {bestMs / 1000f:0.00}s";
         }
     }
 
@@ -323,11 +325,13 @@ public class GameManager : MonoBehaviour
     {
         State = result;
         if (player != null) player.Freeze();
+        Sfx.StopMusic();
         Sfx.Play(result == GameState.Cleared ? SfxId.Clear : SfxId.GameOver);
         ShowResultOverlay();
         resultText.text = message;
         resultText.gameObject.SetActive(true);
         if (retryButton != null) retryButton.gameObject.SetActive(true);
+        if (menuButton != null) menuButton.gameObject.SetActive(true);
         if (result == GameState.Cleared)
         {
             if (shareButton != null && !string.IsNullOrEmpty(GameSession.RemoteStageId))

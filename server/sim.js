@@ -31,6 +31,10 @@ const SIM = {
   KILL_BOTTOM: -12.0,
   KILL_TOP: 15.0,
   GROUND_PROBE: 0.06,
+  FALLER_FALL_SPEED: 22.0,
+  FALLER_RISE_SPEED: 3.0,
+  FALLER_WAIT_TICKS: 25,
+  FALLER_MARGIN: 0.6,
 };
 
 function simQ(v) { return Math.fround(v); }
@@ -41,6 +45,12 @@ class SimWorld {
     this.movers = [];
     this.crumbles = [];
     this.triggers = [];
+    this.fallers = [];
+    this.conveyors = [];
+    this.gates = [];
+    this.keys = [];
+    this.doors = [];
+    this.keysCollected = 0;
 
     this.startX = simQ(startX);
     this.startY = simQ(startY);
@@ -53,6 +63,7 @@ class SimWorld {
     this.lastGroundedTick = -1000000;
     this.jumpPressedTick = -1000000;
     this.groundMover = -1;
+    this.groundConveyor = -1;
     this.tickCount = 0;
     this.clearedFlag = false;
     this.timedOutFlag = false;
@@ -91,6 +102,59 @@ class SimWorld {
     this.crumbles.push({ x: simQ(x), y: simQ(y), halfW: hw, halfH: hh, touchedTick: -1 });
   }
 
+  addFaller(x, y, w, h, dy) {
+    const hw = simQ(w) / 2.0;
+    const hh = simQ(h) / 2.0;
+    let fall = simQ(dy);
+    if (fall <= 0.0) fall = 4.0;
+    this.fallers.push({
+      x: simQ(x), y: simQ(y), halfW: hw, halfH: hh,
+      baseY: simQ(y), dy: fall, state: 0, offset: 0.0, waitLeft: 0,
+    });
+  }
+
+  addConveyor(x, y, w, h, dirX, power) {
+    const hw = simQ(w) / 2.0;
+    const hh = simQ(h) / 2.0;
+    let speed = simQ(power);
+    if (speed <= 0.0) speed = 3.0;
+    let dir = 1.0;
+    if (simQ(dirX) < 0.0) dir = -1.0;
+    this.conveyors.push({ x: simQ(x), y: simQ(y), halfW: hw, halfH: hh, dir, speed });
+  }
+
+  addGate(x, y, w, h, period, phase) {
+    const hw = simQ(w) / 2.0;
+    const hh = simQ(h) / 2.0;
+    let p = simQ(period);
+    if (p <= 0.0) p = 2.0;
+    const pt = p / SIM.TICK;
+    const ph = simQ(phase);
+    const pht = ph / SIM.TICK;
+    const gate = {
+      x: simQ(x), y: simQ(y), halfW: hw, halfH: hh,
+      periodTicks: Math.trunc(pt),
+      phaseTicks: Math.trunc(pht),
+      onTicks: 0,
+    };
+    gate.onTicks = Math.trunc(gate.periodTicks / 2);
+    if (gate.periodTicks < 2) gate.periodTicks = 2;
+    if (gate.onTicks < 1) gate.onTicks = 1;
+    this.gates.push(gate);
+  }
+
+  addKey(x, y, w, h) {
+    const hw = simQ(w) / 2.0;
+    const hh = simQ(h) / 2.0;
+    this.keys.push({ x: simQ(x), y: simQ(y), halfW: hw, halfH: hh, collected: false });
+  }
+
+  addDoor(x, y, w, h) {
+    const hw = simQ(w) / 2.0;
+    const hh = simQ(h) / 2.0;
+    this.doors.push({ x: simQ(x), y: simQ(y), halfW: hw, halfH: hh });
+  }
+
   addTrigger(kind, x, y, w, h, power, dirX) {
     let hw;
     let hh;
@@ -120,6 +184,17 @@ class SimWorld {
     return this.tickCount < vanishAt;
   }
 
+  gateActive(g) {
+    const phase = this.tickCount + g.phaseTicks;
+    const m = phase % g.periodTicks;
+    return m < g.onTicks;
+  }
+
+  doorsOpen() {
+    if (this.keys.length === 0) return true;
+    return this.keysCollected >= this.keys.length;
+  }
+
   static overlaps(ax, ay, ahw, ahh, b) {
     let dx = ax - b.x;
     if (dx < 0.0) dx = -dx;
@@ -145,6 +220,21 @@ class SimWorld {
       if (!this.crumbleActive(c)) continue;
       if (SimWorld.overlaps(this.px, probeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, c)) return true;
     }
+    for (const cv of this.conveyors) {
+      if (SimWorld.overlaps(this.px, probeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, cv)) return true;
+    }
+    for (const g of this.gates) {
+      if (!this.gateActive(g)) continue;
+      if (SimWorld.overlaps(this.px, probeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, g)) return true;
+    }
+    if (!this.doorsOpen()) {
+      for (const d of this.doors) {
+        if (SimWorld.overlaps(this.px, probeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, d)) return true;
+      }
+    }
+    for (const f of this.fallers) {
+      if (SimWorld.overlaps(this.px, probeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, f)) return true;
+    }
     return false;
   }
 
@@ -155,6 +245,15 @@ class SimWorld {
       if (!this.crumbleActive(c)) continue;
       this.resolveAgainst(c, xAxis, c);
     }
+    for (const cv of this.conveyors) this.resolveAgainst(cv, xAxis, null);
+    for (const g of this.gates) {
+      if (!this.gateActive(g)) continue;
+      this.resolveAgainst(g, xAxis, null);
+    }
+    if (!this.doorsOpen()) {
+      for (const d of this.doors) this.resolveAgainst(d, xAxis, null);
+    }
+    for (const f of this.fallers) this.resolveAgainst(f, xAxis, null);
   }
 
   resolveAgainst(b, xAxis, crumble) {
@@ -192,6 +291,7 @@ class SimWorld {
     this.gravityDir = 1.0;
     this.lockTicks = 0;
     this.groundMover = -1;
+    this.groundConveyor = -1;
     this.lastGroundedTick = -1000000;
     this.jumpPressedTick = -1000000;
     this.events.respawned = true;
@@ -228,6 +328,44 @@ class SimWorld {
       m.deltaY = m.y - m.prevY;
     }
 
+    // 1b. fallers (thwomps): trigger when the player passes below, slam
+    // down, wait, rise back. Contact while falling crushes (respawn).
+    for (const f of this.fallers) {
+      if (f.state === 0) {
+        let lo = f.x - f.halfW;
+        lo = lo - SIM.FALLER_MARGIN;
+        let hi = f.x + f.halfW;
+        hi = hi + SIM.FALLER_MARGIN;
+        const bottom = f.y - f.halfH;
+        if (this.px > lo && this.px < hi && this.py < bottom) f.state = 1;
+      } else if (f.state === 1) {
+        const d = SIM.FALLER_FALL_SPEED * SIM.TICK;
+        f.offset = f.offset + d;
+        if (f.offset >= f.dy) {
+          f.offset = f.dy;
+          f.state = 2;
+          f.waitLeft = SIM.FALLER_WAIT_TICKS;
+          this.events.slammed = true;
+        }
+        f.y = f.baseY - f.offset;
+        if (SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, f)) {
+          this.respawn();
+        }
+        continue;
+      } else if (f.state === 2) {
+        f.waitLeft = f.waitLeft - 1;
+        if (f.waitLeft <= 0) f.state = 3;
+      } else {
+        const d = SIM.FALLER_RISE_SPEED * SIM.TICK;
+        f.offset = f.offset - d;
+        if (f.offset <= 0.0) {
+          f.offset = 0.0;
+          f.state = 0;
+        }
+      }
+      f.y = f.baseY - f.offset;
+    }
+
     // 2. crumble reset
     for (const c of this.crumbles) {
       if (c.touchedTick < 0) continue;
@@ -235,11 +373,17 @@ class SimWorld {
       if (this.tickCount >= returnAt) c.touchedTick = -1;
     }
 
-    // 3. carry by ground mover
+    // 3. carry by ground mover / conveyor drift
     if (this.groundMover >= 0) {
       const gm = this.movers[this.groundMover];
       this.px = this.px + gm.deltaX;
       this.py = this.py + gm.deltaY;
+    }
+    if (this.groundConveyor >= 0) {
+      const gc = this.conveyors[this.groundConveyor];
+      const push = gc.speed * SIM.TICK;
+      const pd = push * gc.dir;
+      this.px = this.px + pd;
     }
 
     // 4. input
@@ -251,18 +395,33 @@ class SimWorld {
     // 5. grounded
     if (this.probeGround()) this.lastGroundedTick = this.tickCount;
 
-    // 6. control
+    // 6. control: direct while steering; on the ground releasing stops you,
+    // in the air momentum is preserved (so moving floors don't leave you behind)
+    const groundedNow = this.lastGroundedTick === this.tickCount;
     if (this.lockTicks > 0) {
       this.lockTicks = this.lockTicks - 1;
-    } else {
+    } else if (axis !== 0.0) {
       this.vx = axis * SIM.MOVE_SPEED;
+    } else if (groundedNow) {
+      this.vx = 0.0;
     }
 
-    // 7. jump (coyote + buffer)
+    // 7. jump (coyote + buffer); inherits the velocity of whatever you
+    // were riding so platform jumps feel glued
     const sincePress = this.tickCount - this.jumpPressedTick;
     const sinceGround = this.tickCount - this.lastGroundedTick;
     if (sincePress <= SIM.BUFFER_TICKS && sinceGround <= SIM.COYOTE_TICKS) {
       this.vy = SIM.JUMP_SPEED * this.gravityDir;
+      if (this.groundMover >= 0) {
+        const jm = this.movers[this.groundMover];
+        const mv = jm.deltaX / SIM.TICK;
+        this.vx = this.vx + mv;
+      }
+      if (this.groundConveyor >= 0) {
+        const jc = this.conveyors[this.groundConveyor];
+        const cv = jc.speed * jc.dir;
+        this.vx = this.vx + cv;
+      }
       this.jumpPressedTick = -1000000;
       this.lastGroundedTick = -1000000;
       this.events.jumped = true;
@@ -322,18 +481,37 @@ class SimWorld {
       }
     }
 
+    // 10b. keys unlock the doors once all are collected
+    if (!respawned) {
+      for (const k of this.keys) {
+        if (k.collected) continue;
+        if (!SimWorld.overlaps(this.px, this.py, SIM.PLAYER_HALF, SIM.PLAYER_HALF, k)) continue;
+        k.collected = true;
+        this.keysCollected = this.keysCollected + 1;
+        this.events.key = true;
+        if (this.keysCollected >= this.keys.length) this.events.door = true;
+      }
+    }
+
     // 11. kill zones
     if (!respawned) {
       if (this.py < SIM.KILL_BOTTOM || this.py > SIM.KILL_TOP) this.respawn();
     }
 
-    // 12. ground mover for next tick's carry
+    // 12. ground mover / conveyor for next tick's carry
     this.groundMover = -1;
     const gShift = SIM.GROUND_PROBE * this.gravityDir;
     const gProbeY = this.py - gShift;
     for (let i = 0; i < this.movers.length; i++) {
       if (SimWorld.overlaps(this.px, gProbeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, this.movers[i])) {
         this.groundMover = i;
+        break;
+      }
+    }
+    this.groundConveyor = -1;
+    for (let i = 0; i < this.conveyors.length; i++) {
+      if (SimWorld.overlaps(this.px, gProbeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, this.conveyors[i])) {
+        this.groundConveyor = i;
         break;
       }
     }
@@ -353,6 +531,11 @@ class SimWorld {
         case 'solid': world.addSolid(p.x, p.y, p.w, p.h); break;
         case 'movingPlatform': world.addMover(p.x, p.y, p.w, p.h, p.dx || 0, p.dy || 0, p.period || 0); break;
         case 'crumble': world.addCrumble(p.x, p.y, p.w, p.h); break;
+        case 'faller': world.addFaller(p.x, p.y, p.w, p.h, p.dy || 0); break;
+        case 'conveyor': world.addConveyor(p.x, p.y, p.w, p.h, p.dirX || 0, p.power || 0); break;
+        case 'timedGate': world.addGate(p.x, p.y, p.w, p.h, p.period || 0, p.dx || 0); break;
+        case 'key': world.addKey(p.x, p.y, p.w, p.h); break;
+        case 'door': world.addDoor(p.x, p.y, p.w, p.h); break;
         case 'hazard': world.addTrigger('hazard', p.x, p.y, p.w, p.h, 0, 0); break;
         case 'jumpPad': world.addTrigger('pad', p.x, p.y, p.w, p.h, p.power || 0, 0); break;
         case 'boost': world.addTrigger('boost', p.x, p.y, p.w, p.h, p.power || 0, p.dirX || 0); break;

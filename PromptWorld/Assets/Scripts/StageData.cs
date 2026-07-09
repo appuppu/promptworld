@@ -34,6 +34,7 @@ public class StageEntry
 public class GhostData
 {
     public int clearTimeMs;
+    public int bestTimeMs;
     public ReplayData replay;
 }
 

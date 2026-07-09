@@ -25,12 +25,62 @@
   .play { display: inline-block; border: 2px solid #fff; padding: 12px 28px; margin-top: 40px;
           text-decoration: none; letter-spacing: 2px; }
   .play:hover { background: #fff; color: #000; }
+
+  /* living gimmick hero — every part of the toolbox, in motion */
+  .hero { position: relative; height: 200px; margin: 0 0 44px; border: 1px solid #222; overflow: hidden; }
+  .hero * { position: absolute; }
+  .ground { left: 0; right: 0; bottom: 24px; height: 10px; background: #fff; }
+  .player { width: 26px; height: 26px; background: #fff; bottom: 34px; left: -30px;
+            animation: run 7s linear infinite; }
+  @keyframes run {
+    0%   { left: -30px; bottom: 34px; }
+    22%  { left: 20%;  bottom: 34px; }
+    28%  { left: 25%;  bottom: 104px; }
+    34%  { left: 30%;  bottom: 34px; }
+    54%  { left: 52%;  bottom: 34px; }
+    60%  { left: 57%;  bottom: 114px; }
+    66%  { left: 62%;  bottom: 34px; }
+    88%  { left: 86%;  bottom: 34px; }
+    100% { left: 104%; bottom: 34px; }
+  }
+  .faller { width: 44px; height: 44px; background: #fff; left: 24%; top: 8px;
+            animation: slam 3.5s ease-in infinite; }
+  .faller::before, .faller::after { content: ""; position: absolute; top: 9px; width: 7px; height: 9px; background: #000; }
+  .faller::before { left: 9px; } .faller::after { right: 9px; }
+  @keyframes slam {
+    0%, 55% { top: 8px; }
+    62%, 74% { top: 122px; }
+    100% { top: 8px; }
+  }
+  .gate { width: 16px; height: 54px; background: #fff; left: 45%; bottom: 34px;
+          animation: blink 2s steps(1) infinite; }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  .mover { width: 70px; height: 10px; background: #fff; bottom: 92px; left: 56%;
+           animation: slide 4s ease-in-out infinite alternate; }
+  @keyframes slide { from { left: 56%; } to { left: 72%; } }
+  .key { width: 14px; height: 14px; background: #fff; left: 84%; top: 46px;
+         transform: rotate(45deg); animation: bob 1.6s ease-in-out infinite alternate; }
+  @keyframes bob { from { top: 46px; } to { top: 60px; } }
+  .goal { width: 34px; height: 66px; border: 5px solid #fff; right: 18px; bottom: 34px; }
+  .spike { width: 18px; height: 18px; background: #fff; transform: rotate(45deg); bottom: 28px; left: 38%; }
 </style>
 </head>
 <body>
 <main>
   <h1>PROMPT WORLD</h1>
   <p class="tagline">Worlds made of prompts. You describe a stage — your AI builds it — anyone plays it from a URL.</p>
+
+  <div class="hero" aria-hidden="true">
+    <div class="ground"></div>
+    <div class="player"></div>
+    <div class="faller"></div>
+    <div class="spike"></div>
+    <div class="gate"></div>
+    <div class="mover"></div>
+    <div class="key"></div>
+    <div class="goal"></div>
+  </div>
+  <p class="tagline">Thwomps, conveyors, timed gates, gravity flips, keys &amp; doors — all of it is yours to combine, with a sentence.</p>
 
   <h2>STEP 1 — CONNECT YOUR CLAUDE</h2>
   <p>On <strong>claude.ai</strong>: Settings → Connectors → Add custom connector, and paste:</p>

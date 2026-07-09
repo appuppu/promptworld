@@ -52,6 +52,9 @@ public enum SimEvents
     Crumbled = 32,
     Cleared = 64,
     TimedOut = 128,
+    Slammed = 256,
+    KeyPickup = 512,
+    DoorOpened = 1024,
 }
 
 public class SimBox
@@ -80,6 +83,33 @@ public class SimTrigger : SimBox
     public bool WasOverlapping;
 }
 
+public class SimFaller : SimBox
+{
+    public double BaseY, Dy;
+    public int State;       // 0 idle, 1 falling, 2 waiting, 3 rising
+    public double Offset;
+    public int WaitLeft;
+}
+
+public class SimConveyor : SimBox
+{
+    public double Dir, Speed;
+}
+
+public class SimGate : SimBox
+{
+    public int PeriodTicks, OnTicks, PhaseTicks;
+}
+
+public class SimKey : SimBox
+{
+    public bool Collected;
+}
+
+public class SimDoor : SimBox
+{
+}
+
 public class SimWorld
 {
     public const double Tick = 0.02;
@@ -97,11 +127,21 @@ public class SimWorld
     public const double KillBottom = -12.0;
     public const double KillTop = 15.0;
     public const double GroundProbe = 0.06;
+    public const double FallerFallSpeed = 22.0;
+    public const double FallerRiseSpeed = 3.0;
+    public const int FallerWaitTicks = 25;
+    public const double FallerMargin = 0.6;
 
     public readonly List<SimBox> Solids = new List<SimBox>();
     public readonly List<SimMover> Movers = new List<SimMover>();
     public readonly List<SimCrumble> Crumbles = new List<SimCrumble>();
     public readonly List<SimTrigger> Triggers = new List<SimTrigger>();
+    public readonly List<SimFaller> Fallers = new List<SimFaller>();
+    public readonly List<SimConveyor> Conveyors = new List<SimConveyor>();
+    public readonly List<SimGate> Gates = new List<SimGate>();
+    public readonly List<SimKey> Keys = new List<SimKey>();
+    public readonly List<SimDoor> Doors = new List<SimDoor>();
+    public int KeysCollected;
 
     public double StartX, StartY;
     public double Px, Py, Vx, Vy;
@@ -110,6 +150,7 @@ public class SimWorld
     public int LastGroundedTick = -1000000;
     public int JumpPressedTick = -1000000;
     public int GroundMover = -1;
+    public int GroundConveyor = -1;
     public int TickCount;
     public int MaxTicks;
     public bool ClearedFlag;
@@ -162,6 +203,62 @@ public class SimWorld
         Crumbles.Add(new SimCrumble { X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh });
     }
 
+    public void AddFaller(double x, double y, double w, double h, double dy)
+    {
+        double hw = Q(w) / 2.0;
+        double hh = Q(h) / 2.0;
+        double fall = Q(dy);
+        if (fall <= 0.0) fall = 4.0;
+        var f = new SimFaller { X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh, BaseY = Q(y), Dy = fall };
+        Fallers.Add(f);
+    }
+
+    public void AddConveyor(double x, double y, double w, double h, double dirX, double power)
+    {
+        double hw = Q(w) / 2.0;
+        double hh = Q(h) / 2.0;
+        double speed = Q(power);
+        if (speed <= 0.0) speed = 3.0;
+        double dir = 1.0;
+        if (Q(dirX) < 0.0) dir = -1.0;
+        Conveyors.Add(new SimConveyor { X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh, Dir = dir, Speed = speed });
+    }
+
+    public void AddGate(double x, double y, double w, double h, double period, double phase)
+    {
+        double hw = Q(w) / 2.0;
+        double hh = Q(h) / 2.0;
+        double p = Q(period);
+        if (p <= 0.0) p = 2.0;
+        double pt = p / Tick;
+        double ph = Q(phase);
+        double pht = ph / Tick;
+        var gate = new SimGate
+        {
+            X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh,
+            PeriodTicks = (int)pt,
+            PhaseTicks = (int)pht,
+        };
+        gate.OnTicks = gate.PeriodTicks / 2;
+        if (gate.PeriodTicks < 2) gate.PeriodTicks = 2;
+        if (gate.OnTicks < 1) gate.OnTicks = 1;
+        Gates.Add(gate);
+    }
+
+    public void AddKey(double x, double y, double w, double h)
+    {
+        double hw = Q(w) / 2.0;
+        double hh = Q(h) / 2.0;
+        Keys.Add(new SimKey { X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh });
+    }
+
+    public void AddDoor(double x, double y, double w, double h)
+    {
+        double hw = Q(w) / 2.0;
+        double hh = Q(h) / 2.0;
+        Doors.Add(new SimDoor { X = Q(x), Y = Q(y), HalfW = hw, HalfH = hh });
+    }
+
     public void AddTrigger(string kind, double x, double y, double w, double h, double power, double dirX)
     {
         double hw;
@@ -198,6 +295,19 @@ public class SimWorld
         return TickCount < vanishAt;
     }
 
+    public bool GateActive(SimGate g)
+    {
+        int phase = TickCount + g.PhaseTicks;
+        int m = phase % g.PeriodTicks;
+        return m < g.OnTicks;
+    }
+
+    public bool DoorsOpen()
+    {
+        if (Keys.Count == 0) return true;
+        return KeysCollected >= Keys.Count;
+    }
+
     private static bool Overlaps(double ax, double ay, double ahw, double ahh, SimBox b)
     {
         double dx = ax - b.X;
@@ -228,6 +338,26 @@ public class SimWorld
             if (!CrumbleActive(c)) continue;
             if (Overlaps(Px, probeY, PlayerHalf, PlayerHalf, c)) return true;
         }
+        foreach (SimConveyor cv in Conveyors)
+        {
+            if (Overlaps(Px, probeY, PlayerHalf, PlayerHalf, cv)) return true;
+        }
+        foreach (SimGate g in Gates)
+        {
+            if (!GateActive(g)) continue;
+            if (Overlaps(Px, probeY, PlayerHalf, PlayerHalf, g)) return true;
+        }
+        if (!DoorsOpen())
+        {
+            foreach (SimDoor d in Doors)
+            {
+                if (Overlaps(Px, probeY, PlayerHalf, PlayerHalf, d)) return true;
+            }
+        }
+        foreach (SimFaller f in Fallers)
+        {
+            if (Overlaps(Px, probeY, PlayerHalf, PlayerHalf, f)) return true;
+        }
         return false;
     }
 
@@ -240,6 +370,17 @@ public class SimWorld
             if (!CrumbleActive(c)) continue;
             ResolveAgainst(c, xAxis, c);
         }
+        foreach (SimConveyor cv in Conveyors) ResolveAgainst(cv, xAxis, null);
+        foreach (SimGate g in Gates)
+        {
+            if (!GateActive(g)) continue;
+            ResolveAgainst(g, xAxis, null);
+        }
+        if (!DoorsOpen())
+        {
+            foreach (SimDoor d in Doors) ResolveAgainst(d, xAxis, null);
+        }
+        foreach (SimFaller f in Fallers) ResolveAgainst(f, xAxis, null);
     }
 
     private void ResolveAgainst(SimBox b, bool xAxis, SimCrumble crumble)
@@ -289,6 +430,7 @@ public class SimWorld
         GravityDir = 1.0;
         LockTicks = 0;
         GroundMover = -1;
+        GroundConveyor = -1;
         LastGroundedTick = -1000000;
         JumpPressedTick = -1000000;
         Events |= SimEvents.Respawned;
@@ -330,6 +472,55 @@ public class SimWorld
             m.DeltaY = m.Y - m.PrevY;
         }
 
+        // 1b. fallers (thwomps): trigger when the player passes below, slam
+        // down, wait, rise back. Contact while falling crushes (respawn).
+        foreach (SimFaller f in Fallers)
+        {
+            if (f.State == 0)
+            {
+                double lo = f.X - f.HalfW;
+                lo = lo - FallerMargin;
+                double hi = f.X + f.HalfW;
+                hi = hi + FallerMargin;
+                double bottom = f.Y - f.HalfH;
+                if (Px > lo && Px < hi && Py < bottom) f.State = 1;
+            }
+            else if (f.State == 1)
+            {
+                double d = FallerFallSpeed * Tick;
+                f.Offset = f.Offset + d;
+                if (f.Offset >= f.Dy)
+                {
+                    f.Offset = f.Dy;
+                    f.State = 2;
+                    f.WaitLeft = FallerWaitTicks;
+                    Events |= SimEvents.Slammed;
+                }
+                f.Y = f.BaseY - f.Offset;
+                if (Overlaps(Px, Py, PlayerHalf, PlayerHalf, f))
+                {
+                    Respawn();
+                }
+                continue;
+            }
+            else if (f.State == 2)
+            {
+                f.WaitLeft = f.WaitLeft - 1;
+                if (f.WaitLeft <= 0) f.State = 3;
+            }
+            else
+            {
+                double d = FallerRiseSpeed * Tick;
+                f.Offset = f.Offset - d;
+                if (f.Offset <= 0.0)
+                {
+                    f.Offset = 0.0;
+                    f.State = 0;
+                }
+            }
+            f.Y = f.BaseY - f.Offset;
+        }
+
         // 2. crumble reset
         foreach (SimCrumble c in Crumbles)
         {
@@ -338,12 +529,19 @@ public class SimWorld
             if (TickCount >= returnAt) c.TouchedTick = -1;
         }
 
-        // 3. carry by ground mover
+        // 3. carry by ground mover / conveyor drift
         if (GroundMover >= 0)
         {
             SimMover gm = Movers[GroundMover];
             Px = Px + gm.DeltaX;
             Py = Py + gm.DeltaY;
+        }
+        if (GroundConveyor >= 0)
+        {
+            SimConveyor gc = Conveyors[GroundConveyor];
+            double push = gc.Speed * Tick;
+            double pd = push * gc.Dir;
+            Px = Px + pd;
         }
 
         // 4. input
@@ -355,22 +553,41 @@ public class SimWorld
         // 5. grounded
         if (ProbeGround()) LastGroundedTick = TickCount;
 
-        // 6. control
+        // 6. control: direct while steering; on the ground releasing stops you,
+        // in the air momentum is preserved (so moving floors don't leave you behind)
+        bool groundedNow = LastGroundedTick == TickCount;
         if (LockTicks > 0)
         {
             LockTicks = LockTicks - 1;
         }
-        else
+        else if (axis != 0.0)
         {
             Vx = axis * MoveSpeed;
         }
+        else if (groundedNow)
+        {
+            Vx = 0.0;
+        }
 
-        // 7. jump (coyote + buffer)
+        // 7. jump (coyote + buffer); inherits the velocity of whatever you
+        // were riding so platform jumps feel glued
         int sincePress = TickCount - JumpPressedTick;
         int sinceGround = TickCount - LastGroundedTick;
         if (sincePress <= BufferTicks && sinceGround <= CoyoteTicks)
         {
             Vy = JumpSpeed * GravityDir;
+            if (GroundMover >= 0)
+            {
+                SimMover jm = Movers[GroundMover];
+                double mv = jm.DeltaX / Tick;
+                Vx = Vx + mv;
+            }
+            if (GroundConveyor >= 0)
+            {
+                SimConveyor jc = Conveyors[GroundConveyor];
+                double cv = jc.Speed * jc.Dir;
+                Vx = Vx + cv;
+            }
             JumpPressedTick = -1000000;
             LastGroundedTick = -1000000;
             Events |= SimEvents.Jumped;
@@ -440,13 +657,27 @@ public class SimWorld
             }
         }
 
+        // 10b. keys unlock the doors once all are collected
+        if (!respawned)
+        {
+            foreach (SimKey k in Keys)
+            {
+                if (k.Collected) continue;
+                if (!Overlaps(Px, Py, PlayerHalf, PlayerHalf, k)) continue;
+                k.Collected = true;
+                KeysCollected = KeysCollected + 1;
+                Events |= SimEvents.KeyPickup;
+                if (KeysCollected >= Keys.Count) Events |= SimEvents.DoorOpened;
+            }
+        }
+
         // 11. kill zones
         if (!respawned)
         {
             if (Py < KillBottom || Py > KillTop) Respawn();
         }
 
-        // 12. ground mover for next tick's carry
+        // 12. ground mover / conveyor for next tick's carry
         GroundMover = -1;
         double gShift = GroundProbe * GravityDir;
         double gProbeY = Py - gShift;
@@ -455,6 +686,15 @@ public class SimWorld
             if (Overlaps(Px, gProbeY, PlayerHalf, PlayerHalf, Movers[i]))
             {
                 GroundMover = i;
+                break;
+            }
+        }
+        GroundConveyor = -1;
+        for (int i = 0; i < Conveyors.Count; i++)
+        {
+            if (Overlaps(Px, gProbeY, PlayerHalf, PlayerHalf, Conveyors[i]))
+            {
+                GroundConveyor = i;
                 break;
             }
         }
@@ -479,6 +719,11 @@ public class SimWorld
                 case "solid": world.AddSolid(p.x, p.y, p.w, p.h); break;
                 case "movingPlatform": world.AddMover(p.x, p.y, p.w, p.h, p.dx, p.dy, p.period); break;
                 case "crumble": world.AddCrumble(p.x, p.y, p.w, p.h); break;
+                case "faller": world.AddFaller(p.x, p.y, p.w, p.h, p.dy); break;
+                case "conveyor": world.AddConveyor(p.x, p.y, p.w, p.h, p.dirX, p.power); break;
+                case "timedGate": world.AddGate(p.x, p.y, p.w, p.h, p.period, p.dx); break;
+                case "key": world.AddKey(p.x, p.y, p.w, p.h); break;
+                case "door": world.AddDoor(p.x, p.y, p.w, p.h); break;
                 case "hazard": world.AddTrigger("hazard", p.x, p.y, p.w, p.h, 0, 0); break;
                 case "jumpPad": world.AddTrigger("pad", p.x, p.y, p.w, p.h, p.power, 0); break;
                 case "boost": world.AddTrigger("boost", p.x, p.y, p.w, p.h, p.power, p.dirX); break;

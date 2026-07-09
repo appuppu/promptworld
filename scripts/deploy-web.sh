@@ -14,9 +14,12 @@ s = s.replace("<title>Unity Web Player | Prompt World</title>", "<title>Prompt W
 if (!s.includes("body { background: #000; }")) {
   s = s.replace(
     "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">",
-    "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">\n    <style>body { background: #000; }</style>"
+    "<link rel=\"stylesheet\" href=\"TemplateData/style.css\">\n    <style>body { background: #000; margin: 0; overflow: hidden; }</style>"
   );
 }
+// Desktop: fill the whole window instead of a small fixed canvas.
+s = s.replace("canvas.style.width = \"960px\";", "canvas.style.width = \"100vw\";");
+s = s.replace("canvas.style.height = \"600px\";", "canvas.style.height = \"100vh\";");
 fs.writeFileSync(p, s);
 console.log("index.html patched");
 ' "$OUT/index.html"

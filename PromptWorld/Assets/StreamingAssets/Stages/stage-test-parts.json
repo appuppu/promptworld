@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.3",
+  "id": "stage-test-parts",
+  "name": "Parts Gauntlet (dev)",
+  "timeLimit": 60,
+  "playerStart": { "x": -18, "y": -2.5 },
+  "goal": { "x": 19, "y": -2.3, "w": 1.4, "h": 2.6 },
+  "parts": [
+    { "type": "solid", "x": 0, "y": -4, "w": 40, "h": 1 },
+    { "type": "conveyor", "x": -10, "y": -3, "w": 4, "h": 0.5, "dirX": 1, "power": 4 },
+    { "type": "faller", "x": -6, "y": 2, "w": 2, "h": 2, "dy": 4.5 },
+    { "type": "timedGate", "x": -2, "y": -2.5, "w": 1, "h": 2, "period": 2 },
+    { "type": "key", "x": 2, "y": -2, "w": 1, "h": 1 },
+    { "type": "door", "x": 5, "y": -2.5, "w": 1, "h": 3 },
+    { "type": "movingPlatform", "x": 8, "y": -1, "w": 3, "h": 0.5, "dx": 0, "dy": 3, "period": 4 },
+    { "type": "hazard", "x": 10, "y": -3.1, "w": 0.8, "h": 0.8 },
+    { "type": "crumble", "x": 12, "y": -2.5, "w": 2, "h": 0.5 },
+    { "type": "jumpPad", "x": 14, "y": -3.15, "w": 1.5, "h": 0.3, "power": 20 },
+    { "type": "gravityFlip", "x": 16, "y": 1, "w": 1.2, "h": 1.2 },
+    { "type": "solid", "x": 16, "y": 6, "w": 8, "h": 1 }
+  ]
+}

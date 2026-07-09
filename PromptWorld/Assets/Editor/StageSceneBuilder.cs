@@ -38,16 +38,16 @@ public static class StageSceneBuilder
         Button voteBad = CreateTextButton(canvas.transform, "VoteBad", "BAD", 26,
             new Vector2(0.5f, 0.5f), new Vector2(100f, -150f), new Vector2(170f, 54f));
         Button retryButton = CreateTextButton(canvas.transform, "RetryButton", "RETRY", 42,
-            new Vector2(0.5f, 0.5f), new Vector2(-170f, -240f), new Vector2(300f, 84f));
+            new Vector2(0.5f, 0.5f), new Vector2(-280f, -240f), new Vector2(280f, 84f));
+        Button menuButton = CreateTextButton(canvas.transform, "MenuButton", "MENU", 42,
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -240f), new Vector2(240f, 84f));
         Button nextButton = CreateTextButton(canvas.transform, "NextButton", "NEXT >", 42,
-            new Vector2(0.5f, 0.5f), new Vector2(170f, -240f), new Vector2(300f, 84f));
+            new Vector2(0.5f, 0.5f), new Vector2(280f, -240f), new Vector2(280f, 84f));
         Button shareButton = CreateTextButton(canvas.transform, "ShareButton", "SHARE URL", 32,
             new Vector2(0.5f, 0.5f), new Vector2(0f, -330f), new Vector2(340f, 64f));
         Button createLink = CreateTextButton(canvas.transform, "CreateLink", "CREATE YOUR OWN WORLD  >", 24,
             new Vector2(0.5f, 0.5f), new Vector2(0f, -405f), new Vector2(620f, 50f));
         createLink.GetComponentInChildren<TMPro.TMP_Text>().color = new Color(1f, 1f, 1f, 0.6f);
-        Button menuButton = CreateTextButton(canvas.transform, "MenuButton", "MENU", 30,
-            new Vector2(1f, 1f), new Vector2(-110f, -45f), new Vector2(170f, 55f));
 
         var gmGo = new GameObject("GameManager");
         var gm = gmGo.AddComponent<GameManager>();
@@ -129,6 +129,7 @@ public static class StageSceneBuilder
         var scaler = canvasGo.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
 
         timerText = CreateText(canvasGo.transform, "TimerText", "60", 48, TextAlignmentOptions.Center,
             anchor: new Vector2(0.5f, 1f), anchoredPos: new Vector2(0f, -40f), size: new Vector2(400f, 100f));

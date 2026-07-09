@@ -66,7 +66,7 @@ public class MenuController : MonoBehaviour
         }
         BuildSortRow();
 
-        yield return LoadBuiltInStages();
+        Sfx.StopMusic();
         yield return LoadCommunityStages();
         yield return FillCommunityPreviews();
     }
@@ -119,48 +119,12 @@ public class MenuController : MonoBehaviour
     {
         for (int i = entries.Count - 1; i >= 0; i--)
         {
-            Entry entry = entries[i];
-            bool isCommunity = entry.RemoteId != null || (entry.IsLabel && entry.Title == "COMMUNITY");
-            if (isCommunity)
-            {
-                Destroy(entry.Root);
-                entries.RemoveAt(i);
-            }
+            Destroy(entries[i].Root);
+            entries.RemoveAt(i);
         }
         yield return LoadCommunityStages();
         yield return FillCommunityPreviews();
         Filter(searchInput != null ? searchInput.text : "");
-    }
-
-    private IEnumerator LoadBuiltInStages()
-    {
-        string url = System.IO.Path.Combine(Application.streamingAssetsPath, "Stages", "index.json");
-        if (!url.Contains("://")) url = "file://" + url;
-
-        using var request = UnityWebRequest.Get(url);
-        yield return request.SendWebRequest();
-        if (request.result != UnityWebRequest.Result.Success) yield break;
-
-        var index = JsonUtility.FromJson<StageIndex>(request.downloadHandler.text);
-        foreach (StageEntry stageEntry in index.stages)
-        {
-            string file = stageEntry.file;
-            string stageUrl = System.IO.Path.Combine(Application.streamingAssetsPath, "Stages", file);
-            if (!stageUrl.Contains("://")) stageUrl = "file://" + stageUrl;
-
-            using var stageReq = UnityWebRequest.Get(stageUrl);
-            yield return stageReq.SendWebRequest();
-            StageData data = stageReq.result == UnityWebRequest.Result.Success
-                ? JsonUtility.FromJson<StageData>(stageReq.downloadHandler.text)
-                : null;
-
-            Entry entry = AddEntry(stageEntry.title, $"{(data != null ? data.timeLimit : 0):0}s", () =>
-            {
-                GameSession.SelectedStageFile = file;
-                SceneManager.LoadScene("Stage");
-            });
-            if (data != null) entry.Preview.texture = StagePreview.Render(data);
-        }
     }
 
     private IEnumerator LoadCommunityStages()
@@ -172,14 +136,18 @@ public class MenuController : MonoBehaviour
         var list = JsonUtility.FromJson<PublishedList>(request.downloadHandler.text);
         if (list?.stages == null || list.stages.Length == 0) yield break;
 
-        AddLabel("COMMUNITY");
         foreach (PublishedStage stage in list.stages)
         {
             string id = stage.id;
             var parts = new List<string>();
             if (!string.IsNullOrEmpty(stage.creator)) parts.Add($"by {stage.creator}");
-            if (stage.clear_time_ms > 0) parts.Add($"PAR {stage.clear_time_ms / 1000f:0.0}s");
-            if (stage.goods + stage.bads > 0) parts.Add($"+{stage.goods} / -{stage.bads}");
+            int best = stage.best_time_ms > 0 ? stage.best_time_ms : stage.clear_time_ms;
+            if (best > 0) parts.Add($"BEST {best / 1000f:0.00}s");
+            if (stage.goods + stage.bads > 0)
+            {
+                int pct = stage.goods * 100 / (stage.goods + stage.bads);
+                parts.Add($"GOOD {pct}%");
+            }
             if (stage.attempts >= 10) parts.Add($"CLEAR {stage.clears * 100 / stage.attempts}%");
 
             Entry entry = AddEntry(stage.name, string.Join("  ·  ", parts), () =>
@@ -323,6 +291,7 @@ public class MenuController : MonoBehaviour
         public string name;
         public string creator;
         public int clear_time_ms;
+        public int best_time_ms;
         public int goods;
         public int bads;
         public int attempts;

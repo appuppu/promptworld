@@ -65,9 +65,16 @@ public class StageLoader : MonoBehaviour
         var stageRoot = new GameObject("Stage").transform;
         var moverViews = new List<Transform>();
         var crumbleViews = new List<SpriteRenderer>();
+        var fallerViews = new List<Transform>();
+        var gateViews = new List<GameObject>();
+        var keyViews = new List<GameObject>();
+        var doorViews = new List<GameObject>();
 
         // Visual order MUST mirror SimWorld.FromStage's iteration (parts order).
-        foreach (PartData part in data.parts) BuildPartVisual(part, stageRoot, moverViews, crumbleViews);
+        foreach (PartData part in data.parts)
+        {
+            BuildPartVisual(part, stageRoot, moverViews, crumbleViews, fallerViews, gateViews, keyViews, doorViews);
+        }
         CreateFrame("Goal", stageRoot, data.goal.x, data.goal.y, data.goal.w, data.goal.h, 0.18f);
 
         GameObject player = CreateRectObject("Player", stageRoot,
@@ -76,6 +83,7 @@ public class StageLoader : MonoBehaviour
         SimWorld world = SimWorld.FromStage(data);
         var driver = gameObject.AddComponent<SimDriver>();
         driver.Init(world, player.transform, moverViews.ToArray(), crumbleViews.ToArray(), gameManager);
+        driver.SetPartViews(fallerViews.ToArray(), gateViews.ToArray(), keyViews.ToArray(), doorViews.ToArray());
 
         gameManager.ConfigureSim(data.name, data.timeLimit);
         cameraFollow.SetTarget(player.transform);
@@ -96,7 +104,7 @@ public class StageLoader : MonoBehaviour
         GhostData ghost = JsonUtility.FromJson<GhostData>(request.downloadHandler.text);
         if (ghost?.replay?.rle == null || ghost.replay.rle.Length == 0) yield break;
 
-        gameManager.SetPar(ghost.clearTimeMs);
+        gameManager.SetPar(ghost.bestTimeMs > 0 ? ghost.bestTimeMs : ghost.clearTimeMs);
 
         GameObject ghostGo = CreateRectObject("Ghost", null,
             new Vector3(data.playerStart.x, data.playerStart.y, 0f), Vector3.one);
@@ -107,13 +115,51 @@ public class StageLoader : MonoBehaviour
     }
 
     private void BuildPartVisual(PartData part, Transform parent,
-        List<Transform> moverViews, List<SpriteRenderer> crumbleViews)
+        List<Transform> moverViews, List<SpriteRenderer> crumbleViews,
+        List<Transform> fallerViews, List<GameObject> gateViews,
+        List<GameObject> keyViews, List<GameObject> doorViews)
     {
         Vector3 pos = new Vector3(part.x, part.y, 0f);
         Vector3 scale = new Vector3(part.w, part.h, 1f);
 
         switch (part.type)
         {
+            case "faller":
+            {
+                GameObject go = CreateRectObject("Faller", parent, pos, scale);
+                CreateChildRect(go.transform, new Vector2(-0.22f, 0.18f), new Vector2(0.16f, 0.2f), Color.black);
+                CreateChildRect(go.transform, new Vector2(0.22f, 0.18f), new Vector2(0.16f, 0.2f), Color.black);
+                fallerViews.Add(go.transform);
+                break;
+            }
+            case "conveyor":
+            {
+                GameObject go = CreateRectObject("Conveyor", parent, pos, scale);
+                CreateChildRect(go.transform, new Vector2(0f, 0f), new Vector2(0.9f, 0.25f), Color.black);
+                float notch = part.dirX < 0 ? -0.3f : 0.3f;
+                CreateChildRect(go.transform, new Vector2(notch, 0f), new Vector2(0.12f, 0.25f), Color.white);
+                break;
+            }
+            case "timedGate":
+            {
+                GameObject go = CreateRectObject("TimedGate", parent, pos, scale);
+                gateViews.Add(go);
+                break;
+            }
+            case "key":
+            {
+                GameObject go = CreateRectObject("Key", parent, pos, scale * 0.45f);
+                go.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
+                keyViews.Add(go);
+                break;
+            }
+            case "door":
+            {
+                GameObject go = CreateRectObject("Door", parent, pos, scale);
+                CreateChildRect(go.transform, new Vector2(0f, -0.05f), new Vector2(0.28f, 0.34f), Color.black);
+                doorViews.Add(go);
+                break;
+            }
             case "solid":
                 CreateRectObject("Solid", parent, pos, scale);
                 break;
@@ -174,6 +220,18 @@ public class StageLoader : MonoBehaviour
         CreateEdge(go.transform, new Vector2(-w / 2f + thickness / 2f, 0f), new Vector2(thickness, h));
         CreateEdge(go.transform, new Vector2(w / 2f - thickness / 2f, 0f), new Vector2(thickness, h));
         return go;
+    }
+
+    private void CreateChildRect(Transform parent, Vector2 localPos, Vector2 localSize, Color color)
+    {
+        var child = new GameObject("Detail");
+        child.transform.SetParent(parent, false);
+        child.transform.localPosition = localPos;
+        child.transform.localScale = new Vector3(localSize.x, localSize.y, 1f);
+        var renderer = child.AddComponent<SpriteRenderer>();
+        renderer.sprite = GetWhiteSprite();
+        renderer.color = color;
+        renderer.sortingOrder = 1;
     }
 
     private void CreateEdge(Transform parent, Vector2 localPos, Vector2 size)

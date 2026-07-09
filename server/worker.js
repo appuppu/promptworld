@@ -32,6 +32,7 @@ const LIMITS = {
 
 const KNOWN_TYPES = new Set([
   'solid', 'hazard', 'jumpPad', 'boost', 'gravityFlip', 'movingPlatform', 'crumble',
+  'faller', 'conveyor', 'timedGate', 'key', 'door',
 ]);
 
 const SUPPORTED_VERSIONS = new Set(['0.2', '0.3']);
@@ -68,12 +69,15 @@ function validateStage(data) {
     if (!p || !KNOWN_TYPES.has(p.type)) { errors.push(`${label}: unknown type.`); return; }
     if (typeof p.x !== 'number' || typeof p.y !== 'number' || !inWorld(p.x, p.y)) errors.push(`${label}: outside the world bounds.`);
     if (typeof p.w !== 'number' || typeof p.h !== 'number' || !sizeOk(p.w, p.h)) errors.push(`${label}: size out of range.`);
-    if ((p.type === 'jumpPad' || p.type === 'boost') && p.power !== undefined &&
+    if ((p.type === 'jumpPad' || p.type === 'boost' || p.type === 'conveyor') && p.power !== undefined &&
         (typeof p.power !== 'number' || p.power < 0 || p.power > LIMITS.maxPower))
       errors.push(`${label}: power exceeds the maximum of ${LIMITS.maxPower}.`);
-    if (p.type === 'movingPlatform' && p.period !== undefined && p.period !== 0 &&
+    if ((p.type === 'movingPlatform' || p.type === 'timedGate') && p.period !== undefined && p.period !== 0 &&
         (typeof p.period !== 'number' || p.period < LIMITS.minPeriod || p.period > LIMITS.maxPeriod))
       errors.push(`${label}: period must be within [${LIMITS.minPeriod}, ${LIMITS.maxPeriod}] seconds.`);
+    if (p.type === 'faller' && p.dy !== undefined && p.dy !== 0 &&
+        (typeof p.dy !== 'number' || p.dy < 0.5 || p.dy > 50))
+      errors.push(`${label}: dy (fall distance) must be within [0.5, 50].`);
   });
 
   return errors;
@@ -329,7 +333,8 @@ async function opListPublished(env, query, sort) {
   let sql = `SELECT s.id, s.name, s.published_at, s.clear_time_ms, s.attempts, s.clears,
                     c.name AS creator,
                     COALESCE(SUM(CASE WHEN v.good = 1 THEN 1 END), 0) AS goods,
-                    COALESCE(SUM(CASE WHEN v.good = 0 THEN 1 END), 0) AS bads
+                    COALESCE(SUM(CASE WHEN v.good = 0 THEN 1 END), 0) AS bads,
+                    (SELECT MIN(time_ms) FROM scores WHERE stage_id = s.id) AS best_time_ms
              FROM stages s
              LEFT JOIN creators c ON c.id = s.creator_id
              LEFT JOIN votes v ON v.stage_id = s.id
@@ -362,12 +367,18 @@ async function opListPublished(env, query, sort) {
   return rows.results;
 }
 
-async function opGhost(row) {
-  // The creator's verified replay doubles as a ghost + par time.
+async function opGhost(env, row) {
+  // The creator's verified replay doubles as a ghost; the displayed time is
+  // the current world best (falls back to the creator's clear).
   if (!row.clear_replay) return { status: 404, body: { error: 'No verified replay for this stage yet.' } };
+  const best = await env.promptworld_stages
+    .prepare('SELECT MIN(time_ms) AS t FROM scores WHERE stage_id = ?')
+    .bind(row.id)
+    .first();
+  const bestTimeMs = best && best.t ? best.t : row.clear_time_ms;
   return {
     status: 200,
-    body: { id: row.id, clearTimeMs: row.clear_time_ms, replay: JSON.parse(row.clear_replay) },
+    body: { id: row.id, clearTimeMs: row.clear_time_ms, bestTimeMs, replay: JSON.parse(row.clear_replay) },
   };
 }
 
@@ -514,7 +525,7 @@ async function handleApi(request, env, url) {
   }
 
   if (action === 'ghost' && method === 'GET') {
-    const result = await opGhost(row);
+    const result = await opGhost(env, row);
     return json(result.body, result.status);
   }
   if (action === 'scores' && method === 'GET') {
@@ -581,8 +592,13 @@ PARTS (x,y = center; w,h = size; coords within ±500, sizes 0.05..100):
 - {"type":"jumpPad","x","y","w","h","power"} — vertical relaunch; power<=60, 22 reaches ~8 units up; thin slab h~0.3 on a solid
 - {"type":"boost","x","y","w","h","dirX","power"} — horizontal launch (dirX +1/-1, power<=60, 10 carries ~6 units); thin strip on a solid
 - {"type":"gravityFlip","x","y","w","h"} — hollow square; touch inverts gravity; ~1.2x1.2 floating in the path
-- {"type":"movingPlatform","x","y","w","h","dx","dy","period"} — rideable, oscillates to (x+dx,y+dy) and back every period s (0.5..30)
+- {"type":"movingPlatform","x","y","w","h","dx","dy","period"} — rideable, oscillates to (x+dx,y+dy) and back every period s (0.5..30). Players stick to it and inherit its velocity when jumping
 - {"type":"crumble","x","y","w","h"} — blinks 0.5s after touch, vanishes 2.5s, returns
+- {"type":"faller","x","y","w","h","dy"} — thwomp: hovers until the player passes below, slams down dy units (0.5..50) at 22u/s (touch while falling = respawn), rests 0.5s, rises slowly. Solid otherwise
+- {"type":"conveyor","x","y","w","h","dirX","power"} — belt: standing players drift toward dirX at power u/s (default 3, max 60)
+- {"type":"timedGate","x","y","w","h","period","dx"} — solid that exists for the first half of every period seconds, gone for the second half; dx = phase offset in seconds
+- {"type":"key","x","y","w","h"} — collectible; when ALL keys in the stage are collected, every door opens
+- {"type":"door","x","y","w","h"} — solid until all keys are collected
 
 DESIGN RULES:
 - Chain parts into cause-and-effect sequences; one wow moment beats many gimmicks.

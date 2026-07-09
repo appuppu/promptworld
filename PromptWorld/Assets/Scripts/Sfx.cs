@@ -13,12 +13,91 @@ public static class Sfx
     private const int SampleRate = 44100;
 
     private static AudioSource source;
+    private static AudioSource musicSource;
     private static Dictionary<SfxId, AudioClip> clips;
 
     public static void Play(SfxId id, float volume = 0.5f)
     {
         EnsureInit();
         source.PlayOneShot(clips[id], volume);
+    }
+
+    /// <summary>Looping synthesized drum groove — plays only during stage runs.</summary>
+    public static void StartMusic()
+    {
+        EnsureInit();
+        if (musicSource.isPlaying) return;
+        if (musicSource.clip == null) musicSource.clip = BuildDrumLoop();
+        musicSource.loop = true;
+        musicSource.volume = 0.22f;
+        musicSource.Play();
+    }
+
+    public static void StopMusic()
+    {
+        if (musicSource != null && musicSource.isPlaying) musicSource.Stop();
+    }
+
+    /// <summary>Two bars of 4/4 at 128 BPM: kick, snare, hats — all synthesized.</summary>
+    private static AudioClip BuildDrumLoop()
+    {
+        const float bpm = 128f;
+        float stepDur = 60f / bpm / 4f;              // 16th note
+        int stepSamples = (int)(SampleRate * stepDur);
+        int totalSteps = 32;
+        var samples = new float[stepSamples * totalSteps];
+        var rng = new System.Random(777);
+
+        void AddKick(int step)
+        {
+            int start = step * stepSamples;
+            int n = (int)(SampleRate * 0.14f);
+            float phase = 0f;
+            for (int i = 0; i < n && start + i < samples.Length; i++)
+            {
+                float p = (float)i / n;
+                float freq = Mathf.Lerp(110f, 42f, p);
+                phase += freq / SampleRate;
+                samples[start + i] += Mathf.Sin(phase * 2f * Mathf.PI) * Mathf.Pow(1f - p, 1.6f) * 0.9f;
+            }
+        }
+        void AddSnare(int step)
+        {
+            int start = step * stepSamples;
+            int n = (int)(SampleRate * 0.11f);
+            float last = 0f;
+            for (int i = 0; i < n && start + i < samples.Length; i++)
+            {
+                float p = (float)i / n;
+                float white = (float)rng.NextDouble() * 2f - 1f;
+                last = Mathf.Lerp(last, white, 0.6f);
+                samples[start + i] += last * Mathf.Pow(1f - p, 1.4f) * 0.5f;
+            }
+        }
+        void AddHat(int step, float loudness)
+        {
+            int start = step * stepSamples;
+            int n = (int)(SampleRate * 0.028f);
+            float prev = 0f;
+            for (int i = 0; i < n && start + i < samples.Length; i++)
+            {
+                float p = (float)i / n;
+                float white = (float)rng.NextDouble() * 2f - 1f;
+                float high = white - prev; // crude high-pass
+                prev = white;
+                samples[start + i] += high * (1f - p) * loudness;
+            }
+        }
+
+        for (int bar = 0; bar < 2; bar++)
+        {
+            int b = bar * 16;
+            AddKick(b + 0); AddKick(b + 7); AddKick(b + 10);
+            AddSnare(b + 4); AddSnare(b + 12);
+            for (int s = 0; s < 16; s += 2) AddHat(b + s, s % 4 == 2 ? 0.34f : 0.2f);
+        }
+
+        return ToClip("drumloop", samples);
     }
 
     private static void EnsureInit()
@@ -28,6 +107,7 @@ public static class Sfx
         var go = new GameObject("Sfx");
         Object.DontDestroyOnLoad(go);
         source = go.AddComponent<AudioSource>();
+        musicSource = go.AddComponent<AudioSource>();
 
         clips = new Dictionary<SfxId, AudioClip>
         {
