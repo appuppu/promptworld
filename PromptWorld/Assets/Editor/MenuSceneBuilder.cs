@@ -125,7 +125,7 @@ public static class MenuSceneBuilder
         scrollRect.anchorMin = new Vector2(0.5f, 0f);
         scrollRect.anchorMax = new Vector2(0.5f, 1f);
         scrollRect.pivot = new Vector2(0.5f, 0.5f);
-        scrollRect.sizeDelta = new Vector2(800f, -530f);
+        scrollRect.sizeDelta = new Vector2(960f, -530f);
         scrollRect.anchoredPosition = new Vector2(0f, -115f);
         scrollGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f);
 

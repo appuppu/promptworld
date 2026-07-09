@@ -10,12 +10,12 @@
 <meta name="twitter:card" content="summary_large_image">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #000; color: #fff; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
-         line-height: 1.7; padding: 48px 24px 96px; }
+  body { background: #000; color: #fff; font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", "Noto Sans CJK", Arial, sans-serif;
+         line-height: 1.7; padding: 24px 24px 96px; }
   main { max-width: 640px; margin: 0 auto; }
   h1 { font-size: 40px; letter-spacing: 2px; margin-bottom: 8px; }
-  .tagline { opacity: .55; margin-bottom: 48px; }
-  h2 { font-size: 15px; letter-spacing: 3px; opacity: .5; margin: 48px 0 12px; }
+  .tagline { opacity: .55; margin-bottom: 44px; }
+  h2 { font-size: 15px; letter-spacing: 3px; opacity: .5; margin: 44px 0 12px; }
   p { margin-bottom: 12px; }
   code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14px; }
   pre { background: #111; border: 1px solid #333; padding: 14px 16px; overflow-x: auto;
@@ -26,83 +26,198 @@
           text-decoration: none; letter-spacing: 2px; }
   .play:hover { background: #fff; color: #000; }
 
-  /* living gimmick hero — every part of the toolbox, in motion */
+  /* language switcher */
+  .langbar { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+  .langbar button { background: none; border: 1px solid #333; color: #888; padding: 5px 11px;
+                    font-size: 12px; letter-spacing: 1px; cursor: pointer; font-family: inherit; }
+  .langbar button:hover { color: #fff; border-color: #666; }
+  .langbar button.active { color: #000; background: #fff; border-color: #fff; }
+
+  /* living gimmick hero */
   .hero { position: relative; height: 200px; margin: 0 0 44px; border: 1px solid #222; overflow: hidden; }
   .hero * { position: absolute; }
   .ground { left: 0; right: 0; bottom: 24px; height: 10px; background: #fff; }
-  .player { width: 26px; height: 26px; background: #fff; bottom: 34px; left: -30px;
-            animation: run 7s linear infinite; }
-  @keyframes run {
-    0%   { left: -30px; bottom: 34px; }
-    22%  { left: 20%;  bottom: 34px; }
-    28%  { left: 25%;  bottom: 104px; }
-    34%  { left: 30%;  bottom: 34px; }
-    54%  { left: 52%;  bottom: 34px; }
-    60%  { left: 57%;  bottom: 114px; }
-    66%  { left: 62%;  bottom: 34px; }
-    88%  { left: 86%;  bottom: 34px; }
-    100% { left: 104%; bottom: 34px; }
-  }
-  .faller { width: 44px; height: 44px; background: #fff; left: 24%; top: 8px;
-            animation: slam 3.5s ease-in infinite; }
+  .player { width: 26px; height: 26px; background: #fff; bottom: 34px; left: -30px; animation: run 7s linear infinite; }
+  @keyframes run { 0%{left:-30px;bottom:34px} 22%{left:20%;bottom:34px} 28%{left:25%;bottom:104px} 34%{left:30%;bottom:34px} 54%{left:52%;bottom:34px} 60%{left:57%;bottom:114px} 66%{left:62%;bottom:34px} 88%{left:86%;bottom:34px} 100%{left:104%;bottom:34px} }
+  .faller { width: 44px; height: 44px; background: #fff; left: 24%; top: 8px; animation: slam 3.5s ease-in infinite; }
   .faller::before, .faller::after { content: ""; position: absolute; top: 9px; width: 7px; height: 9px; background: #000; }
   .faller::before { left: 9px; } .faller::after { right: 9px; }
-  @keyframes slam {
-    0%, 55% { top: 8px; }
-    62%, 74% { top: 122px; }
-    100% { top: 8px; }
-  }
-  .gate { width: 16px; height: 54px; background: #fff; left: 45%; bottom: 34px;
-          animation: blink 2s steps(1) infinite; }
-  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-  .mover { width: 70px; height: 10px; background: #fff; bottom: 92px; left: 56%;
-           animation: slide 4s ease-in-out infinite alternate; }
-  @keyframes slide { from { left: 56%; } to { left: 72%; } }
-  .key { width: 14px; height: 14px; background: #fff; left: 84%; top: 46px;
-         transform: rotate(45deg); animation: bob 1.6s ease-in-out infinite alternate; }
-  @keyframes bob { from { top: 46px; } to { top: 60px; } }
+  @keyframes slam { 0%,55%{top:8px} 62%,74%{top:122px} 100%{top:8px} }
+  .gate { width: 16px; height: 54px; background: #fff; left: 45%; bottom: 34px; animation: blink 2s steps(1) infinite; }
+  @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+  .mover { width: 70px; height: 10px; background: #fff; bottom: 92px; left: 56%; animation: slide 4s ease-in-out infinite alternate; }
+  @keyframes slide { from{left:56%} to{left:72%} }
+  .key { width: 16px; height: 16px; background: #fff; left: 84%; top: 46px; animation: bob 1.6s ease-in-out infinite alternate; }
+  .key::after { content:""; position:absolute; inset:5px; background:#000; }
+  @keyframes bob { from{top:46px} to{top:60px} }
   .goal { width: 34px; height: 66px; border: 5px solid #fff; right: 18px; bottom: 34px; }
   .spike { width: 18px; height: 18px; background: #fff; transform: rotate(45deg); bottom: 28px; left: 38%; }
 </style>
 </head>
 <body>
 <main>
+  <div class="langbar" id="langbar"></div>
+
   <h1>PROMPT WORLD</h1>
-  <p class="tagline">Worlds made of prompts. You describe a stage — your AI builds it — anyone plays it from a URL.</p>
+  <p class="tagline" data-i="tagline1"></p>
 
   <div class="hero" aria-hidden="true">
-    <div class="ground"></div>
-    <div class="player"></div>
-    <div class="faller"></div>
-    <div class="spike"></div>
-    <div class="gate"></div>
-    <div class="mover"></div>
-    <div class="key"></div>
-    <div class="goal"></div>
+    <div class="ground"></div><div class="player"></div><div class="faller"></div>
+    <div class="spike"></div><div class="gate"></div><div class="mover"></div>
+    <div class="key"></div><div class="goal"></div>
   </div>
-  <p class="tagline">Thwomps, conveyors, timed gates, gravity flips, keys &amp; doors — all of it is yours to combine, with a sentence.</p>
+  <p class="tagline" data-i="tagline2"></p>
 
-  <h2>STEP 1 — CONNECT YOUR CLAUDE</h2>
-  <p>On <strong>claude.ai</strong>: Settings → Connectors → Add custom connector, and paste:</p>
+  <h2 data-i="step1h"></h2>
+  <p data-i="step1a"></p>
   <pre>https://promptworld.pages.dev/mcp</pre>
-  <p>Using <strong>Claude Code</strong> instead? Run:</p>
+  <p data-i="step1b"></p>
   <pre>claude mcp add --transport http promptworld https://promptworld.pages.dev/mcp</pre>
 
-  <h2>STEP 2 — SAY WHAT YOU WANT</h2>
-  <p>Just describe a stage. For example:</p>
-  <pre>Create a Prompt World stage: a gravity-flip corridor
-where I run on the ceiling to dodge spikes, then a big
-boost launch into the goal. Time limit 45 seconds.</pre>
-  <p>Your Claude reads the toolbox, designs the level, and hands you a <strong>test link</strong>.</p>
+  <h2 data-i="step2h"></h2>
+  <p data-i="step2a"></p>
+  <pre data-i="step2ex"></pre>
+  <p data-i="step2b"></p>
 
-  <h2>STEP 3 — PROVE IT, THEN PUBLISH</h2>
-  <div class="rule"><strong>The one rule:</strong> a stage can only be published after <em>you</em> clear it in the browser. Your run is recorded and mathematically verified by the server — impossible stages cannot exist here.</div>
-  <p>Clear your test link, tell your Claude to publish, and share the play URL anywhere. Friends tap it and play instantly — no install, no account, free.</p>
+  <h2 data-i="step3h"></h2>
+  <div class="rule"><strong data-i="ruleLabel"></strong> <span data-i="rule"></span></div>
+  <p data-i="step3a"></p>
 
-  <h2>LIMITS</h2>
-  <p>Time limit 5s–30min · up to 300 parts per stage · 5 publishes per day. Stages that take under 3 seconds are too trivial to publish.</p>
+  <h2 data-i="limitsh"></h2>
+  <p data-i="limits"></p>
 
-  <a class="play" href="/">PLAY&nbsp;NOW&nbsp;→</a>
+  <a class="play" href="/" data-i="playnow"></a>
 </main>
+
+<script>
+const I18N = {
+  en: {
+    _name: 'English',
+    tagline1: 'Worlds made of prompts. You describe a stage — your AI builds it — anyone plays it from a URL.',
+    tagline2: 'Crushers, conveyors, timed gates, gravity flips, keys & doors — all of it is yours to combine, with a sentence.',
+    step1h: 'STEP 1 — CONNECT YOUR CLAUDE',
+    step1a: 'On claude.ai: Settings → Connectors → Add custom connector, and paste:',
+    step1b: 'Using Claude Code instead? Run:',
+    step2h: 'STEP 2 — SAY WHAT YOU WANT',
+    step2a: 'Just describe a stage. For example:',
+    step2ex: 'Create a Prompt World stage: a gravity-flip corridor where I run\non the ceiling to dodge spikes, then a big launch into the goal.\nTime limit 60 seconds.',
+    step2b: 'Your Claude reads the toolbox, designs the level, and hands you a test link.',
+    step3h: 'STEP 3 — PLAY IT, THEN PUBLISH',
+    ruleLabel: 'The one rule:',
+    rule: 'a stage can only be published after YOU clear it in the browser. Your run is recorded and mathematically verified by the server — impossible stages cannot exist here.',
+    step3a: 'Clear your test link, tell your Claude to publish, then find your stage by searching its name — or share the play URL. Friends open it and play instantly. No install, no account, free.',
+    limitsh: 'LIMITS',
+    limits: 'Time limit 5s–30min · up to 300 parts per stage · 5 publishes per day. Stages clearable in under 3 seconds are too trivial to publish.',
+    playnow: 'PLAY NOW →',
+  },
+  ja: {
+    _name: '日本語',
+    tagline1: 'プロンプトでできた世界。ステージを言葉で説明すると、あなたのAIが組み立て、誰でもURLから遊べます。',
+    tagline2: 'クラッシャー、ベルトコンベア、時限ゲート、重力反転、鍵と扉——ぜんぶ一文で組み合わせられます。',
+    step1h: 'STEP 1 — CLAUDEをつなぐ',
+    step1a: 'claude.ai で 設定 → コネクタ → カスタムコネクタを追加 し、次を貼り付け:',
+    step1b: 'Claude Code を使う場合はこちらを実行:',
+    step2h: 'STEP 2 — 作りたいものを伝える',
+    step2a: 'ステージを言葉で説明するだけ。例えば:',
+    step2ex: 'Prompt Worldのステージを作って: 天井を走ってトゲをよけ、\n最後に大きく打ち上げられてゴールへ。制限時間60秒。',
+    step2b: 'あなたのClaudeが道具箱を読み、レベルを設計し、テスト用リンクを渡してくれます。',
+    step3h: 'STEP 3 — プレイして、公開する',
+    ruleLabel: 'たった一つのルール:',
+    rule: 'ステージは、あなた自身がブラウザでクリアして初めて公開できます。プレイ記録はサーバーが数学的に検証——クリア不能なステージは存在できません。',
+    step3a: 'テストリンクをクリアしたらClaudeに公開を頼み、名前で検索して自分のステージを見つけましょう。プレイURLを共有すれば、友達もすぐ遊べます。インストール不要・アカウント不要・無料。',
+    limitsh: '制限',
+    limits: '制限時間 5秒〜30分 · ステージあたり最大300パーツ · 1日5回まで公開可能。3秒未満でクリアできるステージは公開できません。',
+    playnow: '今すぐプレイ →',
+  },
+  zh: {
+    _name: '中文',
+    tagline1: '用提示词构建的世界。你描述一个关卡——你的AI来搭建——任何人都能通过网址游玩。',
+    tagline2: '碾压块、传送带、定时门、重力反转、钥匙与门——只需一句话即可自由组合。',
+    step1h: '第 1 步 — 连接你的 CLAUDE',
+    step1a: '在 claude.ai：设置 → 连接器 → 添加自定义连接器，粘贴:',
+    step1b: '使用 Claude Code？运行:',
+    step2h: '第 2 步 — 说出你想要的',
+    step2a: '只需描述一个关卡。例如:',
+    step2ex: '创建一个 Prompt World 关卡：在天花板上奔跑躲避尖刺，\n最后被大力弹射到终点。限时60秒。',
+    step2b: '你的 Claude 会读取工具箱，设计关卡，并给你一个测试链接。',
+    step3h: '第 3 步 — 游玩，然后发布',
+    ruleLabel: '唯一的规则:',
+    rule: '只有你在浏览器中通关后，关卡才能发布。你的通关过程会被服务器数学验证——不可能通关的关卡无法存在。',
+    step3a: '通关你的测试链接，让你的 Claude 发布，然后搜索名称找到你的关卡，或分享游玩网址。朋友打开即玩。无需安装、无需账号、免费。',
+    limitsh: '限制',
+    limits: '限时 5秒–30分钟 · 每关最多300个部件 · 每天最多发布5次。3秒内可通关的关卡过于简单，无法发布。',
+    playnow: '立即游玩 →',
+  },
+  es: {
+    _name: 'Español',
+    tagline1: 'Mundos hechos de prompts. Describes un nivel — tu IA lo construye — cualquiera lo juega desde una URL.',
+    tagline2: 'Aplastadores, cintas, puertas temporizadas, gravedad invertida, llaves y puertas — todo combinable con una frase.',
+    step1h: 'PASO 1 — CONECTA TU CLAUDE',
+    step1a: 'En claude.ai: Ajustes → Conectores → Añadir conector personalizado, y pega:',
+    step1b: '¿Usas Claude Code? Ejecuta:',
+    step2h: 'PASO 2 — DI LO QUE QUIERES',
+    step2a: 'Solo describe un nivel. Por ejemplo:',
+    step2ex: 'Crea un nivel de Prompt World: un pasillo con gravedad invertida\ndonde corro por el techo esquivando pinchos, y un gran impulso\nhacia la meta. Límite de 60 segundos.',
+    step2b: 'Tu Claude lee la caja de herramientas, diseña el nivel y te da un enlace de prueba.',
+    step3h: 'PASO 3 — JUÉGALO Y PUBLÍCALO',
+    ruleLabel: 'La única regla:',
+    rule: 'un nivel solo se publica después de que TÚ lo completes en el navegador. Tu partida se verifica matemáticamente en el servidor — aquí no existen niveles imposibles.',
+    step3a: 'Completa tu enlace de prueba, pide a tu Claude que publique, y encuentra tu nivel buscando su nombre — o comparte la URL. Tus amigos lo abren y juegan al instante. Sin instalar, sin cuenta, gratis.',
+    limitsh: 'LÍMITES',
+    limits: 'Límite de 5s–30min · hasta 300 piezas por nivel · 5 publicaciones al día. Niveles superables en menos de 3 segundos son demasiado triviales.',
+    playnow: 'JUGAR AHORA →',
+  },
+  ko: {
+    _name: '한국어',
+    tagline1: '프롬프트로 만든 세계. 스테이지를 말로 설명하면 당신의 AI가 만들고, 누구나 URL로 플레이합니다.',
+    tagline2: '크러셔, 컨베이어, 타이머 게이트, 중력 반전, 열쇠와 문 — 모두 한 문장으로 조합하세요.',
+    step1h: 'STEP 1 — CLAUDE 연결하기',
+    step1a: 'claude.ai에서 설정 → 커넥터 → 커스텀 커넥터 추가 후 붙여넣기:',
+    step1b: 'Claude Code를 사용하나요? 실행:',
+    step2h: 'STEP 2 — 원하는 것을 말하기',
+    step2a: '스테이지를 설명하기만 하면 됩니다. 예를 들어:',
+    step2ex: 'Prompt World 스테이지를 만들어줘: 천장을 달리며 가시를 피하고,\n마지막에 크게 발사되어 골인. 제한 시간 60초.',
+    step2b: '당신의 Claude가 도구상자를 읽고 레벨을 설계해 테스트 링크를 줍니다.',
+    step3h: 'STEP 3 — 플레이하고 게시하기',
+    ruleLabel: '단 하나의 규칙:',
+    rule: '스테이지는 당신이 브라우저에서 직접 클리어해야만 게시할 수 있습니다. 플레이 기록은 서버가 수학적으로 검증 — 클리어 불가능한 스테이지는 존재할 수 없습니다.',
+    step3a: '테스트 링크를 클리어하고 Claude에게 게시를 요청한 뒤, 이름으로 검색해 스테이지를 찾으세요. 플레이 URL을 공유하면 친구도 바로 플레이합니다. 설치 불필요, 계정 불필요, 무료.',
+    limitsh: '제한',
+    limits: '제한 시간 5초–30분 · 스테이지당 최대 300개 부품 · 하루 5회 게시. 3초 안에 클리어되는 스테이지는 너무 단순해 게시할 수 없습니다.',
+    playnow: '지금 플레이 →',
+  },
+};
+
+const LANGS = ['en','ja','zh','es','ko'];
+
+function apply(lang) {
+  const dict = I18N[lang] || I18N.en;
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i]').forEach(el => {
+    const key = el.getAttribute('data-i');
+    if (dict[key] != null) el.textContent = dict[key];
+  });
+  document.querySelectorAll('#langbar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === lang));
+  try { localStorage.setItem('pw_lang', lang); } catch (e) {}
+}
+
+function detectLang() {
+  try { const saved = localStorage.getItem('pw_lang'); if (saved && I18N[saved]) return saved; } catch (e) {}
+  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+  const code = nav.toLowerCase().split('-')[0];
+  return I18N[code] ? code : 'en';
+}
+
+const bar = document.getElementById('langbar');
+for (const l of LANGS) {
+  const b = document.createElement('button');
+  b.textContent = I18N[l]._name;
+  b.dataset.lang = l;
+  b.onclick = () => apply(l);
+  bar.appendChild(b);
+}
+apply(detectLang());
+</script>
 </body>
 </html>

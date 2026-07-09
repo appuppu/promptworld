@@ -161,7 +161,9 @@ public class SimDriver : MonoBehaviour
         for (int i = 0; i < fallerViews.Length; i++)
         {
             SimFaller f = world.Fallers[i];
-            fallerViews[i].position = new Vector3((float)f.X, (float)f.Y, 0f);
+            // Shudder horizontally during the telegraph so the slam reads clearly.
+            float shake = f.State == 4 ? Mathf.Sin(world.TickCount * 2.2f) * 0.12f : 0f;
+            fallerViews[i].position = new Vector3((float)f.X + shake, (float)f.Y, 0f);
         }
         for (int i = 0; i < gateViews.Length; i++)
         {

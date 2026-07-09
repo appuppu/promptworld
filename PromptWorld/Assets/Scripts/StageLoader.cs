@@ -135,9 +135,9 @@ public class StageLoader : MonoBehaviour
             case "conveyor":
             {
                 GameObject go = CreateRectObject("Conveyor", parent, pos, scale);
-                CreateChildRect(go.transform, new Vector2(0f, 0f), new Vector2(0.9f, 0.25f), Color.black);
-                float notch = part.dirX < 0 ? -0.3f : 0.3f;
-                CreateChildRect(go.transform, new Vector2(notch, 0f), new Vector2(0.12f, 0.25f), Color.white);
+                float beltSpeed = part.power > 0f ? part.power : 3f;
+                var anim = go.AddComponent<ConveyorAnimator>();
+                anim.Init(part.w, part.h, part.dirX, beltSpeed, GetWhiteSprite());
                 break;
             }
             case "timedGate":
@@ -148,8 +148,10 @@ public class StageLoader : MonoBehaviour
             }
             case "key":
             {
-                GameObject go = CreateRectObject("Key", parent, pos, scale * 0.45f);
-                go.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
+                // A white ring (square with a black hole) — clearly a
+                // collectible, distinct from the solid danger diamond.
+                GameObject go = CreateRectObject("Key", parent, pos, scale * 0.6f);
+                CreateChildRect(go.transform, new Vector2(0f, 0f), new Vector2(0.5f, 0.5f), Color.black);
                 keyViews.Add(go);
                 break;
             }
@@ -190,11 +192,10 @@ public class StageLoader : MonoBehaviour
             case "launcher":
             {
                 GameObject go = CreateRectObject("Launcher", parent, pos, scale);
-                // A hollow black up-chevron so it reads as "flings you skyward".
-                CreateChildRect(go.transform, new Vector2(0f, 0.22f), new Vector2(0.5f, 0.14f), Color.black);
-                CreateChildRect(go.transform, new Vector2(-0.16f, 0.02f), new Vector2(0.18f, 0.14f), Color.black);
-                CreateChildRect(go.transform, new Vector2(0.16f, 0.02f), new Vector2(0.18f, 0.14f), Color.black);
-                CreateChildRect(go.transform, new Vector2(0f, -0.2f), new Vector2(0.5f, 0.14f), Color.black);
+                // A black up-arrow so it clearly reads "flings you skyward".
+                CreateChildRect(go.transform, new Vector2(0f, -0.05f), new Vector2(0.16f, 0.55f), Color.black); // shaft
+                var head = CreateChildRectGO(go.transform, new Vector2(0f, 0.28f), new Vector2(0.32f, 0.32f), Color.black);
+                head.transform.localRotation = Quaternion.Euler(0f, 0f, 45f); // arrowhead diamond
                 break;
             }
             case "gravityFlip":
@@ -234,6 +235,11 @@ public class StageLoader : MonoBehaviour
 
     private void CreateChildRect(Transform parent, Vector2 localPos, Vector2 localSize, Color color)
     {
+        CreateChildRectGO(parent, localPos, localSize, color);
+    }
+
+    private GameObject CreateChildRectGO(Transform parent, Vector2 localPos, Vector2 localSize, Color color)
+    {
         var child = new GameObject("Detail");
         child.transform.SetParent(parent, false);
         child.transform.localPosition = localPos;
@@ -242,6 +248,7 @@ public class StageLoader : MonoBehaviour
         renderer.sprite = GetWhiteSprite();
         renderer.color = color;
         renderer.sortingOrder = 1;
+        return child;
     }
 
     private void CreateEdge(Transform parent, Vector2 localPos, Vector2 size)

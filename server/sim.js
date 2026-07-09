@@ -31,7 +31,8 @@ const SIM = {
   KILL_MARGIN_BELOW: 8.0,
   KILL_MARGIN_ABOVE: 12.0,
   GROUND_PROBE: 0.06,
-  FALLER_FALL_SPEED: 22.0,
+  FALLER_FALL_SPEED: 8.0,
+  FALLER_TELEGRAPH_TICKS: 18,
   FALLER_RISE_SPEED: 3.0,
   FALLER_WAIT_TICKS: 25,
   FALLER_MARGIN: 0.6,
@@ -333,7 +334,7 @@ class SimWorld {
       m.deltaY = m.y - m.prevY;
     }
 
-    // 1b. fallers (thwomps): trigger when the player passes below, slam
+    // 1b. fallers (crushers): trigger when the player passes below, slam
     // down, wait, rise back. Contact while falling crushes (respawn).
     for (const f of this.fallers) {
       if (f.state === 0) {
@@ -342,7 +343,13 @@ class SimWorld {
         let hi = f.x + f.halfW;
         hi = hi + SIM.FALLER_MARGIN;
         const bottom = f.y - f.halfH;
-        if (this.px > lo && this.px < hi && this.py < bottom) f.state = 1;
+        if (this.px > lo && this.px < hi && this.py < bottom) {
+          f.state = 4; // telegraph before slamming
+          f.waitLeft = SIM.FALLER_TELEGRAPH_TICKS;
+        }
+      } else if (f.state === 4) {
+        f.waitLeft = f.waitLeft - 1;
+        if (f.waitLeft <= 0) f.state = 1;
       } else if (f.state === 1) {
         const d = SIM.FALLER_FALL_SPEED * SIM.TICK;
         f.offset = f.offset + d;
@@ -424,17 +431,14 @@ class SimWorld {
     const sinceGround = this.tickCount - this.lastGroundedTick;
     if (sincePress <= SIM.BUFFER_TICKS && sinceGround <= SIM.COYOTE_TICKS) {
       this.vy = SIM.JUMP_SPEED * this.gravityDir;
+      // Moving platforms carry you: jumping inherits their velocity so you are
+      // not left behind. A conveyor only slides your feet — jumping releases
+      // you cleanly with your own steering velocity, not the belt's.
       if (this.groundMover >= 0) {
         const jm = this.movers[this.groundMover];
         const mv = jm.deltaX / SIM.TICK;
         this.airCarryVx = mv;
         this.vx = this.vx + mv;
-      }
-      if (this.groundConveyor >= 0) {
-        const jc = this.conveyors[this.groundConveyor];
-        const cv = jc.speed * jc.dir;
-        this.airCarryVx = cv;
-        this.vx = this.vx + cv;
       }
       this.jumpPressedTick = -1000000;
       this.lastGroundedTick = -1000000;

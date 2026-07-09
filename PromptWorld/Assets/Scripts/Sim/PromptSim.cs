@@ -127,9 +127,10 @@ public class SimWorld
     public const double KillMarginBelow = 8.0;
     public const double KillMarginAbove = 12.0;
     public const double GroundProbe = 0.06;
-    public const double FallerFallSpeed = 22.0;
+    public const double FallerFallSpeed = 8.0;
     public const double FallerRiseSpeed = 3.0;
     public const int FallerWaitTicks = 25;
+    public const int FallerTelegraphTicks = 18; // shudder before the slam
     public const double FallerMargin = 0.6;
     public const double AirDamping = 0.86;
 
@@ -477,18 +478,30 @@ public class SimWorld
             m.DeltaY = m.Y - m.PrevY;
         }
 
-        // 1b. fallers (thwomps): trigger when the player passes below, slam
+        // 1b. fallers (crushers): trigger when the player passes below, slam
         // down, wait, rise back. Contact while falling crushes (respawn).
         foreach (SimFaller f in Fallers)
         {
             if (f.State == 0)
             {
+                // Trigger when the player is under the faller — with a wider
+                // horizontal margin so it fires early and telegraphs.
                 double lo = f.X - f.HalfW;
                 lo = lo - FallerMargin;
                 double hi = f.X + f.HalfW;
                 hi = hi + FallerMargin;
                 double bottom = f.Y - f.HalfH;
-                if (Px > lo && Px < hi && Py < bottom) f.State = 1;
+                if (Px > lo && Px < hi && Py < bottom)
+                {
+                    f.State = 4; // telegraph before slamming
+                    f.WaitLeft = FallerTelegraphTicks;
+                }
+            }
+            else if (f.State == 4)
+            {
+                // Held in place, shuddering, so the player sees it coming.
+                f.WaitLeft = f.WaitLeft - 1;
+                if (f.WaitLeft <= 0) f.State = 1;
             }
             else if (f.State == 1)
             {
@@ -590,19 +603,15 @@ public class SimWorld
         if (sincePress <= BufferTicks && sinceGround <= CoyoteTicks)
         {
             Vy = JumpSpeed * GravityDir;
+            // Moving platforms carry you: jumping inherits their velocity so you
+            // are not left behind. A conveyor only slides your feet — jumping
+            // releases you cleanly with your own steering velocity, not the belt's.
             if (GroundMover >= 0)
             {
                 SimMover jm = Movers[GroundMover];
                 double mv = jm.DeltaX / Tick;
                 AirCarryVx = mv;
                 Vx = Vx + mv;
-            }
-            if (GroundConveyor >= 0)
-            {
-                SimConveyor jc = Conveyors[GroundConveyor];
-                double cv = jc.Speed * jc.Dir;
-                AirCarryVx = cv;
-                Vx = Vx + cv;
             }
             JumpPressedTick = -1000000;
             LastGroundedTick = -1000000;

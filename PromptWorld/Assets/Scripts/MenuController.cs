@@ -188,7 +188,7 @@ public class MenuController : MonoBehaviour
             var parts = new List<string>();
             if (!string.IsNullOrEmpty(stage.creator)) parts.Add($"by {stage.creator}");
             int best = stage.best_time_ms > 0 ? stage.best_time_ms : stage.clear_time_ms;
-            if (best > 0) parts.Add($"BEST {best / 1000f:0.00}s");
+            if (best > 0) parts.Add($"BEST {best / 1000f:0.0}s");
             if (stage.goods + stage.bads > 0)
             {
                 int pct = stage.goods * 100 / (stage.goods + stage.bads);
@@ -196,11 +196,11 @@ public class MenuController : MonoBehaviour
             }
             if (stage.attempts > 0)
             {
-                parts.Add($"{stage.attempts} PLAYS");
-                parts.Add($"CLEAR {stage.clears} ({stage.clears * 100 / stage.attempts}%)");
+                parts.Add($"PLAYS {stage.attempts}");
+                parts.Add($"CLEAR {stage.clears * 100 / stage.attempts}%");
             }
 
-            Entry entry = AddEntry(stage.name, string.Join("  ·  ", parts), () =>
+            Entry entry = AddEntry(stage.name, string.Join("     ", parts), () =>
             {
                 GameSession.RemoteStageId = id;
                 SceneManager.LoadScene("Stage");
@@ -230,37 +230,52 @@ public class MenuController : MonoBehaviour
         }
     }
 
+    private const float CardWidth = 920f;
+    private const float CardHeight = 128f;
+
     private Entry AddEntry(string title, string subtitle, UnityEngine.Events.UnityAction onClick)
     {
         var row = new GameObject($"Stage_{title}", typeof(RectTransform));
         row.transform.SetParent(listRoot, false);
         var rowRect = row.GetComponent<RectTransform>();
-        rowRect.sizeDelta = new Vector2(760f, 104f);
+        rowRect.sizeDelta = new Vector2(CardWidth, CardHeight);
         var layout = row.AddComponent<LayoutElement>();
-        layout.preferredHeight = 104f;
-        layout.preferredWidth = 760f;
+        layout.preferredHeight = CardHeight;
+        layout.preferredWidth = CardWidth;
 
         var cardImage = row.AddComponent<Image>();
-        cardImage.color = new Color(1f, 1f, 1f, 0.05f);
+        cardImage.color = new Color(1f, 1f, 1f, 0.06f);
 
         var button = row.AddComponent<Button>();
         button.targetGraphic = cardImage;
         button.onClick.AddListener(onClick);
+        // subtle highlight on hover/press
+        var colors = button.colors;
+        colors.highlightedColor = new Color(1f, 1f, 1f, 0.14f);
+        colors.pressedColor = new Color(1f, 1f, 1f, 0.22f);
+        colors.fadeDuration = 0.08f;
+        button.colors = colors;
 
+        // thumbnail on the left, inset with a hairline frame
         var previewGo = new GameObject("Preview", typeof(RectTransform));
         previewGo.transform.SetParent(row.transform, false);
         var previewRect = previewGo.GetComponent<RectTransform>();
         previewRect.anchorMin = new Vector2(0f, 0.5f);
         previewRect.anchorMax = new Vector2(0f, 0.5f);
         previewRect.pivot = new Vector2(0f, 0.5f);
-        previewRect.anchoredPosition = new Vector2(8f, 0f);
-        previewRect.sizeDelta = new Vector2(184f, 92f);
+        previewRect.anchoredPosition = new Vector2(16f, 0f);
+        previewRect.sizeDelta = new Vector2(216f, 100f);
         var preview = previewGo.AddComponent<RawImage>();
         preview.texture = Placeholder();
         preview.raycastTarget = false;
 
-        CreateRowText(row.transform, title, 32, new Vector2(212f, 18f), Color.white);
-        CreateRowText(row.transform, subtitle, 20, new Vector2(212f, -26f), new Color(1f, 1f, 1f, 0.5f));
+        // title (large) + stat line (smaller), both left-aligned in the wide area
+        float textX = 256f;
+        float textW = CardWidth - textX - 32f;
+        CreateRowText(row.transform, title, 38, new Vector2(textX, 24f), textW, Color.white,
+            TextAlignmentOptions.MidlineLeft);
+        CreateRowText(row.transform, subtitle, 22, new Vector2(textX, -28f), textW,
+            new Color(1f, 1f, 1f, 0.55f), TextAlignmentOptions.MidlineLeft);
 
         var entry = new Entry { Root = row, Title = title, Preview = preview };
         entries.Add(entry);
@@ -271,10 +286,10 @@ public class MenuController : MonoBehaviour
     {
         var go = new GameObject($"Label_{title}", typeof(RectTransform));
         go.transform.SetParent(listRoot, false);
-        go.GetComponent<RectTransform>().sizeDelta = new Vector2(760f, 46f);
+        go.GetComponent<RectTransform>().sizeDelta = new Vector2(CardWidth, 46f);
         var layout = go.AddComponent<LayoutElement>();
         layout.preferredHeight = 46f;
-        layout.preferredWidth = 760f;
+        layout.preferredWidth = CardWidth;
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text = title;
@@ -286,7 +301,8 @@ public class MenuController : MonoBehaviour
         entries.Add(new Entry { Root = go, Title = title, IsLabel = true });
     }
 
-    private void CreateRowText(Transform parent, string text, float size, Vector2 pos, Color color)
+    private void CreateRowText(Transform parent, string text, float size, Vector2 pos, float width,
+        Color color, TextAlignmentOptions align)
     {
         var go = new GameObject("Text", typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -295,12 +311,12 @@ public class MenuController : MonoBehaviour
         rect.anchorMax = new Vector2(0f, 0.5f);
         rect.pivot = new Vector2(0f, 0.5f);
         rect.anchoredPosition = pos;
-        rect.sizeDelta = new Vector2(540f, 44f);
+        rect.sizeDelta = new Vector2(width, 48f);
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text = text;
         tmp.fontSize = size;
-        tmp.alignment = TextAlignmentOptions.MidlineLeft;
+        tmp.alignment = align;
         tmp.color = color;
         tmp.raycastTarget = false;
         tmp.richText = false; // user-supplied names must never inject tags

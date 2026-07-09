@@ -20,6 +20,11 @@ if (!s.includes("#unity-footer { display: none; }")) {
 // Desktop: fill the whole window instead of a small fixed canvas.
 s = s.replace("canvas.style.width = \"960px\";", "canvas.style.width = \"100vw\";");
 s = s.replace("canvas.style.height = \"600px\";", "canvas.style.height = \"100vh\";");
+// A small always-visible CREATE link so players discover they can build too.
+if (!s.includes("id=\"pw-create-link\"")) {
+  const link = "<a id=\"pw-create-link\" href=\"/create\" style=\"position:fixed;top:10px;right:12px;z-index:9999;color:#fff;opacity:.65;font:600 13px/1 -apple-system,Arial,sans-serif;letter-spacing:1px;text-decoration:none;border:1px solid rgba(255,255,255,.35);padding:6px 12px;border-radius:2px;background:rgba(0,0,0,.4)\">+ CREATE</a>";
+  s = s.replace("</body>", link + "\n</body>");
+}
 fs.writeFileSync(p, s);
 console.log("index.html patched");
 ' "$OUT/index.html"

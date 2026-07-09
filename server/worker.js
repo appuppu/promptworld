@@ -259,7 +259,8 @@ async function opCreateStage(env, origin, stage, request, creatorToken, creatorN
     playUrl: `${origin}/?stage=${id}`,
     status: 'draft',
     creatorId: creator.id,
-    note: 'A human must clear the stage at testUrl in the browser within its time limit. Publishing stays blocked until that clear is recorded.',
+    note: 'DRAFT created. Give the human this testUrl and ask them to PLAY it in the browser now. The stage cannot be published until the human clears it there (their run is recorded as the proof-of-clear and becomes the ghost + par time). Do NOT bot-solve or auto-verify — a real human must clear it. After they confirm a clear, ask them to approve the name, then call publish_stage.',
+    instructionsForClaude: `Tell the human: "Open this link and play the stage: ${origin}/?stage=${id}&key=${editKey} — when you clear it, come back and I'll publish it."`,
   };
   if (minted) {
     body.creatorToken = creator.token;
@@ -373,7 +374,16 @@ async function opPublish(env, origin, row, request) {
     .prepare("UPDATE stages SET status = 'published', published_at = ? WHERE id = ?")
     .bind(new Date().toISOString(), row.id)
     .run();
-  return { status: 200, body: { id: row.id, status: 'published', playUrl: `${origin}/?stage=${row.id}` } };
+  return {
+    status: 200,
+    body: {
+      id: row.id,
+      status: 'published',
+      name: row.name,
+      playUrl: `${origin}/?stage=${row.id}`,
+      searchHint: `Published! Tell the human: it's now live — open ${origin} and type "${row.name}" in the search box to find and play it, or share this link: ${origin}/?stage=${row.id}`,
+    },
+  };
 }
 
 async function opListPublished(env, query, sort) {
@@ -418,17 +428,22 @@ async function opListPublished(env, query, sort) {
 }
 
 async function opGhost(env, row) {
-  // The creator's verified replay doubles as a ghost; the displayed time is
-  // the current world best (falls back to the creator's clear).
-  if (!row.clear_replay) return { status: 404, body: { error: 'No verified replay for this stage yet.' } };
+  // The ghost you race is the current world-best run. Fall back to the
+  // creator's proof-of-clear replay when no player score exists yet.
   const best = await env.promptworld_stages
-    .prepare('SELECT MIN(time_ms) AS t FROM scores WHERE stage_id = ?')
+    .prepare('SELECT time_ms, replay FROM scores WHERE stage_id = ? AND replay IS NOT NULL ORDER BY time_ms ASC LIMIT 1')
     .bind(row.id)
     .first();
-  const bestTimeMs = best && best.t ? best.t : row.clear_time_ms;
+  if (best && best.replay) {
+    return {
+      status: 200,
+      body: { id: row.id, clearTimeMs: row.clear_time_ms, bestTimeMs: best.time_ms, replay: JSON.parse(best.replay) },
+    };
+  }
+  if (!row.clear_replay) return { status: 404, body: { error: 'No verified replay for this stage yet.' } };
   return {
     status: 200,
-    body: { id: row.id, clearTimeMs: row.clear_time_ms, bestTimeMs, replay: JSON.parse(row.clear_replay) },
+    body: { id: row.id, clearTimeMs: row.clear_time_ms, bestTimeMs: row.clear_time_ms, replay: JSON.parse(row.clear_replay) },
   };
 }
 
@@ -533,10 +548,11 @@ async function opScore(env, row, body, request) {
     .bind(row.id, body.playerId)
     .first();
   if (!existing || timeMs < existing.time_ms) {
+    // Store the verified replay too — the world-best replay becomes the ghost.
     await env.promptworld_stages
-      .prepare(`INSERT INTO scores (stage_id, player_id, name, time_ms, created_at) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(stage_id, player_id) DO UPDATE SET name = excluded.name, time_ms = excluded.time_ms, created_at = excluded.created_at`)
-      .bind(row.id, body.playerId, name, timeMs, new Date().toISOString())
+      .prepare(`INSERT INTO scores (stage_id, player_id, name, time_ms, replay, created_at) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(stage_id, player_id) DO UPDATE SET name = excluded.name, time_ms = excluded.time_ms, replay = excluded.replay, created_at = excluded.created_at`)
+      .bind(row.id, body.playerId, name, timeMs, JSON.stringify(body.replay), new Date().toISOString())
       .run();
   }
   const top = await opTopScores(env, row.id);
@@ -672,7 +688,7 @@ PARTS (x,y = center; w,h = size; coords within ±500, sizes 0.05..100):
 - {"type":"gravityFlip","x","y","w","h"} — hollow square; touch inverts gravity; ~1.2x1.2 floating in the path
 - {"type":"movingPlatform","x","y","w","h","dx","dy","period"} — rideable, oscillates to (x+dx,y+dy) and back every period s (0.5..30). Players stick to it and inherit its velocity when jumping
 - {"type":"crumble","x","y","w","h"} — blinks 0.5s after touch, vanishes 2.5s, returns
-- {"type":"faller","x","y","w","h","dy"} — thwomp: hovers until the player passes below, slams down dy units (0.5..50) at 22u/s (touch while falling = respawn), rests 0.5s, rises slowly. Solid otherwise
+- {"type":"faller","x","y","w","h","dy"} — crusher: a heavy block that hovers low and visible until the player passes below, then shudders and slams down dy units (0.5..50) to crush anything beneath (touch while falling = respawn), rests, then rises back. Hang it LOW so its slam reaches the floor
 - {"type":"conveyor","x","y","w","h","dirX","power"} — belt: standing players drift toward dirX at power u/s (default 3, max 60)
 - {"type":"timedGate","x","y","w","h","period","dx"} — solid that exists for the first half of every period seconds, gone for the second half; dx = phase offset in seconds
 - {"type":"key","x","y","w","h"} — collectible; when ALL keys in the stage are collected, every door opens
@@ -681,18 +697,29 @@ PARTS (x,y = center; w,h = size; coords within ±500, sizes 0.05..100):
 DESIGN RULES:
 - Chain parts into cause-and-effect sequences; one wow moment beats many gimmicks.
 - Verify reachability: gaps >7 units or steps >3 units need a pad/boost/platform.
-- WARNING from experience: chained mid-air gravityFlips pump velocity and diverge —
-  prefer discrete floor<->ceiling sections. Never assume clearable from theory alone.
-- The stage MUST be cleared by a human in the browser before it can be published.
+- Prefer discrete floor<->ceiling sections for gravityFlip (chained mid-air flips
+  pump velocity and diverge).
+- The stage MUST be cleared by a real HUMAN in the browser before it can be
+  published. You (the AI) do NOT bot-solve or auto-verify stages — that lowers
+  quality and diverges from human play. Your job is to DESIGN well and hand the
+  human a testUrl.
 
 IDENTITY: no signup exists. Your first create_stage mints an invisible
 creator identity and returns a creatorToken — remember it and pass it in
 later create_stage calls so all stages share one identity. Players never
 need any identity.
 
-WORKFLOW: create_stage -> give the human the testUrl -> they clear it in the
-browser (auto-recorded, replay-verified) -> ASK THE HUMAN to confirm the
-stage's final name -> publish_stage with confirmedName -> share the playUrl.`;
+WORKFLOW (follow exactly):
+1. create_stage -> you get a testUrl. GIVE THE HUMAN THE testUrl and tell them
+   to open it and play the stage NOW.
+2. The human plays it in the browser. If they clear it, their run is recorded
+   and replay-verified automatically (it becomes the ghost + par time).
+3. Ask the human to CONFIRM the stage cleared, and to APPROVE the final name.
+4. publish_stage with confirmedName. Only then is it public.
+5. After publishing, tell the human they can find it by typing the stage NAME
+   in the search box at the site, or by sharing the playUrl.
+Never skip the human playtest. If the human says it was too hard/easy/broken,
+redesign and create_stage again (same creatorToken).`;
 
 const MCP_TOOLS = [
   {
