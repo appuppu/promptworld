@@ -264,6 +264,9 @@ class SimWorld {
     for (const f of this.fallers) {
       if (SimWorld.overlaps(this.px, probeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, f)) return true;
     }
+    for (const cn of this.cannons) {
+      if (SimWorld.overlaps(this.px, probeY, SIM.PLAYER_HALF, SIM.PLAYER_HALF, cn)) return true;
+    }
     return false;
   }
 
@@ -283,6 +286,7 @@ class SimWorld {
       for (const d of this.doors) this.resolveAgainst(d, xAxis, null);
     }
     for (const f of this.fallers) this.resolveAgainst(f, xAxis, null);
+    for (const cn of this.cannons) this.resolveAgainst(cn, xAxis, null);
   }
 
   resolveAgainst(b, xAxis, crumble) {

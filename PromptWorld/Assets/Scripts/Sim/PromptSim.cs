@@ -398,6 +398,10 @@ public class SimWorld
         {
             if (Overlaps(Px, probeY, PlayerHalf, PlayerHalf, f)) return true;
         }
+        foreach (SimCannon cn in Cannons)
+        {
+            if (Overlaps(Px, probeY, PlayerHalf, PlayerHalf, cn)) return true;
+        }
         return false;
     }
 
@@ -421,6 +425,7 @@ public class SimWorld
             foreach (SimDoor d in Doors) ResolveAgainst(d, xAxis, null);
         }
         foreach (SimFaller f in Fallers) ResolveAgainst(f, xAxis, null);
+        foreach (SimCannon cn in Cannons) ResolveAgainst(cn, xAxis, null);
     }
 
     private void ResolveAgainst(SimBox b, bool xAxis, SimCrumble crumble)
