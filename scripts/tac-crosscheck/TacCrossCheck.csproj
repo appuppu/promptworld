@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>TacCrossCheck</AssemblyName>
+    <RootNamespace>TacCrossCheck</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- the SAME kernel file the Unity client compiles — never a copy -->
+    <Compile Include="../../PromptWorld/Assets/Scripts/TacSim/TacMath.cs" Link="TacMath.cs" />
+    <Compile Include="../../PromptWorld/Assets/Scripts/TacSim/TacSim.cs" Link="TacSim.cs" />
+    <Compile Include="../../PromptWorld/Assets/Scripts/TacSim/TacJson.cs" Link="TacJson.cs" />
+  </ItemGroup>
+</Project>

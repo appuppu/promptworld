@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prompt World</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7781697026745179" crossorigin="anonymous"></script>
+<style>
+  :root { --bg:#0b0d10; --panel:#12151b; --line:#2a2f38; --fg:#f2f4f6; --dim:#9aa3ad; --teal:#4dd2c3; --warn:#ffd23e; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--fg);
+    font-family:'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
+  a { color:inherit; text-decoration:none; }
+  .wrap { max-width:980px; margin:0 auto; padding:0 20px; }
+  .up { text-transform:uppercase; letter-spacing:.22em; }
+
+  header { padding:16px 0; border-bottom:1px solid var(--line); }
+  header .wrap { display:flex; justify-content:space-between; align-items:center; }
+  .brand { font-size:13px; letter-spacing:.3em; }
+  .brand b { color:var(--teal); font-weight:normal; }
+  nav a { font-size:11px; color:var(--dim); margin-left:18px; letter-spacing:.18em; text-transform:uppercase; }
+  nav a:hover { color:var(--fg); }
+
+  .hero { padding:72px 0 56px; text-align:center;
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -10%, rgba(77,210,195,.13), transparent),
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.025) 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,.025) 39px 40px); }
+  h1 { font-size:clamp(34px, 7vw, 60px); font-weight:normal; letter-spacing:.24em; margin:0 0 14px; }
+  h1 b { color:var(--teal); font-weight:normal; }
+  .tag { color:var(--dim); font-size:clamp(13px,2.4vw,16px); line-height:1.9; margin:0 auto 34px; max-width:640px; }
+  .cta { display:inline-block; border:1px solid var(--teal); color:var(--teal); padding:15px 44px;
+    font-size:13px; letter-spacing:.26em; text-transform:uppercase; margin:6px 8px; }
+  .cta:hover { background:var(--teal); color:#04110f; }
+  .cta.ghost { border-color:var(--line); color:var(--dim); }
+  .cta.ghost:hover { background:var(--panel); color:var(--fg); }
+  .keys { margin-top:26px; color:#5f6873; font-size:11px; letter-spacing:.12em; }
+
+  section { padding:54px 0; border-top:1px solid var(--line); }
+  h2 { font-size:14px; font-weight:normal; letter-spacing:.3em; text-transform:uppercase; color:var(--teal); margin:0 0 26px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:14px; }
+  .card { border:1px solid var(--line); background:var(--panel); padding:14px; display:block; }
+  .card canvas.thumb { width:100%; height:150px; display:block; background:#0b0d10;
+    border:1px solid var(--line); margin-bottom:12px; }
+  .card .comp { color:var(--dim); font-size:10px; letter-spacing:.12em; margin-top:6px;
+    text-transform:uppercase; line-height:1.9; }
+  .card .desc { color:#b9c0c9; font-size:12px; line-height:1.7; margin-top:8px; }
+  .card:hover { border-color:var(--teal); }
+  .card .nm { font-size:15px; letter-spacing:.08em; margin-bottom:8px; }
+  .card .meta { color:var(--dim); font-size:11px; letter-spacing:.1em; }
+  .card .play { color:var(--teal); font-size:11px; letter-spacing:.24em; margin-top:14px; text-transform:uppercase; }
+  #stageEmpty { color:var(--dim); font-size:13px; }
+  .tabbtn { background:#07090c; border:1px solid #2a2f38; color:#9aa3ad; padding:9px 18px; font-size:12px; letter-spacing:.14em; cursor:pointer; }
+  .tabbtn.on { color:#f2f4f6; border-color:#4dd2c3; }
+  .tbmeta { color:#ffd23e; }
+
+  .steps { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; margin-bottom:26px; }
+  .step { border:1px solid var(--line); padding:20px; }
+  .step .n { color:var(--teal); font-size:22px; margin-bottom:10px; }
+  .step .t { font-size:13px; margin-bottom:8px; letter-spacing:.06em; }
+  .step p { color:var(--dim); font-size:12px; line-height:1.8; margin:0; }
+  code.cmd { display:block; background:#07090c; border:1px solid var(--line); color:var(--teal);
+    padding:14px 16px; font-size:12px; overflow-x:auto; white-space:nowrap; font-family:ui-monospace,Menlo,monospace; }
+  .hintline { color:var(--dim); font-size:12px; margin-top:12px; line-height:1.8; }
+
+  .units { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px; }
+  .unit { border:1px solid var(--line); padding:14px; font-size:11px; color:var(--dim); line-height:1.7; }
+  .unit b { display:block; color:var(--fg); font-weight:normal; letter-spacing:.14em; margin-bottom:6px; }
+
+  footer { border-top:1px solid var(--line); padding:30px 0 50px; color:#5f6873; font-size:11px; }
+  footer .wrap { display:flex; flex-wrap:wrap; gap:18px; justify-content:space-between; }
+  footer a { color:var(--dim); letter-spacing:.14em; text-transform:uppercase; }
+  footer a:hover { color:var(--fg); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand up">PROMPT<b>WORLD</b></div>
+    <nav>
+      <a href="#stages" data-t="navStages"></a>
+      <a href="#create" data-t="navCreate"></a>
+      <a href="/classic" data-t="navClassic"></a>
+      <select id="langSel" style="background:#12151b;color:#9aa3ad;border:1px solid #2a2f38;font-size:11px;padding:4px 6px;margin-left:18px;letter-spacing:.1em">
+        <option value="en">EN</option><option value="ja">日本語</option><option value="zh">中文</option><option value="es">ES</option><option value="ko">한국어</option>
+      </select>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1 class="up">PROMPT<b>WORLD</b></h1>
+    <p class="tag" data-t="tag"></p>
+    <a class="cta" href="/tac" data-t="play"></a>
+    <a class="cta ghost" href="#create" data-t="make"></a>
+    <div class="keys" data-t="keys"></div>
+  </div>
+</div>
+
+<section id="stages">
+  <div class="wrap">
+    <h2 data-t="secStages"></h2>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="tabMain" class="tabbtn on" type="button"></button>
+      <button id="tabTb" class="tabbtn" type="button"></button>
+    </div>
+    <input id="q" data-p="search" style="width:100%;max-width:340px;background:#07090c;border:1px solid #2a2f38;color:#f2f4f6;padding:11px 14px;font-size:13px;margin-bottom:18px;letter-spacing:.06em" />
+    <div class="grid" id="stageGrid"><span id="stageEmpty" data-t="loading"></span></div>
+  </div>
+</section>
+
+<section id="create">
+  <div class="wrap">
+    <h2 data-t="secCreate"></h2>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><div class="t up" data-t="s1t"></div><p data-t="s1p"></p></div>
+      <div class="step"><div class="n">02</div><div class="t up" data-t="s2t"></div><p data-t="s2p"></p></div>
+      <div class="step"><div class="n">03</div><div class="t up" data-t="s3t"></div><p data-t="s3p"></p></div>
+    </div>
+    <code class="cmd">claude mcp add --transport http promptworld https://promptworldgame.org/mcp</code>
+    <p class="hintline" data-t="cmdHint"></p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 data-t="secUnits"></h2>
+    <div class="units">
+      <div class="unit"><b>SOLDIER</b><span data-t="uSoldier"></span></div>
+      <div class="unit"><b>GATLING</b><span data-t="uGatling"></span></div>
+      <div class="unit"><b>SNIPER</b><span data-t="uSniper"></span></div>
+      <div class="unit"><b>DRONE</b><span data-t="uDrone"></span></div>
+      <div class="unit"><b>OPERATOR</b><span data-t="uOperator"></span></div>
+      <div class="unit"><b>MINE / BARREL</b><span data-t="uMine"></span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© PROMPT WORLD</span>
+    <span>
+      <a href="/classic" data-t="navClassic"></a> ·
+      <a href="/create.html">MCP GUIDE</a> ·
+      <a href="/privacy.html">PRIVACY</a> ·
+      <a href="/terms.html">TERMS</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var L = {
+    en: {
+      navStages: 'Stages', navCreate: 'Create', navClassic: 'Classic 2D',
+      tag: 'A 3D stealth shooter where every arena is built by prompting an AI. Sneak past vision cones, bait patrols onto mines, capture drones — then publish your own arena for anyone to raid.',
+      play: 'Play now', make: 'Build with AI', keys: 'WASD/stick: move · auto-aim · SPACE jump · G grenade · E drone · M map',
+      secStages: 'Published stages', loading: 'Loading…', empty: 'No stages yet — be the first.',
+      secCreate: 'Build an arena with your AI',
+      s1t: 'Connect', s1p: 'Add the Prompt World MCP server to Claude (or any MCP client) with the command below.',
+      s2t: 'Prompt', s2p: 'Say "build me a 3D stealth arena". Your AI gets the full toolbox: terrain, five enemy types, mines, medkits, even the soundtrack.',
+      s3t: 'Clear & publish', s3p: 'You must beat your own stage in the browser — your verified run is the proof. Then it goes live at a URL anyone can play.',
+      cmdHint: 'Then just ask your AI: “Make me a stealth arena on Prompt World.” Stage names appear on this page once published.',
+      secUnits: 'The toolbox',
+      uSoldier: 'Rifle infantry. Patrols, hears footsteps, telegraphs before firing.',
+      uGatling: 'Manned emplacement. Sweeps lanes with suppressive fire — take out the gunner.',
+      uSniper: 'Long-range laser lock. Break line of sight before it turns red.',
+      uDrone: 'Flying kamikaze scout. Sees over cover. One shot drops it.',
+      uOperator: 'Drone pilot. Kill it: its drones crash — and you capture one to fly yourself.',
+      uMine: 'Proximity mine & rolling powder keg. Enemies trip them too.',
+      plays: 'plays', clears: 'clears', playCard: 'Play'
+    },
+    ja: {
+      navStages: 'ステージ', navCreate: '作る', navClassic: 'クラシック2D',
+      tag: 'AIに頼んでアリーナを作る3Dステルスシューター。視界コーンをかいくぐり、足音で敵を地雷へ誘い込み、ドローンを奪って飛ばせ。作ったステージは公開して誰でも挑戦できる。',
+      play: '今すぐ遊ぶ', make: 'AIで作る', keys: 'WASD/スティック: 移動 · 自動照準 · SPACEジャンプ · G グレネード · E ドローン · M マップ',
+      secStages: '公開ステージ', loading: '読み込み中…', empty: 'まだステージがありません — 最初の作者になろう。',
+      secCreate: 'AIと一緒にアリーナを作る',
+      s1t: '接続', s1p: '下のコマンドでPrompt WorldのMCPサーバーをClaude(または任意のMCPクライアント)に追加。',
+      s2t: '注文', s2p: '「3Dステルスアリーナ作って」と言うだけ。地形・5種の敵・地雷・回復・BGMまでAIがフル装備で設計します。',
+      s3t: 'クリアして公開', s3p: '自分のステージをブラウザでクリアすることが公開の条件(検証済みリプレイが証明)。公開されると誰でも遊べるURLに。',
+      cmdHint: '接続したらAIに「Prompt Worldでステルスアリーナ作って」と頼むだけ。公開されたステージはこのページに並びます。',
+      secUnits: 'ツールボックス',
+      uSoldier: 'ライフル歩兵。巡回し、足音を聞き、照準線を出してから撃つ。',
+      uGatling: '有人銃座。レーンを掃射で制圧 — 射手を狙え。',
+      uSniper: '長距離レーザー照準。赤くなる前に遮蔽へ。',
+      uDrone: '自爆偵察ドローン。遮蔽の上から見てくる。一発で落ちる。',
+      uOperator: 'ドローン操縦兵。倒せば配下のドローンは墜落 — さらに1機奪って自分で飛ばせる。',
+      uMine: '接近地雷と転がる爆薬缶。敵も踏む。',
+      plays: 'プレイ', clears: 'クリア', playCard: '遊ぶ'
+    },
+    zh: {
+      navStages: '关卡', navCreate: '创建', navClassic: '经典2D',
+      tag: '一款由AI构建竞技场的3D潜行射击游戏。避开视野、用脚步声把敌人引上地雷、夺取无人机——然后发布你自己的关卡。',
+      play: '立即游玩', make: '用AI创建', keys: 'WASD/摇杆: 移动 · 自动瞄准 · SPACE跳跃 · G手雷 · E无人机 · M地图',
+      secStages: '已发布关卡', loading: '加载中…', empty: '还没有关卡——成为第一个作者吧。',
+      secCreate: '和你的AI一起建造竞技场',
+      s1t: '连接', s1p: '用下面的命令把Prompt World MCP服务器添加到Claude(或任意MCP客户端)。',
+      s2t: '下单', s2p: '只需说"给我造一个3D潜行竞技场"。AI拥有完整工具箱:地形、五种敌人、地雷、医疗包、甚至配乐。',
+      s3t: '通关并发布', s3p: '你必须在浏览器里通关自己的关卡——验证过的回放就是证明。之后任何人都可以通过URL游玩。',
+      cmdHint: '连接后对AI说"在Prompt World给我做个潜行竞技场"即可。发布的关卡会出现在本页。',
+      secUnits: '工具箱',
+      uSoldier: '步枪兵。巡逻、听脚步、开火前有瞄准提示。',
+      uGatling: '有人机枪阵地。扫射封锁通道——干掉射手。',
+      uSniper: '远程激光锁定。变红前切断视线。',
+      uDrone: '自爆侦察无人机。能越过掩体看到你。一枪即落。',
+      uOperator: '无人机操作员。击杀后其无人机坠毁——你还能夺取一架亲自驾驶。',
+      uMine: '感应地雷与滚动火药桶。敌人也会踩中。',
+      plays: '游玩', clears: '通关', playCard: '游玩'
+    },
+    es: {
+      navStages: 'Niveles', navCreate: 'Crear', navClassic: '2D clásico',
+      tag: 'Un shooter de sigilo 3D donde cada arena la construye una IA. Esquiva conos de visión, atrae patrullas a las minas, captura drones — y publica tu propia arena.',
+      play: 'Jugar ahora', make: 'Crear con IA', keys: 'WASD/stick: mover · auto-apuntado · SPACE saltar · G granada · E dron · M mapa',
+      secStages: 'Niveles publicados', loading: 'Cargando…', empty: 'Aún no hay niveles — sé el primero.',
+      secCreate: 'Construye una arena con tu IA',
+      s1t: 'Conecta', s1p: 'Añade el servidor MCP de Prompt World a Claude (o cualquier cliente MCP) con el comando de abajo.',
+      s2t: 'Pide', s2p: 'Di "constrúyeme una arena de sigilo 3D". Tu IA tiene todo: terreno, cinco enemigos, minas, botiquines y hasta la música.',
+      s3t: 'Supera y publica', s3p: 'Debes superar tu propio nivel en el navegador — tu partida verificada es la prueba. Luego queda publicado en una URL.',
+      cmdHint: 'Después pídele a tu IA: “Hazme una arena de sigilo en Prompt World.” Los niveles publicados aparecen en esta página.',
+      secUnits: 'La caja de herramientas',
+      uSoldier: 'Infantería. Patrulla, oye pasos, telegrafía antes de disparar.',
+      uGatling: 'Nido tripulado. Barre pasillos con fuego — elimina al artillero.',
+      uSniper: 'Láser de largo alcance. Rompe la línea de visión antes del rojo.',
+      uDrone: 'Dron kamikaze volador. Ve por encima de la cobertura.',
+      uOperator: 'Piloto de drones. Mátalo: sus drones caen — y capturas uno.',
+      uMine: 'Mina de proximidad y barril rodante. Los enemigos también los pisan.',
+      plays: 'partidas', clears: 'victorias', playCard: 'Jugar'
+    },
+    ko: {
+      navStages: '스테이지', navCreate: '만들기', navClassic: '클래식 2D',
+      tag: 'AI에게 부탁해 아레나를 만드는 3D 스텔스 슈터. 시야를 피하고, 발소리로 적을 지뢰로 유인하고, 드론을 탈취하라. 만든 스테이지는 공개해 누구나 도전할 수 있다.',
+      play: '지금 플레이', make: 'AI로 만들기', keys: 'WASD/스틱: 이동 · 자동 조준 · SPACE 점프 · G 수류탄 · E 드론 · M 지도',
+      secStages: '공개된 스테이지', loading: '로딩 중…', empty: '아직 스테이지가 없습니다 — 첫 제작자가 되어보세요.',
+      secCreate: 'AI와 함께 아레나 만들기',
+      s1t: '연결', s1p: '아래 명령어로 Prompt World MCP 서버를 Claude(또는 MCP 클라이언트)에 추가하세요.',
+      s2t: '주문', s2p: '"3D 스텔스 아레나 만들어줘"라고 말하면 끝. 지형·5종 적·지뢰·회복·BGM까지 AI가 설계합니다.',
+      s3t: '클리어 & 공개', s3p: '자신의 스테이지를 브라우저에서 직접 클리어해야 공개됩니다(검증된 리플레이가 증명). 이후 누구나 URL로 플레이.',
+      cmdHint: '연결 후 AI에게 "Prompt World에서 스텔스 아레나 만들어줘"라고 부탁하세요. 공개된 스테이지는 이 페이지에 표시됩니다.',
+      secUnits: '툴박스',
+      uSoldier: '소총병. 순찰하고, 발소리를 듣고, 사격 전 조준선을 보여준다.',
+      uGatling: '유인 기관총좌. 사수를 노려라.',
+      uSniper: '장거리 레이저 조준. 빨개지기 전에 시야를 끊어라.',
+      uDrone: '자폭 정찰 드론. 엄폐물 위에서 내려다본다.',
+      uOperator: '드론 조종병. 처치하면 드론이 추락하고, 한 대를 탈취해 직접 조종할 수 있다.',
+      uMine: '근접 지뢰와 구르는 화약통. 적도 밟는다.',
+      plays: '플레이', clears: '클리어', playCard: '플레이'
+    }
+  };
+  var lang = 'en';
+  try {
+    var saved = localStorage.getItem('pw_lang');
+    if (saved && L[saved]) lang = saved;
+    else { var nav = (navigator.language || 'en').slice(0, 2); if (L[nav]) lang = nav; }
+  } catch (e) { }
+  L.en.search = 'Search stages…'; L.ja.search = 'ステージ名で検索…'; L.zh.search = '搜索关卡…'; L.es.search = 'Buscar niveles…'; L.ko.search = '스테이지 검색…';
+  L.en.tabMain = 'MISSIONS'; L.ja.tabMain = 'ミッション'; L.zh.tabMain = '任务'; L.es.tabMain = 'MISIONES'; L.ko.tabMain = '미션';
+  L.en.tabTb = 'TESTBENCH'; L.ja.tabTb = '検証待ち'; L.zh.tabTb = '待验证'; L.es.tabTb = 'BANCO DE PRUEBAS'; L.ko.tabTb = '검증 대기';
+  L.en.tbNone = 'CLEARED BY: NONE'; L.ja.tbNone = 'クリア者: なし'; L.zh.tbNone = '通关者: 无'; L.es.tbNone = 'SUPERADO POR: NADIE'; L.ko.tbNone = '클리어: 없음';
+  L.en.tbLife = 'avg life'; L.ja.tbLife = '平均生存'; L.zh.tbLife = '平均存活'; L.es.tbLife = 'vida media'; L.ko.tbLife = '평균 생존';
+  L.en.tbHint = 'Be the FIRST in the world to clear one — your run becomes its ghost.'; L.ja.tbHint = '世界初クリアを奪え — 君のプレイがゴーストになる。'; L.zh.tbHint = '成为世界首位通关者——你的操作将成为幽灵。'; L.es.tbHint = 'Sé el PRIMERO del mundo en superarlo.'; L.ko.tbHint = '세계 최초 클리어에 도전하라.';
+  var T = function (k) { return L[lang][k] || L.en[k] || k; };
+  document.querySelectorAll('[data-t]').forEach(function (el) { el.textContent = T(el.getAttribute('data-t')); });
+  document.querySelectorAll('[data-p]').forEach(function (el) { el.placeholder = T(el.getAttribute('data-p')); });
+  var sel = document.getElementById('langSel');
+  sel.value = lang;
+  sel.onchange = function () { try { localStorage.setItem('pw_lang', sel.value); } catch (e) { } location.reload(); };
+  if (lang === 'ja') document.documentElement.lang = 'ja';
+
+  var tabMain = document.getElementById('tabMain');
+  var tabTb = document.getElementById('tabTb');
+  tabMain.textContent = T('tabMain');
+  tabTb.textContent = T('tabTb');
+  tabTb.onclick = function () {
+    tabTb.classList.add('on'); tabMain.classList.remove('on');
+    var grid = document.getElementById('stageGrid');
+    grid.innerHTML = '<span style="color:#9aa3ad;font-size:13px">…</span>';
+    fetch('/api/stages?game=tac&sort=testbench').then(function (r) { return r.json(); }).then(function (d) {
+      var esc = function (t) { var e = document.createElement('span'); e.textContent = t || ''; return e.innerHTML; };
+      var rows = (d.stages || []).map(function (s) {
+        var life = s.avg_survive_ms ? (s.avg_survive_ms / 1000).toFixed(1) + 's' : '—';
+        return '<a class="card" href="/?stage=' + encodeURIComponent(s.id) + '">' +
+          '<div class="nm">⚠ ' + esc(s.name) + '</div>' +
+          '<div class="meta tbmeta">' + T('tbNone') + '</div>' +
+          '<div class="meta">' + (s.attempts || 0) + ' tries · ' + T('tbLife') + ' ' + life +
+          (s.creator ? ' · by ' + esc(s.creator) : '') + '</div>' +
+          '<div class="play up">▶</div></a>';
+      }).join('');
+      grid.innerHTML = '<div style="grid-column:1/-1;color:#ffd23e;font-size:12px;letter-spacing:.08em;margin-bottom:6px">' + T('tbHint') + '</div>' +
+        (rows || '<span style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>');
+    }).catch(function () { grid.innerHTML = '<span style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>'; });
+  };
+  tabMain.onclick = function () { location.reload(); };
+
+  fetch('/api/stages?game=tac').then(function (r) { return r.json(); }).then(function (d) {
+    var grid = document.getElementById('stageGrid');
+    if (!d.stages || !d.stages.length) { document.getElementById('stageEmpty').textContent = T('empty'); return; }
+    var esc = function (t) { var e = document.createElement('span'); e.textContent = t || ''; return e.innerHTML; };
+    var TCOL = { soldier: '#7c9a6e', gatling: '#c0564e', sniper: '#a06ec2', drone: '#a6adba', operator: '#c2a05e' };
+    var TCODE = { soldier: 'SOL', gatling: 'GAT', sniper: 'SNP', drone: 'DRN', operator: 'OPR' };
+    function drawThumb(cv, st) {
+      var dpr2 = Math.min(window.devicePixelRatio || 1, 2);
+      var W = cv.clientWidth * dpr2, H = 150 * dpr2;
+      cv.width = W; cv.height = H;
+      var c = cv.getContext('2d');
+      c.fillStyle = '#0b0d10'; c.fillRect(0, 0, W, H);
+      var aw = st.arena.w, ad = st.arena.d;
+      var m2 = 6 * dpr2;
+      var sc2 = Math.min((W - 2 * m2) / aw, (H - 2 * m2) / ad);
+      var ox2 = (W - aw * sc2) / 2, oy2 = (H - ad * sc2) / 2;
+      var X2 = function (x) { return ox2 + x * sc2; };
+      var Z2 = function (z) { return oy2 + (ad - z) * sc2; };
+      c.strokeStyle = '#2a2f38'; c.strokeRect(X2(0), Z2(ad), aw * sc2, ad * sc2);
+      (st.parts || []).forEach(function (pt) {
+        var w2 = pt.w || 1, d2 = pt.d || 1;
+        if (pt.type === 'block') {
+          c.fillStyle = /^#[0-9a-f]{6}$/i.test(pt.tint || '') ? pt.tint : '#5a6270';
+          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+        } else if (pt.type === 'pit') {
+          c.fillStyle = 'rgba(10,12,15,0.95)';
+          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+        } else if (pt.type === 'rock' || pt.type === 'wall' || pt.type === 'platform') {
+          c.fillStyle = pt.type === 'wall' ? '#454c58' : (pt.type === 'platform' ? '#6f7683' : '#575e6a');
+          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+        } else if (pt.type === 'slope') {
+          c.fillStyle = '#636a76';
+          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+        } else if (pt.type === 'river') {
+          c.fillStyle = 'rgba(70,130,200,0.55)';
+          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+        } else if (pt.type === 'trench') {
+          c.fillStyle = 'rgba(15,17,20,0.95)';
+          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+        } else {
+          var dotc = pt.type === 'barrel' ? '#e85a40' : (pt.type === 'mine' ? '#ff4633' :
+            (pt.type === 'medkit' ? '#f2f4f6' : (pt.type === 'scope' ? '#59d9f0' :
+            (pt.type === 'switch' ? '#7dff9a' : null))));
+          if (pt.type === 'jammer') {
+            c.strokeStyle = 'rgba(140,100,255,0.7)';
+            c.beginPath(); c.arc(X2(pt.x), Z2(pt.z), (pt.r || 12) * sc2, 0, Math.PI * 2); c.stroke();
+          } else if (dotc) {
+            c.fillStyle = dotc;
+            c.beginPath(); c.arc(X2(pt.x), Z2(pt.z), 1.8 * dpr2, 0, Math.PI * 2); c.fill();
+          }
+        }
+      });
+      (st.enemies || []).forEach(function (e) {
+        c.fillStyle = TCOL[e.type] || '#999';
+        c.beginPath(); c.arc(X2(e.x), Z2(e.z), 2.4 * dpr2, 0, Math.PI * 2); c.fill();
+      });
+      if (st.playerStart) {
+        c.fillStyle = '#4dd2c3';
+        c.beginPath();
+        c.moveTo(X2(st.playerStart.x), Z2(st.playerStart.z) - 4.5 * dpr2);
+        c.lineTo(X2(st.playerStart.x) + 3.5 * dpr2, Z2(st.playerStart.z) + 3.5 * dpr2);
+        c.lineTo(X2(st.playerStart.x) - 3.5 * dpr2, Z2(st.playerStart.z) + 3.5 * dpr2);
+        c.closePath(); c.fill();
+      }
+    }
+    function stageDetails(st) {
+      var counts = {};
+      (st.enemies || []).forEach(function (e) { counts[e.type] = (counts[e.type] || 0) + 1; });
+      var comp = Object.keys(counts).map(function (k) { return (TCODE[k] || k) + '×' + counts[k]; }).join(' · ');
+      var mins = Math.round((st.timeLimit || 0) / 60);
+      return comp + '<br>' + st.arena.w + '×' + st.arena.d + 'm · ' + mins + 'min · ♥' + (st.lives || 1) +
+        ' · ' + (st.ammo ? st.ammo + ' ammo' : '∞ ammo');
+    }
+    var render = function (list) { grid.innerHTML = list.map(function (s) {
+      var meta = (s.attempts || 0) + ' ' + T('plays') + ' · ' + (s.clears || 0) + ' ' + T('clears') +
+        (s.creator ? ' · by ' + esc(s.creator) : '');
+      return '<a class="card" href="/?stage=' + encodeURIComponent(s.id) + '">' +
+        '<canvas class="thumb" data-sid="' + esc(s.id) + '"></canvas>' +
+        '<div class="nm" data-nid="' + esc(s.id) + '">' + esc(s.name) + '</div>' +
+        '<div class="meta">' + meta + '</div>' +
+        '<div class="desc" data-did="' + esc(s.id) + '"></div>' +
+        '<div class="comp" data-cid="' + esc(s.id) + '">…</div>' +
+        '<div class="play up">▶ ' + T('playCard') + '</div></a>';
+    }).join('') || ('<span style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>');
+      // hydrate thumbnails + details from each stage's JSON
+      list.slice(0, 24).forEach(function (s) {
+        fetch('/api/stages/' + encodeURIComponent(s.id)).then(function (r) { return r.json(); }).then(function (st) {
+          if (!st || !st.arena) return;
+          var cv = document.querySelector('canvas.thumb[data-sid="' + s.id + '"]');
+          if (cv) drawThumb(cv, st);
+          var ci = document.querySelector('[data-cid="' + s.id + '"]');
+          if (ci) ci.innerHTML = stageDetails(st);
+          if (st.nameLoc && st.nameLoc[lang]) {
+            var ni = document.querySelector('[data-nid="' + s.id + '"]');
+            if (ni) ni.textContent = st.nameLoc[lang];
+          }
+          if (st.desc && (st.desc[lang] || st.desc.en)) {
+            var di = document.querySelector('[data-did="' + s.id + '"]');
+            if (di) di.textContent = st.desc[lang] || st.desc.en;
+          }
+        }).catch(function () { });
+      });
+    };
+    render(d.stages);
+    document.getElementById('q').oninput = function () {
+      var q = this.value.trim().toLowerCase();
+      render(!q ? d.stages : d.stages.filter(function (s) { return (s.name || '').toLowerCase().indexOf(q) >= 0; }));
+    };
+  }).catch(function () { document.getElementById('stageEmpty').textContent = T('empty'); });
+})();
+</script>
+</body>
+</html>
