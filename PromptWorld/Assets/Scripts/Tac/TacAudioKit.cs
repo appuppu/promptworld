@@ -6,7 +6,7 @@ using UnityEngine;
 
 public class TacAudioKit : MonoBehaviour
 {
-    AudioSource sfxSrc, musicSrc;
+    AudioSource sfxSrc, stealthSrc, combatSrc;
     readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     float combatMix, combatTarget;
 
@@ -25,10 +25,12 @@ public class TacAudioKit : MonoBehaviour
     {
         sfxSrc = gameObject.AddComponent<AudioSource>();
         sfxSrc.playOnAwake = false;
-        musicSrc = gameObject.AddComponent<AudioSource>();
-        musicSrc.playOnAwake = false;
-        musicSrc.loop = true;
-        musicSrc.volume = 0.13f;
+        // Two music layers that crossfade like the web client: an always-on light
+        // stealth pulse and a drum-forward combat groove that rises when alerted.
+        stealthSrc = gameObject.AddComponent<AudioSource>();
+        stealthSrc.playOnAwake = false; stealthSrc.loop = true; stealthSrc.volume = 0.15f;
+        combatSrc = gameObject.AddComponent<AudioSource>();
+        combatSrc.playOnAwake = false; combatSrc.loop = true; combatSrc.volume = 0f;
         clips["shot"] = Blip(720, 160, 0.07f, Wave.Square, 0.5f);
         clips["eshot"] = Blip(300, 90, 0.09f, Wave.Square, 0.25f);
         clips["kill"] = Blip(500, 60, 0.25f, Wave.Saw, 0.6f);
@@ -119,21 +121,34 @@ public class TacAudioKit : MonoBehaviour
         { "pentatonic", new[] { 0, 3, 5, 7, 10 } },
     };
 
-    // 4-bar loop from the stage recipe: bass pulse at bpm + soft pad triad
-    public void StartMusic(TacJson.JObj recipe)
+    // Bright scales get the up-tempo melodic combat feel; dark ones a tighter,
+    // moodier groove. Mirrors BRIGHT_SCALES in the web client (tac-client.js).
+    static readonly HashSet<string> BRIGHT = new HashSet<string> { "major", "dorian", "pentatonic" };
+
+    const int SR = 22050;
+    int mSr;                 // samples per 16th step
+    float[] mScale;          // 7 scale semitone offsets
+    float mRootHz;           // stage key root (low octave)
+    float[] mRoots;          // per-bar bass roots
+
+    // Bake TWO looping clips — a light stealth pulse and a drum-forward combat
+    // groove — from the stage recipe, then crossfade them (see Update). This
+    // reproduces the web client's two-layer engine on-device, note for note.
+    public void StartMusic(TacJson.JObj recipe, bool night = false)
     {
-        float bpm = 110;
+        float bpm = 116;
         int keyIdx = 9; // A
+        string scaleName = "minor";
         int[] scale = SCALES["minor"];
-        var prog = new List<int> { 0, -2, 1, 0 };
+        var prog = new List<int> { 0, 0, 2, -1 };
         if (recipe != null)
         {
-            bpm = (float)recipe.Num("bpm", 110);
+            bpm = (float)recipe.Num("bpm", 116);
             string k = recipe.Has("key") ? recipe.Str("key") : "A";
             keyIdx = System.Array.IndexOf(KEYS, k);
             if (keyIdx < 0) keyIdx = 9;
-            string sc = recipe.Has("scale") ? recipe.Str("scale") : "minor";
-            if (SCALES.ContainsKey(sc)) scale = SCALES[sc];
+            scaleName = recipe.Has("scale") ? recipe.Str("scale") : "minor";
+            if (SCALES.ContainsKey(scaleName)) scale = SCALES[scaleName];
             if (recipe.Has("prog"))
             {
                 prog.Clear();
@@ -141,37 +156,159 @@ public class TacAudioKit : MonoBehaviour
                 for (int i = 0; i < pa.Count; i++) prog.Add((int)(double)pa.l[i]);
             }
         }
-        int sr = 22050;
-        float beat = 60f / bpm;
-        float barLen = beat * 4f;
-        int n = (int)(sr * barLen * prog.Count);
-        var data = new float[n];
-        float root = 110f * Mathf.Pow(2f, keyIdx / 12f);
-        for (int bar = 0; bar < prog.Count; bar++)
+        bool bright = BRIGHT.Contains(scaleName);
+        mRootHz = 55f * Mathf.Pow(2f, keyIdx / 12f); // A2-relative low root like web
+        mScale = new float[7];
+        for (int i = 0; i < 7; i++) mScale[i] = scale[i % scale.Length];
+        mRoots = new float[4];
+        for (int b = 0; b < 4; b++)
         {
-            int deg = ((prog[bar] % scale.Length) + scale.Length) % scale.Length;
-            float f = root * Mathf.Pow(2f, scale[deg] / 12f);
-            int start = (int)(sr * barLen * bar);
-            int len = (int)(sr * barLen);
-            for (int i = 0; i < len && start + i < n; i++)
+            int deg = Mathf.RoundToInt(prog[b % prog.Count]);
+            int oct = Mathf.FloorToInt(deg / 7f);
+            int idx = ((deg % 7) + 7) % 7;
+            mRoots[b] = mRootHz * Mathf.Pow(2f, (mScale[idx] + 12 * oct) / 12f);
+        }
+        float spb = 60f / bpm / 4f;          // seconds per 16th
+        mSr = Mathf.Max(1, (int)(SR * spb));  // samples per step
+        int total = mSr * 64;                 // 4 bars * 16 steps
+
+        var stealth = new float[total];
+        var combat = new float[total];
+        for (int s = 0; s < 64; s++) BakeStep(s, stealth, combat, bright, night);
+
+        stealthSrc.clip = MakeClip("mStealth", stealth);
+        combatSrc.clip = MakeClip("mCombat", combat);
+        combatMix = 0f; combatTarget = 0f;
+        stealthSrc.volume = 0.15f * BgmVol; combatSrc.volume = 0f;
+        stealthSrc.Play(); combatSrc.Play();
+    }
+
+    AudioClip MakeClip(string name, float[] data)
+    {
+        var c = AudioClip.Create(name, data.Length, 1, SR, false);
+        c.SetData(data, 0);
+        return c;
+    }
+
+    float NoteHz(int deg)
+    {
+        int oct = Mathf.FloorToInt(deg / 7f), idx = ((deg % 7) + 7) % 7;
+        return mRootHz * Mathf.Pow(2f, (mScale[idx] + 12 * oct) / 12f);
+    }
+
+    // Write one 16th-note step into the stealth+combat buffers, mirroring the
+    // web client's musicStep(): drums up front, a melodic hook, light stealth.
+    void BakeStep(int s, float[] st, float[] cb, bool bright, bool night)
+    {
+        int bar = (s >> 4) & 3, pos = s & 15;
+        float root = mRoots[bar];
+        int at = s * mSr;
+
+        // stealth: soft pulse + airy tick (no heavy drone)
+        if (pos == 0) AddTone(st, at, root * 2, root * 2, 0.09f, Wave.Tri, 0.22f);
+        if (pos == 8) AddTone(st, at, root * 3, root * 3, 0.07f, Wave.Tri, 0.14f);
+        if ((s & 3) == 2) AddNoise(st, at, 0.02f, 0.035f, true);
+        if (night && pos == 0) AddPad(st, at, root, mSr * 12);
+
+        // combat: kick / snare / hats / bass / lead
+        bool kick = bright ? (pos == 0 || pos == 6 || pos == 8 || pos == 14)
+                           : (pos == 0 || pos == 4 || pos == 8 || pos == 12);
+        if (kick) AddKick(cb, at, 0.9f);
+        if (pos == 4 || pos == 12) AddSnare(cb, at, 0.5f);
+        if ((s & 1) == 0) AddNoise(cb, at, bright ? 0.022f : 0.022f, bright ? 0.14f : 0.10f, true);
+        if (bright && (pos == 2 || pos == 10)) AddNoise(cb, at, 0.06f, 0.11f, true);
+        if ((s & 1) == 0)
+        {
+            float b = root * 2;
+            if (pos == 14) b *= 1.335f;
+            AddTone(cb, at, b, b, bright ? 0.10f : 0.13f, bright ? Wave.Square : Wave.Saw, bright ? 0.26f : 0.32f);
+        }
+        if (bright)
+        {
+            int[][] motifs = { new[] { 7, 9 }, new[] { 7, 11 }, new[] { 9, 12 }, new[] { 7, 10 } };
+            var m = motifs[bar];
+            if (pos == 0) AddTone(cb, at, NoteHz(m[0]), NoteHz(m[0]), 0.16f, Wave.Square, 0.16f);
+            if (pos == 8) AddTone(cb, at, NoteHz(m[1]), NoteHz(m[1]), 0.16f, Wave.Square, 0.16f);
+        }
+        else
+        {
+            int[] stabs = { 7, 8, 10, 7 };
+            int stab = stabs[bar];
+            if (pos == 0)
             {
-                float tt = (float)i / sr;
-                float beatT = (tt % beat) / beat;
-                float bass = Mathf.Sin(2f * Mathf.PI * f * 0.5f * tt) * Mathf.Exp(-beatT * 4f) * 0.34f;
-                float padEnv = Mathf.Sin(Mathf.PI * ((float)i / len)); // swell per bar, no drone-y sustain
-                float pad = (Mathf.Sin(2f * Mathf.PI * f * tt) + Mathf.Sin(2f * Mathf.PI * f * 1.5f * tt) * 0.5f) * 0.06f * padEnv;
-                data[start + i] = bass + pad;
+                AddTone(cb, at, NoteHz(stab), NoteHz(stab), 0.28f, Wave.Saw, 0.15f);
+                AddTone(cb, at, NoteHz(stab + 2), NoteHz(stab + 2), 0.28f, Wave.Saw, 0.11f);
             }
         }
-        var clip = AudioClip.Create("music", n, 1, sr, false);
-        clip.SetData(data, 0);
-        musicSrc.clip = clip;
-        musicSrc.Play();
+    }
+
+    // --- additive voice writers (wrap-around into the loop buffer) ---
+    void AddTone(float[] buf, int at, float f0, float f1, float dur, Wave w, float vol)
+    {
+        int len = (int)(SR * dur);
+        for (int i = 0; i < len; i++)
+        {
+            float t = (float)i / len;
+            float f = Mathf.Lerp(f0, f1, t);
+            float ph = 2f * Mathf.PI * f * i / SR;
+            float sv = w == Wave.Sine ? Mathf.Sin(ph)
+                : w == Wave.Square ? Mathf.Sign(Mathf.Sin(ph))
+                : w == Wave.Saw ? (2f * ((ph / (2f * Mathf.PI)) % 1f) - 1f)
+                : Mathf.PingPong(ph / Mathf.PI, 1f) * 2f - 1f;
+            buf[(at + i) % buf.Length] += sv * vol * (1f - t);
+        }
+    }
+    void AddKick(float[] buf, int at, float vol)
+    {
+        int len = (int)(SR * 0.18f);
+        for (int i = 0; i < len; i++)
+        {
+            float t = (float)i / len;
+            float f = Mathf.Lerp(150f, 48f, Mathf.Clamp01(t * 2.2f));
+            float env = Mathf.Exp(-t * 5f);
+            buf[(at + i) % buf.Length] += Mathf.Sin(2f * Mathf.PI * f * i / SR) * vol * env;
+        }
+    }
+    void AddSnare(float[] buf, int at, float vol)
+    {
+        AddNoise(buf, at, 0.12f, vol, false);
+        int len = (int)(SR * 0.09f);
+        for (int i = 0; i < len; i++)
+        {
+            float t = (float)i / len;
+            buf[(at + i) % buf.Length] += Mathf.Sin(2f * Mathf.PI * 190f * i / SR) * vol * 0.5f * (1f - t);
+        }
+    }
+    System.Random mRng = new System.Random(11);
+    void AddNoise(float[] buf, int at, float dur, float vol, bool high)
+    {
+        int len = (int)(SR * dur);
+        float lp = 0f;
+        for (int i = 0; i < len; i++)
+        {
+            float t = (float)i / len;
+            float raw = (float)mRng.NextDouble() * 2f - 1f;
+            lp += (raw - lp) * (high ? 0.9f : 0.3f);  // high=hat/snare crack, low=body
+            float v = high ? (raw - lp) : lp;          // crude high/low split
+            buf[(at + i) % buf.Length] += v * vol * (1f - t);
+        }
+    }
+    void AddPad(float[] buf, int at, float root, int len)
+    {
+        float[] parts = { root, root * 1.006f, root * 1.5f };
+        for (int i = 0; i < len; i++)
+        {
+            float env = Mathf.Sin(Mathf.PI * ((float)i / len)) * 0.12f; // gentle swell
+            float sv = 0f;
+            foreach (var fr in parts) sv += Mathf.Sin(2f * Mathf.PI * fr * i / SR);
+            buf[(at + i) % buf.Length] += (sv / parts.Length) * env;
+        }
     }
 
     public void StopMusic()
     {
-        if (musicSrc != null) musicSrc.Stop();
+        if (stealthSrc != null) stealthSrc.Stop();
+        if (combatSrc != null) combatSrc.Stop();
     }
 
     public void SetCombat(bool combat)
@@ -182,10 +319,7 @@ public class TacAudioKit : MonoBehaviour
     void Update()
     {
         combatMix = Mathf.MoveTowards(combatMix, combatTarget, Time.deltaTime * 0.8f);
-        if (musicSrc != null)
-        {
-            musicSrc.volume = (0.1f + combatMix * 0.04f) * BgmVol;
-            musicSrc.pitch = 1f + combatMix * 0.04f;
-        }
+        if (stealthSrc != null) stealthSrc.volume = 0.15f * (1f - 0.85f * combatMix) * BgmVol;
+        if (combatSrc != null) combatSrc.volume = 0.15f * combatMix * BgmVol;
     }
 }

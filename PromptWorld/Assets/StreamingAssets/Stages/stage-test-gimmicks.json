@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "0.3",
+  "id": "stage-test-gimmicks",
+  "name": "Gimmick Gauntlet (dev)",
+  "timeLimit": 60,
+  "lives": 99,
+  "playerStart": { "x": -18, "y": -2.5 },
+  "goal": { "x": 19, "y": -2.3, "w": 1.4, "h": 2.6 },
+  "parts": [
+    { "type": "solid", "x": 0, "y": -4, "w": 44, "h": 1 },
+    { "type": "checkpoint", "x": -14, "y": -3, "w": 1.2, "h": 1.6 },
+    { "type": "rotatingHazard", "x": -9, "y": -1, "w": 3, "h": 3, "power": 1.2, "dx": 0.4 },
+    { "type": "fan", "x": -4, "y": -1, "w": 3, "h": 5, "dirX": 0, "power": 14, "dy": 1 },
+    { "type": "teleporter", "x": 2, "y": -3, "w": 1.2, "h": 2, "dirX": 1, "period": 1 },
+    { "type": "teleporter", "x": 12, "y": -3, "w": 1.2, "h": 2, "dirX": -1, "period": 1 },
+    { "type": "switch", "x": 6, "y": -3.3, "w": 1.4, "h": 0.4, "period": 1 },
+    { "type": "switchGate", "x": 9, "y": -2.5, "w": 1, "h": 3, "period": 1 },
+    { "type": "solid", "x": 9, "y": 0.2, "w": 1.4, "h": 0.5 },
+    { "type": "enemy", "x": 13, "y": -3, "w": 1, "h": 1, "dx": 2, "period": 3, "power": 2 },
+    { "type": "enemy", "x": 5, "y": -3, "w": 1, "h": 1, "dirX": 1, "power": 1 },
+    { "type": "enemy", "x": 7, "y": -3, "w": 1, "h": 1, "dirX": 2, "power": 1 },
+    { "type": "enemy", "x": 9, "y": -3, "w": 1, "h": 1, "dirX": 3, "period": 1, "power": 1 },
+    { "type": "enemy", "x": 16, "y": -3, "w": 1.2, "h": 1.2, "dx": 0, "period": 4, "power": 1, "dy": 1 },
+    { "type": "bossDoor", "x": 17.5, "y": -2.5, "w": 1, "h": 3 },
+    { "type": "rotatingHazard", "x": 15, "y": -1, "w": 4, "h": 4, "power": 0.9, "dirX": -1, "dx": 0.5 }
+  ]
+}

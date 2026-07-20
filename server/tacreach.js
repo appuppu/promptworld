@@ -7,13 +7,15 @@
 // different nodes), then BFS from the spawn twice:
 //   WALK  — steps up to +0.42, any descent
 //   +JUMP — additionally steps up to +1.35
-// PASS rule: every intel, the exit zone and every medkit must be reachable by
-// WALK alone (jumps are for optional shortcuts, per design policy).
+// PASS rule: every intel, the exit zone and every medkit must be reachable ON
+// FOOT — walking OR jumping. A jump-only objective is allowed (surfaced as a
+// warning); only a spot NO jump can reach fails the gate. (Design policy: the
+// player is expected to jump for elevated objectives.)
 //
 // tacAnalyzeReachability(stage) -> {
-//   pass:     boolean            — false when an objective is not walk-reachable
-//   failures: [string]           — UNREACHABLE / JUMP-ONLY objectives (gate on these)
-//   warnings: [string]           — advisory: elevated tops nothing can reach
+//   pass:     boolean            — false only when an objective is reachable by neither walk nor jump
+//   failures: [string]           — UNREACHABLE objectives (gate on these)
+//   warnings: [string]           — JUMP-ONLY objectives + elevated tops nothing can reach
 //   jumpTops: n, deadTops: n     — counts for reporting
 //   skipped:  boolean            — true when the stage exceeds the work budget
 // }
@@ -21,11 +23,11 @@
 
 function tacAnalyzeReachability(stage) {
   var CELL = 0.5;
-  var STEP = 0.42;   // auto step-up (sim STEP_UP 0.4 + slack)
   var JUMP = 1.35;   // jump-assisted step
   var HEAD = 1.6;    // headroom needed to stand
 
   var w = new TacWorld(stage);
+  var STEP = w.stepUp + 0.07;   // auto step-up (sim stepUp, default 0.35, + slack)
   var W = Math.ceil(w.arenaW / CELL), D = Math.ceil(w.arenaD / CELL);
 
   // ---- work budget ----
@@ -110,6 +112,89 @@ function tacAnalyzeReachability(stage) {
     surfaces[cz * W + cx] = ok;
   }
 
+  // ---- radius-aware edge test ----------------------------------------------
+  // The walk graph steps between 0.5 m cell CENTERS, but the real player is a
+  // PLAYER_R (0.4 m) circle resolved by moveCircle. A point flood-fill leaks
+  // through gaps and thin walls the circle can't actually pass:
+  //   * a wall thinner than a cell can sit BETWEEN two sample centers, so no
+  //     cell ever samples it and the graph walks straight through;
+  //   * an L-notch or slot narrower than 2*PLAYER_R is "open" to a point but
+  //     impassable to the circle.
+  // edgeBlocked() rejects a move A->B when a solid box (top above what the feet
+  // can step onto) intrudes within PLAYER_R of the segment between the two cell
+  // centers — mirroring moveCircle's blockAbove = feetY + STEP_UP rule. R is
+  // trimmed by a hair (EDGE_SLACK) so a legitimately tight-but-passable opening
+  // the sim lets you slide through isn't falsely sealed.
+  var PLAYER_R = 0.4;
+  var EDGE_SLACK = 0.06;      // clearance the sim's slide-resolution buys back
+  var R = PLAYER_R - EDGE_SLACK;
+  // shortest distance from point (px,pz) to the axis-aligned box [x0,x1]x[z0,z1]
+  function distPtBox(px, pz, x0, z0, x1, z1) {
+    var ddx = px < x0 ? x0 - px : (px > x1 ? px - x1 : 0.0);
+    var ddz = pz < z0 ? z0 - pz : (pz > z1 ? pz - z1 : 0.0);
+    return Math.sqrt(ddx * ddx + ddz * ddz);
+  }
+  // Push a circle centered at (px,pz) out of every wall taller than `lim` that it
+  // overlaps — a faithful mini-copy of moveCircle's push loop. Walls that ARE the
+  // feet's own floor (top == footY, center over them) are skipped: you stand ON
+  // them, they don't push you. Returns the settled {x,z}. Used to answer "can the
+  // circle actually occupy this spot, and where does it end up?".
+  function settleCircle(px, pz, footY) {
+    for (var iter = 0; iter < 4; iter++) {
+      var moved = false;
+      var res = w.forBoxesIn ? null : null; // (keep closure shape; iterate manually below)
+      // manual scan of nearby boxes
+      var cands = [];
+      w.forBoxesIn(px - R, pz - R, px + R, pz + R, function (bi) { cands.push(bi); });
+      for (var ci = 0; ci < cands.length; ci++) {
+        var b = w.boxes[cands[ci]];
+        if (!b.alive) continue;
+        if (b.h <= footY + STEP) continue;                 // steppable: not a wall
+        if (b.yb >= footY + HEAD) continue;                // clears the body: pass under
+        var cxp = px < b.x0 ? b.x0 : (px > b.x1 ? b.x1 : px);
+        var czp = pz < b.z0 ? b.z0 : (pz > b.z1 ? b.z1 : pz);
+        var ox = px - cxp, oz = pz - czp, d2 = ox * ox + oz * oz;
+        if (d2 >= R * R) continue;
+        if (d2 > 1e-6) {
+          var d = Math.sqrt(d2), push = R - d;
+          px += (ox / d) * push; pz += (oz / d) * push; moved = true;
+        } else {
+          var lxx = px - b.x0, rxx = b.x1 - px, lzz = pz - b.z0, rzz = b.z1 - pz;
+          if (lxx <= rxx && lxx <= lzz && lxx <= rzz) px = b.x0 - R;
+          else if (rxx <= lzz && rxx <= rzz) px = b.x1 + R;
+          else if (lzz <= rzz) pz = b.z0 - R; else pz = b.z1 + R;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    return { x: px, z: pz };
+  }
+  // true when the circle cannot travel from cell A (feet yA) to adjacent cell B
+  // (feet yB). Faithful to moveCircle: we try to settle the circle at B's center
+  // against every wall too tall to step onto; if the settle pushes it more than a
+  // cell away from B (it can't fit near B), the move is blocked. A thin wall or a
+  // sub-radius slot between the cells pushes the circle right back; a wall the
+  // player merely walks the edge of only nudges it a little and the move stands.
+  function edgeBlocked(cxA, czA, yA, cxB, czB, yB) {
+    var bx = (cxB + 0.5) * CELL, bz = (czB + 0.5) * CELL;
+    var s = settleCircle(bx, bz, yB);
+    // If, after being pushed out of walls, the circle's center leaves B's own cell
+    // by more than a slack margin, it cannot actually stand at B: blocked. (Half a
+    // cell + slack keeps honest edge-walking — a small nudge — passable.)
+    var dx = s.x - bx, dz = s.z - bz;
+    if (dx * dx + dz * dz > (CELL * 0.5 + EDGE_SLACK) * (CELL * 0.5 + EDGE_SLACK)) return true;
+    // Also require the MIDPOINT between A and B to admit the circle — catches a
+    // thin wall sitting exactly on the shared cell boundary (both centers clear,
+    // but the circle can't pass through the middle).
+    var ax = (cxA + 0.5) * CELL, az = (czA + 0.5) * CELL;
+    var mx = (ax + bx) / 2, mz = (az + bz) / 2;
+    var sm = settleCircle(mx, mz, Math.max(yA, yB));
+    var mdx = sm.x - mx, mdz = sm.z - mz;
+    if (mdx * mdx + mdz * mdz > (CELL * 0.5 + EDGE_SLACK) * (CELL * 0.5 + EDGE_SLACK)) return true;
+    return false;
+  }
+
   // ---- BFS over (cell, level) nodes ----
   function bfs(maxUp) {
     var seen = new Array(W * D);
@@ -138,6 +223,7 @@ function tacAnalyzeReachability(stage) {
           if (ns[k2] <= y + maxUp) { pick = k2; break; }
         }
         if (pick < 0) continue;
+        if (edgeBlocked(cx3, cz3, y, nx, nz, ns[pick])) continue; // circle can't fit past a wall/slot
         if (!seen[nz * W + nx][pick]) {
           seen[nz * W + nx][pick] = true;
           q.push([nx, nz, pick]);
@@ -159,11 +245,17 @@ function tacAnalyzeReachability(stage) {
   var walk = bfs(STEP);
   var jump = bfs(JUMP);
 
-  // ---- objectives: must be walk-reachable, or the stage is broken ----
+  // ---- objectives: must be reachable ON FOOT, walking OR jumping ----
+  // Design policy (per the creator): every objective has to be attainable by a
+  // player who is willing to jump — a jump-only approach is fine, a spot no jump
+  // can reach is a broken stage. So JUMP-ONLY is an advisory NOTE (surfaced as a
+  // warning), and only a truly UNREACHABLE objective (not walk, not jump) fails
+  // the gate.
   var failures = [];
+  var jumpNotes = [];
   function checkPoint(kind, x, z, y) {
     if (reachableAt(walk, x, z, y)) return;
-    if (reachableAt(jump, x, z, y)) failures.push('JUMP-ONLY ' + kind + ' at (' + x + ',' + z + ') y' + y.toFixed(1));
+    if (reachableAt(jump, x, z, y)) jumpNotes.push('JUMP-ONLY ' + kind + ' at (' + x + ',' + z + ') y' + y.toFixed(1) + ' (reachable by jumping)');
     else failures.push('UNREACHABLE ' + kind + ' at (' + x + ',' + z + ') y' + y.toFixed(1));
   }
   w.intels.forEach(function (it) { checkPoint('intel', it.x, it.z, it.y); });
@@ -187,5 +279,8 @@ function tacAnalyzeReachability(stage) {
     if (warnings.length < 30) warnings.push('unreachable top at (' + mx.toFixed(0) + ',' + mz.toFixed(0) + ') y' + b2.h.toFixed(1));
   }
 
-  return { pass: failures.length === 0, failures: failures, warnings: warnings, jumpTops: jumpTops, deadTops: deadTops, skipped: false };
+  // jump-only objectives are allowed but worth surfacing — prepend them so the
+  // operator sees "this intel needs a jump" ahead of the dead-top advisories.
+  var allWarnings = jumpNotes.concat(warnings);
+  return { pass: failures.length === 0, failures: failures, warnings: allWarnings, jumpTops: jumpTops, deadTops: deadTops, skipped: false };
 }

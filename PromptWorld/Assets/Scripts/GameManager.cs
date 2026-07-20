@@ -34,6 +34,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_Text leaderboardText;
     [SerializeField] private Button homeButton;
     [SerializeField] private TMP_Text keyText;
+    [SerializeField] private TMP_Text livesText;
+    [SerializeField] private GameObject resultRoot; // dim backdrop; only shown on clear/game-over
 
     public GameState State { get; private set; } = GameState.Playing;
 
@@ -49,7 +51,7 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>Sim-driven stages: the sim owns the clock; we only display it.</summary>
-    public void ConfigureSim(string stageName, float stageTimeLimit)
+    public void ConfigureSim(string stageName, float stageTimeLimit, bool hasBoss = false, MusicData music = null)
     {
         simDriven = true;
         timeLimit = stageTimeLimit;
@@ -57,13 +59,54 @@ public class GameManager : MonoBehaviour
         lastTickSecond = -1;
         if (stageNameText != null) stageNameText.text = stageName;
         UpdateTimerLabel();
-        Sfx.StartMusic();
+        // A stage's own "music" recipe takes priority — the author chose it on
+        // purpose. Otherwise fall back to the default loops.
+        if (music != null) Sfx.StartStageMusic(music);
+        else if (hasBoss) Sfx.StartBossMusic();
+        else Sfx.StartMusic();
+    }
+
+    // Turn on TMP auto-sizing so a label shrinks to fit its box instead of
+    // clipping with an ellipsis. min/max bound the range; max = the scene's
+    // intended size. Safe on a null ref.
+    private static void FitText(TMP_Text t, float min, float max)
+    {
+        if (t == null) return;
+        t.enableAutoSizing = true;
+        t.fontSizeMin = min;
+        t.fontSizeMax = max;
+    }
+
+    // Same, for a Button's child label.
+    private static void FitButton(Button b, float min, float max)
+    {
+        if (b == null) return;
+        var t = b.GetComponentInChildren<TMP_Text>();
+        FitText(t, min, max);
     }
 
     private void Start()
     {
+        Loc.WarmupFont(); // pre-rasterize glyphs so non-Latin HUD text isn't blank
+        // Make every HUD / result / button label AUTO-SIZE so nothing clips on
+        // narrow phones or in longer localized languages (the scene assets ship
+        // with autosizing off / fixed font sizes). Shrinks to fit; never truncates.
+        FitText(resultText, 24f, 60f);
+        FitText(stageNameText, 14f, 24f);
+        FitText(keyText, 14f, 26f);
+        FitText(livesText, 14f, 26f);
+        FitText(timerText, 18f, 34f);
+        FitText(leaderboardText, 16f, 22f);
+        FitButton(retryButton, 12f, 24f);
+        FitButton(menuButton, 12f, 24f);
+        FitButton(shareButton, 12f, 24f);
+        FitButton(nextButton, 12f, 24f);
+        FitButton(createLinkButton, 12f, 22f);
+        FitButton(voteGoodButton, 12f, 24f);
+        FitButton(voteBadButton, 12f, 24f);
         timeRemaining = timeLimit;
         resultText.gameObject.SetActive(false);
+        if (resultRoot != null) resultRoot.SetActive(false); // no dim overlay while playing
         UpdateTimerLabel();
 
         if (retryButton != null)
@@ -103,6 +146,23 @@ public class GameManager : MonoBehaviour
         }
         if (leaderboardText != null) leaderboardText.text = "";
         if (homeButton != null) homeButton.onClick.AddListener(BackToMenu);
+
+        // Localize the baked-in button labels to the detected language.
+        SetButtonLabel(retryButton, Loc.T("retry"));
+        SetButtonLabel(menuButton, Loc.T("menu"));
+        SetButtonLabel(nextButton, Loc.T("next"));
+        SetButtonLabel(shareButton, Loc.T("share"));
+        SetButtonLabel(createLinkButton, Loc.T("createOwn"));
+        SetButtonLabel(voteGoodButton, Loc.T("good"));
+        SetButtonLabel(voteBadButton, Loc.T("bad"));
+        SetButtonLabel(homeButton, Loc.T("menu"));
+    }
+
+    private static void SetButtonLabel(Button b, string text)
+    {
+        if (b == null) return;
+        var label = b.GetComponentInChildren<TMP_Text>();
+        if (label != null) label.text = text;
     }
 
     /// <summary>Appends the current world-best time to the stage label.</summary>
@@ -110,15 +170,30 @@ public class GameManager : MonoBehaviour
     {
         if (stageNameText != null)
         {
-            stageNameText.text += $"   ·   BEST {bestMs / 1000f:0.00}s";
+            stageNameText.text += $"   ·   {Loc.T("best")} {bestMs / 1000f:0.00}s";
         }
     }
 
     private void SharePlayUrl()
     {
-        WebBridge.Copy($"{GameSession.ApiOrigin}/?stage={GameSession.RemoteStageId}");
+        string url = $"{GameSession.ApiOrigin}/?stage={GameSession.RemoteStageId}";
+        string title = string.IsNullOrEmpty(stageNameText != null ? stageNameText.text : null)
+            ? "this stage" : StripTags(stageNameText.text);
+        // A ready-to-post caption; opens the native share sheet (Instagram/X on
+        // mobile) or an X compose window on desktop, with the URL on clipboard.
+        WebBridge.Share(Loc.T("shareCaption", title), url);
         var label = shareButton.GetComponentInChildren<TMP_Text>();
-        if (label != null) label.text = "COPIED!";
+        if (label != null) label.text = Loc.T("copied");
+    }
+
+    private static string StripTags(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return s;
+        int cut = s.IndexOf('\n');
+        if (cut >= 0) s = s.Substring(0, cut);        // drop the "· BEST ..." suffix line
+        cut = s.IndexOf("   ·");
+        if (cut >= 0) s = s.Substring(0, cut);
+        return s.Trim();
     }
 
     private IEnumerator NextRandomStage()
@@ -140,6 +215,9 @@ public class GameManager : MonoBehaviour
                     GameSession.RemoteStageId = candidates[Random.Range(0, candidates.Count)];
                     GameSession.EditKey = null;
                     GameSession.SelectedStageFile = null;
+                    // Consumed: a later MENU press should return to the menu, not
+                    // re-trigger a deep-link jump from the URL.
+                    GameSession.DeepLinkConsumed = true;
                     SceneManager.LoadScene("Stage");
                     yield break;
                 }
@@ -175,7 +253,7 @@ public class GameManager : MonoBehaviour
         if (timeRemaining <= 0f)
         {
             timeRemaining = 0f;
-            EndGame(GameState.GameOver, "Game Over");
+            EndGame(GameState.GameOver, Loc.T("gameOver"));
         }
         TickSecond();
         UpdateTimerLabel();
@@ -194,14 +272,146 @@ public class GameManager : MonoBehaviour
         keyText.gameObject.SetActive(true);
         if (collected >= total)
         {
-            keyText.text = $"KEYS {collected}/{total}  —  DOOR OPEN!";
+            keyText.text = Loc.T("keysDoorOpen", collected, total);
             keyText.color = new Color(1f, 1f, 1f, 0.95f);
         }
         else
         {
-            keyText.text = $"KEYS {collected}/{total}  —  collect all to open the door";
+            keyText.text = Loc.T("keysCollect", collected, total);
             keyText.color = new Color(1f, 1f, 1f, 0.7f);
         }
+    }
+
+    private RectTransform livesRow;
+    private Image[] heartIcons;
+    private static Sprite heartSprite;
+
+    /// <summary>
+    /// Shows remaining lives as a prominent row of heart icons under the timer.
+    /// Filled hearts = lives left, dim outlines = lost. Drawn as generated
+    /// sprites (no font glyphs) so it renders identically everywhere.
+    /// </summary>
+    public void UpdateLives(int left, int max)
+    {
+        if (max <= 0)
+        {
+            if (livesRow != null) livesRow.gameObject.SetActive(false);
+            if (livesText != null) livesText.gameObject.SetActive(false);
+            return;
+        }
+        if (left < 0) left = 0;
+        if (left > max) left = max;
+
+        // Many lives (>12) would overflow a row of icons: show one heart + count.
+        if (max > 12)
+        {
+            if (livesRow != null) livesRow.gameObject.SetActive(false);
+            if (livesText != null)
+            {
+                livesText.gameObject.SetActive(true);
+                livesText.alignment = TextAlignmentOptions.Left;
+                livesText.rectTransform.anchorMin = new Vector2(0f, 1f);
+                livesText.rectTransform.anchorMax = new Vector2(0f, 1f);
+                livesText.rectTransform.pivot = new Vector2(0f, 1f);
+                livesText.rectTransform.anchoredPosition = new Vector2(40f, -84f);
+                livesText.fontSize = 26;
+                livesText.text = $"{Loc.T("lives")}  {left} / {max}";
+                livesText.color = left <= 3 ? new Color(1f, 0.85f, 0.85f, 1f) : Color.white;
+            }
+            return;
+        }
+
+        // The old ASCII label is retired in favor of heart icons.
+        if (livesText != null) livesText.gameObject.SetActive(false);
+
+        EnsureLivesRow(max);
+        livesRow.gameObject.SetActive(true);
+        for (int i = 0; i < heartIcons.Length; i++)
+        {
+            bool alive = i < left;
+            heartIcons[i].color = alive
+                ? new Color(1f, 1f, 1f, 1f)          // full heart
+                : new Color(1f, 1f, 1f, 0.18f);      // lost heart (ghosted)
+        }
+    }
+
+    /// <summary>Lazily builds the heart row inside the HUD stack (under the timer).</summary>
+    private void EnsureLivesRow(int max)
+    {
+        if (livesRow != null && heartIcons != null && heartIcons.Length == max) return;
+
+        // Live inside the same auto-layout HUD column as the timer/livesText so
+        // it stacks under them and never overlaps at any aspect.
+        Transform hud = livesText != null ? livesText.transform.parent
+            : (timerText != null ? timerText.transform.parent : transform);
+
+        if (livesRow != null) Destroy(livesRow.gameObject);
+
+        var rowGo = new GameObject("LivesRow", typeof(RectTransform));
+        rowGo.transform.SetParent(hud, false);
+        // Place right after the timer (index 1) so it reads timer → hearts.
+        rowGo.transform.SetSiblingIndex(1);
+        livesRow = rowGo.GetComponent<RectTransform>();
+        livesRow.anchorMin = new Vector2(0f, 1f);
+        livesRow.anchorMax = new Vector2(0f, 1f);
+        livesRow.pivot = new Vector2(0f, 1f);
+
+        const float sizePx = 22f;
+        const float gapPx = 5f;
+        float step = sizePx + gapPx;
+        // A layout element so the HUD VStack reserves height for it.
+        var le = rowGo.AddComponent<LayoutElement>();
+        le.minHeight = sizePx; le.preferredHeight = sizePx;
+
+        heartIcons = new Image[max];
+        for (int i = 0; i < max; i++)
+        {
+            var h = new GameObject($"Heart{i}", typeof(RectTransform));
+            h.transform.SetParent(livesRow, false);
+            var hr = h.GetComponent<RectTransform>();
+            hr.anchorMin = new Vector2(0f, 1f);
+            hr.anchorMax = new Vector2(0f, 1f);
+            hr.pivot = new Vector2(0f, 1f);
+            hr.anchoredPosition = new Vector2(i * step, 0f); // grow rightward from the left edge
+            hr.sizeDelta = new Vector2(sizePx, sizePx);
+            var img = h.AddComponent<Image>();
+            img.sprite = GetHeartSprite();
+            img.raycastTarget = false;
+            heartIcons[i] = img;
+        }
+    }
+
+    /// <summary>A filled heart sprite generated in memory (no asset dependency).</summary>
+    private static Sprite GetHeartSprite()
+    {
+        if (heartSprite != null) return heartSprite;
+
+        const int n = 48;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false);
+        var clear = new Color32(255, 255, 255, 0);
+        var solid = new Color32(255, 255, 255, 255);
+        var px = new Color32[n * n];
+        for (int yy = 0; yy < n; yy++)
+        {
+            for (int xx = 0; xx < n; xx++)
+            {
+                // Texture row 0 is the BOTTOM in Unity, so map yy=0 to y=-1 to
+                // keep the heart upright (lobes at top, point at bottom).
+                float x = (xx + 0.5f) / n * 2f - 1f;
+                float y = (yy + 0.5f) / n * 2f - 1f;
+                // Heart implicit curve: (x^2 + y^2 - 1)^3 - x^2 y^3 <= 0
+                float xs = x * 1.15f;
+                float ys = y * 1.15f + 0.35f;
+                float a = xs * xs + ys * ys - 1f;
+                float f = a * a * a - xs * xs * ys * ys * ys;
+                px[yy * n + xx] = f <= 0f ? solid : clear;
+            }
+        }
+        tex.SetPixels32(px);
+        tex.Apply();
+        tex.filterMode = FilterMode.Bilinear;
+        heartSprite = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), n);
+        return heartSprite;
     }
 
     public void OnSimTick(int remainingTicks)
@@ -229,14 +439,16 @@ public class GameManager : MonoBehaviour
         if (State != GameState.Playing) return;
         pendingClearMs = clearTimeMs;
         pendingReplay = replayJson;
-        EndGame(GameState.Cleared, $"Stage Clear!\n<size=45%>{clearTimeMs / 1000f:0.00}s</size>");
+        EndGame(GameState.Cleared, $"{Loc.T("stageClear")}\n<size=45%>{clearTimeMs / 1000f:0.00}s</size>");
         ReportPlayOutcome(deaths, true);
     }
 
-    public void GameOverFromSim(int deaths)
+    public void GameOverFromSim(int deaths, bool livesOut = false)
     {
         if (State != GameState.Playing) return;
-        EndGame(GameState.GameOver, "Game Over");
+        string reason = livesOut ? Loc.T("outOfLives") : Loc.T("timeUp");
+        string msg = $"{Loc.T("gameOver")}\n<size=45%>{reason}</size>";
+        EndGame(GameState.GameOver, msg);
         ReportPlayOutcome(deaths, false);
     }
 
@@ -266,7 +478,7 @@ public class GameManager : MonoBehaviour
         {
             var result = JsonUtility.FromJson<ScoreResponse>(response);
             if (result?.top == null || result.top.Length == 0 || leaderboardText == null) return;
-            var sb = new System.Text.StringBuilder("<size=75%>BEST TIMES</size>\n");
+            var sb = new System.Text.StringBuilder($"<size=75%>{Loc.T("bestTimes")}</size>\n");
             for (int i = 0; i < result.top.Length; i++)
             {
                 sb.Append($"{i + 1}.  {result.top[i].name}   {result.top[i].time_ms / 1000f:0.00}s\n");
@@ -328,7 +540,7 @@ public class GameManager : MonoBehaviour
     public void StageClear()
     {
         if (State != GameState.Playing) return;
-        EndGame(GameState.Cleared, "Stage Clear!");
+        EndGame(GameState.Cleared, Loc.T("stageClear"));
     }
 
     public void RespawnPlayer()
@@ -344,6 +556,14 @@ public class GameManager : MonoBehaviour
 
     public void BackToMenu()
     {
+        // Deliberately returning to the menu: wipe the deep-link/session so the
+        // menu can't re-read a leftover ?stage= (or a re-fired deepLinkActivated)
+        // and bounce us straight back into the stage we just left.
+        GameSession.RemoteStageId = null;
+        GameSession.EditKey = null;
+        GameSession.SelectedStageFile = null;
+        GameSession.DeepLinkConsumed = true;
+        WebBridge.SetUrlStage(""); // clear ?stage= from the address bar immediately
         SceneManager.LoadScene("Menu");
     }
 
@@ -353,7 +573,12 @@ public class GameManager : MonoBehaviour
         if (player != null) player.Freeze();
         Sfx.StopMusic();
         Sfx.Play(result == GameState.Cleared ? SfxId.Clear : SfxId.GameOver);
-        ShowResultOverlay();
+        // Ad policy: show an interstitial IMMEDIATELY on GAME OVER only.
+        // No ad on CLEAR — the clear screen (share / next / vote) stays clean.
+        // 45s frequency cap is enforced inside Ads.ShowInterstitial().
+        if (result == GameState.GameOver) Ads.ShowInterstitial();
+        if (resultRoot != null) resultRoot.SetActive(true); // now show the dim backdrop
+        else ShowResultOverlay();                            // legacy scenes without a ResultRoot
         resultText.text = message;
         resultText.gameObject.SetActive(true);
         if (retryButton != null) retryButton.gameObject.SetActive(true);
@@ -395,12 +620,12 @@ public class GameManager : MonoBehaviour
 
         if (request.result == UnityWebRequest.Result.Success)
         {
-            resultText.text += "\n<size=30%>CLEAR VERIFIED — READY TO PUBLISH</size>";
+            resultText.text += $"\n<size=30%>{Loc.T("clearVerified")}</size>";
             Debug.Log("[PromptWorld] Replay-verified clear recorded.");
         }
         else
         {
-            resultText.text += "\n<size=30%>CLEAR VERIFICATION FAILED</size>";
+            resultText.text += $"\n<size=30%>{Loc.T("clearFailed")}</size>";
             Debug.LogError($"[PromptWorld] Failed to record clear: {request.error} {request.downloadHandler.text}");
         }
     }

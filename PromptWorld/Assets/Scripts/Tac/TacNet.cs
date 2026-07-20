@@ -24,6 +24,16 @@ public static class TacNet
         }
     }
 
+    // Deep-link status probe: {status, cleared, name, game} without the stage
+    // body, so the app can gate draft-preview to drafts only. ok(null) on any
+    // failure (network, 404) so the caller can fall back to "open the app".
+    public static IEnumerator GetStageMeta(string stageId, Action<string> ok)
+    {
+        string got = null;
+        yield return GetJson("/api/stages/" + stageId + "?meta=1", (j) => got = j, null);
+        ok(got);
+    }
+
     public static IEnumerator GetJson(string path, Action<string> ok, Action fail)
     {
         using (var req = UnityWebRequest.Get(Origin + path))
@@ -64,12 +74,21 @@ public static class TacNet
     }
 
     // replay-verified leaderboard submission — the server re-simulates the run
-    public static IEnumerator SubmitScore(string stageId, int ticks, string data, Action<bool> done)
+    // Submit a verified clear replay. The server records the leaderboard time +
+    // ghost and, if this is the FIRST clear of an unverified stage, promotes it
+    // to published. done(sent, firstClear): firstClear drives the world-first
+    // celebration on the result screen.
+    public static IEnumerator SubmitScore(string stageId, int ticks, string data, Action<bool, bool> done)
     {
-        string body = "{\"playerId\":\"" + Esc(PlayerId) + "\",\"replay\":{\"v\":\"t1\",\"ticks\":" + ticks + ",\"data\":\"" + data + "\"}}";
-        bool sent = false;
-        yield return PostJson("/api/stages/" + stageId + "/score", body, (_) => { sent = true; }, null);
-        if (done != null) done(sent);
+        string body = "{\"playerId\":\"" + Esc(PlayerId) + "\",\"name\":\"anonymous\",\"replay\":{\"v\":\"t1\",\"ticks\":" + ticks + ",\"data\":\"" + data + "\"}}";
+        bool sent = false, first = false;
+        yield return PostJson("/api/stages/" + stageId + "/score", body, (resp) =>
+        {
+            sent = true;
+            // cheap flag scan — avoids a full JSON parse for two booleans
+            if (resp != null && (resp.Contains("\"firstClear\":true") || resp.Contains("\"promoted\":true"))) first = true;
+        }, null);
+        if (done != null) done(sent, first);
     }
 
     // GOOD / BAD rating (one per device, updatable) — feeds the 高評価 sort
@@ -77,5 +96,13 @@ public static class TacNet
     {
         string body = "{\"playerId\":\"" + Esc(PlayerId) + "\",\"good\":" + (good ? "true" : "false") + "}";
         yield return PostJson("/api/stages/" + stageId + "/vote", body, (_) => { if (done != null) done(); }, () => { if (done != null) done(); });
+    }
+
+    // Report / hide a stage for THIS device only. The server filters it out of
+    // this player's future lists; it stays visible to everyone else.
+    public static IEnumerator Hide(string stageId, Action done)
+    {
+        string body = "{\"playerId\":\"" + Esc(PlayerId) + "\"}";
+        yield return PostJson("/api/stages/" + stageId + "/hide", body, (_) => { if (done != null) done(); }, () => { if (done != null) done(); });
     }
 }

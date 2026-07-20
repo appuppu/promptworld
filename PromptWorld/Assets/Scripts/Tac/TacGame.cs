@@ -41,6 +41,12 @@ public class TacGame : MonoBehaviour
     // views
     Transform worldRoot;
     GameObject playerView;
+    // Minecraft-style leg walk cycle (render-only, mirrors tac-client.js): per-view
+    // phase + eased amplitude, advanced from ground speed measured between frames.
+    float playerLegPhase, playerLegAmp; Vector3 playerLegPrevPos; bool playerLegInit;
+    readonly List<float> enemyLegPhase = new List<float>();
+    readonly List<float> enemyLegAmp = new List<float>();
+    readonly List<Vector3> enemyLegPrevPos = new List<Vector3>();
     readonly List<GameObject> boxViews = new List<GameObject>();
     readonly List<GameObject> enemyViews = new List<GameObject>();
     readonly List<GameObject> bulletPool = new List<GameObject>();
@@ -90,11 +96,13 @@ public class TacGame : MonoBehaviour
     readonly Dictionary<string, string> stageCache = new Dictionary<string, string>();
     class StageMeta { public string id, name, creator, published; public double goods, bads, attempts, clears, parMs; }
     readonly List<StageMeta> metas = new List<StageMeta>();
-    int sortMode; // 0 new, 1 good, 2 plays, 3 hard
+    int sortMode; // 0 new, 1 good, 2 plays, 3 hard, 4 testbench
+    string searchQuery = ""; // stage-name search (server-side ?q=)
     class BriefEntry { public string sid, name, creator, embedded; public StageMeta meta; }
     readonly List<BriefEntry> briefList = new List<BriefEntry>();
     int briefIndex;
     Text hpText, foesText, timeText, msgText;
+    Text toastText; float toastUntil; // canvas-level toast (visible on any screen)
     RawImage minimapImg;
     Texture2D minimapTex;
     Color32[] minimapBase;
@@ -102,6 +110,10 @@ public class TacGame : MonoBehaviour
     Camera cam;
     TacAudioKit audioKit;
     float msgUntil;
+    // Deep-link draft preview: set true while the stage on screen arrived via a
+    // shared ?stage=&key= link AND is still status='draft'. Drives the PREVIEW
+    // badge and keeps score/vote submission off an unpublished stage.
+    bool previewDraft;
 
     const string TRAINING = "{\"name\":\"TRAINING GROUND\",\"timeLimit\":600,\"lives\":5,\"ammo\":0," +
         "\"arena\":{\"w\":40,\"d\":70},\"playerStart\":{\"x\":20,\"z\":5,\"yaw\":0}," +
@@ -165,6 +177,81 @@ public class TacGame : MonoBehaviour
         audioKit = gameObject.AddComponent<TacAudioKit>();
         BuildUi();
         ShowList();
+
+        // Deep links: a shared ?stage=<id>&key=<editKey> URL. Cold start arrives
+        // in Application.absoluteURL; a tap while running fires deepLinkActivated.
+        // Both route to the SAME handler, which only previews status='draft'
+        // stages (published courses must be reached through the in-app list).
+        Application.deepLinkActivated += OnDeepLink;
+        if (!string.IsNullOrEmpty(Application.absoluteURL)) OnDeepLink(Application.absoluteURL);
+    }
+
+    void OnDestroy()
+    {
+        Application.deepLinkActivated -= OnDeepLink;
+    }
+
+    // Parse ?stage=<id>[&key=<editKey>] out of a deep-link URL, then preview the
+    // stage IF it is an unpublished draft. Anything else (no stage id, network
+    // failure, or an already-published stage) is a silent no-op — the app just
+    // stays on the home list.
+    void OnDeepLink(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return;
+        string sid = QueryParam(url, "stage");
+        if (string.IsNullOrEmpty(sid)) return;
+        string key = QueryParam(url, "key");
+        StartCoroutine(OpenDraftPreview(sid, key));
+    }
+
+    static string QueryParam(string url, string name)
+    {
+        int q = url.IndexOf('?');
+        if (q < 0) return null;
+        string query = url.Substring(q + 1);
+        foreach (var pair in query.Split('&'))
+        {
+            int eq = pair.IndexOf('=');
+            if (eq <= 0) continue;
+            if (pair.Substring(0, eq) == name)
+                return System.Uri.UnescapeDataString(pair.Substring(eq + 1));
+        }
+        return null;
+    }
+
+    IEnumerator OpenDraftPreview(string sid, string key)
+    {
+        // 1. Probe status WITHOUT the body — never preview a published stage.
+        string metaJson = null;
+        yield return TacNet.GetStageMeta(sid, (j) => metaJson = j);
+        if (metaJson == null)
+        {
+            Toast(TacLoc.T("dl_notfound"), 5f);
+            yield break;
+        }
+        string status = "";
+        try { status = TacJson.Parse(metaJson).Str("status"); }
+        catch (System.Exception) { }
+        if (status != "draft")
+        {
+            // Published (or unverified testbench) — direct links are draft-only.
+            Toast(TacLoc.T("dl_published"), 6f);
+            yield break;
+        }
+        // 2. Fetch the full draft JSON (opGetStage returns drafts) and preview it.
+        string full = null;
+        yield return TacNet.GetJson("/api/stages/" + sid, (j) => full = j, null);
+        if (full == null)
+        {
+            Toast(TacLoc.T("dl_notfound"), 5f);
+            yield break;
+        }
+        stageCache[sid] = full;
+        // Preview mode: solo brief entry, PREVIEW badge, no score/vote writes.
+        previewDraft = true;
+        briefList.Clear();
+        briefList.Add(new BriefEntry { sid = sid, name = null, embedded = null, meta = null });
+        StartStage(full, sid, null);
     }
 
     IEnumerator ShotLoop(string dir)
@@ -309,7 +396,9 @@ public class TacGame : MonoBehaviour
         var brand = TacUi.Label(listRoot, "", 20, TacUi.Fg, TextAnchor.MiddleLeft, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -38), new Vector2(-24, -4), false);
         brand.supportRichText = true;
         brand.text = TacUi.Track("PROMPT") + " <color=#4dd2c3>" + TacUi.Track("WORLD") + "</color>";
-        TacUi.Label(listRoot, TacLoc.T("tagline"), 10, TacUi.Dim, TextAnchor.MiddleLeft, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -60), new Vector2(-24, -38));
+        StartCoroutine(FadeRiseIn((RectTransform)brand.transform, 0f, 0.6f, 12f)); // logo entrance (mirrors web)
+        var tagLbl = TacUi.Label(listRoot, TacLoc.T("tagline"), 10, TacUi.Dim, TextAnchor.MiddleLeft, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -60), new Vector2(-24, -38));
+        StartCoroutine(FadeIn((RectTransform)tagLbl.transform, 0.1f, 0.6f));
         var hline = TacUi.Rect("hline", listRoot, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -67), new Vector2(0, -66));
         TacUi.Fill(hline, TacUi.Line);
 
@@ -434,7 +523,22 @@ public class TacGame : MonoBehaviour
         briefRoot.gameObject.SetActive(false);
         resultRoot.gameObject.SetActive(false);
         pauseRoot.gameObject.SetActive(false);
+        // Canvas-level toast: a deep-link that resolves to nothing (bad link, or
+        // an already-published stage) shows feedback here — msgText lives on the
+        // HUD and is invisible on the home list where deep links land.
+        toastText = TacUi.Label((RectTransform)canvas.transform, "", 14, TacUi.Warn, TextAnchor.MiddleCenter,
+            new Vector2(0.08f, 0.44f), new Vector2(0.92f, 0.52f), Vector2.zero, Vector2.zero);
+        toastText.gameObject.SetActive(false);
         uiScreenW = Screen.width; uiScreenH = Screen.height; uiSafe = SafeArea();
+    }
+
+    void Toast(string msg, float secs)
+    {
+        if (toastText == null) return;
+        toastText.text = msg;
+        toastText.gameObject.SetActive(true);
+        toastText.transform.SetAsLastSibling();
+        toastUntil = Time.time + secs;
     }
 
     void ClearChildren(RectTransform rt, int keep = 0)
@@ -451,6 +555,8 @@ public class TacGame : MonoBehaviour
     void ShowList()
     {
         mode = Mode.List;
+        // Leaving any deep-link preview: back to normal published-course flow.
+        previewDraft = false;
         if (uiDirty) { uiDirty = false; BuildUiRefresh(); return; }
         listRoot.gameObject.SetActive(true);
         hudRoot.gameObject.SetActive(false);
@@ -482,8 +588,20 @@ public class TacGame : MonoBehaviour
             new Vector2(6, -144), new Vector2(-24, -112), ShowSettings, out tmpS);
         tmpS.color = TacUi.Dim;
 
+        // stage-name search — re-queries the server (works on the published list
+        // AND the testbench shelf) when the field is committed.
+        var searchField = TacUi.Search(listRoot, TacLoc.T("search"), 11, new Vector2(0, 1), new Vector2(1, 1),
+            new Vector2(24, -184), new Vector2(-24, -152), null);
+        searchField.text = searchQuery;
+        searchField.onEndEdit.AddListener(v =>
+        {
+            var q = (v ?? "").Trim();
+            if (q == searchQuery) return;
+            searchQuery = q; metas.Clear(); ShowList();
+        });
+
         // scroll shell — reaches the safe-area bottom (user: fill the screen with courses)
-        var scrollRt = TacUi.Rect("scroll", listRoot, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0), new Vector2(0, -152));
+        var scrollRt = TacUi.Rect("scroll", listRoot, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0), new Vector2(0, -192));
         var scroll = scrollRt.gameObject.AddComponent<ScrollRect>();
         scroll.horizontal = false;
         scroll.movementType = ScrollRect.MovementType.Elastic;
@@ -503,7 +621,12 @@ public class TacGame : MonoBehaviour
         }
         var status = TacUi.Label(listRoot, TacLoc.T("loading"), 12, TacUi.Dim, TextAnchor.MiddleRight, new Vector2(0.5f, 0), new Vector2(1, 0.08f), Vector2.zero, new Vector2(-24, 0));
         string sortParam = sortMode == 1 ? "&sort=top" : (sortMode == 3 ? "&sort=hard" : (sortMode == 4 ? "&sort=testbench" : "&sort=new"));
-        StartCoroutine(TacNet.GetJson("/api/stages?game=tac" + sortParam, (json) =>
+        // playerId lets the server drop stages this device has hidden; q= is the
+        // stage-name search (works on both the published list and the testbench).
+        string extra = "&playerId=" + UnityEngine.Networking.UnityWebRequest.EscapeURL(TacNet.PlayerId);
+        if (!string.IsNullOrEmpty(searchQuery))
+            extra += "&q=" + UnityEngine.Networking.UnityWebRequest.EscapeURL(searchQuery);
+        StartCoroutine(TacNet.GetJson("/api/stages?game=tac" + sortParam + extra, (json) =>
         {
             try
             {
@@ -721,6 +844,48 @@ public class TacGame : MonoBehaviour
         listContent.sizeDelta = new Vector2(0, CardTop + count * (CardH + CardGap) + 16);
     }
 
+    // --- lightweight UI entrance animations (mirror the web home) --------------
+    // Fade a rect in from `rise` px below its resting position, after `delay` s.
+    IEnumerator FadeRiseIn(RectTransform rt, float delay, float dur, float rise)
+    {
+        if (rt == null) yield break;
+        var cg = rt.GetComponent<CanvasGroup>() ?? rt.gameObject.AddComponent<CanvasGroup>();
+        Vector2 rest = rt.anchoredPosition;
+        cg.alpha = 0f;
+        rt.anchoredPosition = rest - new Vector2(0, rise);
+        float t = 0f;
+        while (delay > 0f) { delay -= Time.unscaledDeltaTime; yield return null; if (rt == null) yield break; }
+        while (t < dur)
+        {
+            if (rt == null) yield break;
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / dur));
+            cg.alpha = k;
+            rt.anchoredPosition = Vector2.LerpUnclamped(rest - new Vector2(0, rise), rest, k);
+            yield return null;
+        }
+        cg.alpha = 1f;
+        rt.anchoredPosition = rest;
+    }
+
+    // Fade a rect in (no movement) — for header title/buttons.
+    IEnumerator FadeIn(RectTransform rt, float delay, float dur)
+    {
+        if (rt == null) yield break;
+        var cg = rt.GetComponent<CanvasGroup>() ?? rt.gameObject.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+        while (delay > 0f) { delay -= Time.unscaledDeltaTime; yield return null; if (rt == null) yield break; }
+        float t = 0f;
+        while (t < dur)
+        {
+            if (rt == null) yield break;
+            t += Time.unscaledDeltaTime;
+            cg.alpha = Mathf.Clamp01(t / dur);
+            yield return null;
+        }
+        cg.alpha = 1f;
+    }
+
     void AddStageCard(int idx, string sid, string nm, string creator, string embeddedJson, StageMeta meta)
     {
         // single column: portrait width fits exactly one card
@@ -728,8 +893,23 @@ public class TacGame : MonoBehaviour
         var card = TacUi.Box(listContent, TacUi.Panel, TacUi.Line,
             new Vector2(0.03f, 1), new Vector2(0.97f, 1),
             new Vector2(0, y0 - CardH), new Vector2(0, y0));
+        // Staggered entrance: fade + rise, mirroring the web home's cardIn. Only
+        // the first dozen stagger; later cards just fade so long lists don't lag.
+        float delay = idx < 12 ? idx * 0.045f : 0f;
+        StartCoroutine(FadeRiseIn(card, delay, 0.5f, 14f));
         // the panel-fill Image is the raycast target (one Graphic per GO)
         var btn = card.gameObject.AddComponent<Button>();
+        // Tap feedback (mobile has no hover): the card panel tints brighter while
+        // pressed, so a touch feels responsive. targetGraphic = the fill Image.
+        btn.targetGraphic = card.GetComponent<Image>();
+        btn.transition = Selectable.Transition.ColorTint;
+        var cbtn = btn.colors;
+        cbtn.normalColor = Color.white;
+        cbtn.highlightedColor = Color.white;
+        cbtn.pressedColor = new Color(1.35f, 1.35f, 1.35f, 1f); // brighten the panel on press
+        cbtn.selectedColor = Color.white;
+        cbtn.fadeDuration = 0.08f;
+        btn.colors = cbtn;
         btn.onClick.AddListener(() =>
         {
             if (embeddedJson != null) StartStage(embeddedJson, null, nm);
@@ -768,6 +948,26 @@ public class TacGame : MonoBehaviour
             if (edge != null) edge.GetComponent<Image>().color = new Color(TacUi.Teal.r, TacUi.Teal.g, TacUi.Teal.b, 0.55f);
         }
         TacUi.Label(card, TacUi.Track("PLAY ▸"), 11, TacUi.Teal, TextAnchor.LowerLeft, new Vector2(0, 0), new Vector2(1, 1), new Vector2(140, 10), new Vector2(-10, -8));
+
+        // Report / hide — bottom-right of the card, only for real (server) stages.
+        // Tapping once hides the card for THIS device and reports it (the stage
+        // stays visible to everyone else; admins review the report count).
+        if (!string.IsNullOrEmpty(sid))
+        {
+            Text hideTxt;
+            var hideBtn = TacUi.Btn(card, TacLoc.T("hide"), 9, TacUi.Line,
+                new Vector2(1, 0), new Vector2(1, 0), new Vector2(-118, 8), new Vector2(-10, 30), null, out hideTxt);
+            hideTxt.color = TacUi.Dim;
+            bool reported = false;
+            hideBtn.onClick.AddListener(() =>
+            {
+                if (reported) return;
+                reported = true;
+                hideTxt.text = TacLoc.T("hidden");
+                hideTxt.color = TacUi.Alert;
+                StartCoroutine(TacNet.Hide(sid, () => { if (card != null) card.gameObject.SetActive(false); }));
+            });
+        }
     }
 
     IEnumerator LoadThumb(string sid, RawImage raw, Text nameLbl = null, Text descLbl = null)
@@ -848,7 +1048,9 @@ public class TacGame : MonoBehaviour
         // actual arena from the start position behind a translucent overlay
         BuildWorldView();
         briefCamT = 0f;
-        TacUi.Label(briefRoot, TacUi.Track("MISSION"), 11, TacUi.Teal, TextAnchor.MiddleCenter, new Vector2(0, 0.90f), new Vector2(1, 0.94f), Vector2.zero, Vector2.zero);
+        TacUi.Label(briefRoot, TacUi.Track(previewDraft ? TacLoc.T("preview") : "MISSION"), 11,
+            previewDraft ? TacUi.Warn : TacUi.Teal, TextAnchor.MiddleCenter,
+            new Vector2(0, 0.90f), new Vector2(1, 0.94f), Vector2.zero, Vector2.zero);
         TacUi.Label(briefRoot, TacUi.Track(stageName), 22, TacUi.Fg, TextAnchor.MiddleCenter, new Vector2(0.04f, 0.83f), new Vector2(0.96f, 0.90f), Vector2.zero, Vector2.zero);
         TacUi.Divider(briefRoot, 0.82f);
         // map inset bottom-left, stats + desc to its right — the vertical
@@ -950,12 +1152,14 @@ public class TacGame : MonoBehaviour
         fireHeld = false; sneakOn = false; bombAiming = false;
         autoLockT = 0; autoLockKey = -1;
         jumpLatch = grenLatch = droneLatch = scopeLatch = false;
-        audioKit.StartMusic(stageDoc.Has("music") ? stageDoc.Obj("music") : null);
+        bool nightStage = stageDoc.Has("night") && stageDoc.Num("night") != 0.0;
+        audioKit.StartMusic(stageDoc.Has("music") ? stageDoc.Obj("music") : null, nightStage);
 
         briefRoot.gameObject.SetActive(false);
         hudRoot.gameObject.SetActive(true);
         mode = Mode.Play;
-        if (stageId != null) StartCoroutine(TacNet.ReportPlay(stageId, false));
+        // Draft preview stays fully off the server's stat counters.
+        if (stageId != null && !previewDraft) StartCoroutine(TacNet.ReportPlay(stageId, false));
     }
 
     void BuildWorldView()
@@ -1122,6 +1326,8 @@ public class TacGame : MonoBehaviour
         if (worldRoot != null) Destroy(worldRoot.gameObject);
         worldRoot = null;
         boxViews.Clear(); enemyViews.Clear(); bulletPool.Clear(); grenadePool.Clear();
+        enemyLegPhase.Clear(); enemyLegAmp.Clear(); enemyLegPrevPos.Clear();
+        playerLegInit = false; playerLegPhase = 0f; playerLegAmp = 0f;
         bombViews.Clear(); veilViews.Clear(); switchViews.Clear(); mineViews.Clear(); barrelViews.Clear(); medkitViews.Clear(); intelViews.Clear();
         searchPivots.Clear(); waterViews.Clear();
         ApplyNightLighting(false);
@@ -1335,6 +1541,8 @@ public class TacGame : MonoBehaviour
     void Update()
     {
         WatchScreenSize();
+        if (toastText != null && toastText.gameObject.activeSelf && Time.time > toastUntil)
+            toastText.gameObject.SetActive(false);
         UpdateDebris();
         UpdateTimed();
         if (dmgFlash != null && dmgT > 0f)
@@ -1409,6 +1617,9 @@ public class TacGame : MonoBehaviour
             PlayerPrefs.Save();
         }
         audioKit.Play(world.clearedFlag ? "clear" : "dead");
+        // Game over (death or timeout) shows an interstitial; clears never do.
+        // The 45s frequency cap lives inside Ads.ShowInterstitial().
+        if (!world.clearedFlag) Ads.ShowInterstitial();
         mode = Mode.Result;
         resultRoot.gameObject.SetActive(true);
         ClearChildren(resultRoot);
@@ -1428,10 +1639,10 @@ public class TacGame : MonoBehaviour
         }, out tmp);
         TacUi.Btn(resultRoot, TacLoc.T("back"), 14, TacUi.Dim, new Vector2(0.52f, 0.14f), new Vector2(0.92f, 0.22f), Vector2.zero, Vector2.zero, ShowList, out tmp);
 
-        // LIKE / MEH rating — only for real published stages (not training).
-        // Each button pairs a glyph with a text label so the meaning is obvious;
-        // the heart stays an empty outline (♡) until the player actually votes.
-        if (stageId != null)
+        // LIKE / MEH rating — only for real published stages (not training, not
+        // a deep-link draft preview). Each button pairs a glyph with a text
+        // label; the heart stays an empty outline (♡) until the player votes.
+        if (stageId != null && !previewDraft)
         {
             TacUi.Label(resultRoot, TacLoc.T("rateStage"), 12, TacUi.Dim, TextAnchor.MiddleCenter, new Vector2(0, 0.49f), new Vector2(1, 0.535f), Vector2.zero, Vector2.zero);
             Text goodT, badT;
@@ -1462,18 +1673,36 @@ public class TacGame : MonoBehaviour
             paint(PlayerPrefs.GetInt("tac_voted_" + stageId, 0));
         }
 
-        if (stageId != null)
+        // Deep-link draft preview never touches the server's play stats, ghost
+        // or leaderboard — the stage isn't published, and its verified clear
+        // must come from the creator's own browser run, not an app preview.
+        if (stageId != null && !previewDraft)
         {
             StartCoroutine(TacNet.ReportPlay(stageId, world.clearedFlag, world.tick * 20));
             if (world.clearedFlag)
             {
                 string data = TacReplay.EncodeTrace(recs);
                 var note = TacUi.Label(resultRoot, "", 12, TacUi.Teal, TextAnchor.MiddleCenter, new Vector2(0, 0.27f), new Vector2(1, 0.315f), Vector2.zero, Vector2.zero);
-                StartCoroutine(TacNet.SubmitScore(stageId, recs.Count, data, (okSent) =>
+                StartCoroutine(TacNet.SubmitScore(stageId, recs.Count, data, (okSent, firstClear) =>
                 {
-                    if (okSent && note != null) note.text = TacLoc.T("scoreSent");
+                    if (!okSent) return;
+                    if (firstClear)
+                    {
+                        // World-first clear = this run just published the stage. Celebrate.
+                        var banner = TacUi.Label(resultRoot, TacLoc.T("firstClear"), 22, TacUi.Warn, TextAnchor.MiddleCenter,
+                            new Vector2(0, 0.80f), new Vector2(1, 0.90f), Vector2.zero, Vector2.zero, true);
+                        TacUi.Label(resultRoot, TacLoc.T("firstClearSub"), 12, TacUi.Fg, TextAnchor.MiddleCenter,
+                            new Vector2(0, 0.755f), new Vector2(1, 0.795f), Vector2.zero, Vector2.zero);
+                        if (note != null) note.text = "";
+                    }
+                    else if (note != null) note.text = TacLoc.T("scoreSent");
                 }));
             }
+        }
+        else if (previewDraft && world.clearedFlag)
+        {
+            TacUi.Label(resultRoot, TacLoc.T("preview_clear"), 12, TacUi.Warn, TextAnchor.MiddleCenter,
+                new Vector2(0, 0.27f), new Vector2(1, 0.315f), Vector2.zero, Vector2.zero);
         }
     }
 
@@ -1558,6 +1787,33 @@ public class TacGame : MonoBehaviour
     static Vector3 LerpPos(MoBody a, MoBody b, float t) { return Vector3.LerpUnclamped(a.pos, b.pos, t); }
     static float LerpYaw(float a, float b, float t) { return a + Mathf.DeltaAngle(a, b) * t; } // shortest arc
 
+    // Slide a view's legL/legR feet fore/aft (local +Z) in counter-phase to fake
+    // a stiff Minecraft walk. amp 0 = feet level. Render-only; matches tac-client.js.
+    static void SwingLegs(GameObject view, float phase, float amp)
+    {
+        if (view == null) return;
+        var lt = view.transform.Find("legL");
+        var rt = view.transform.Find("legR");
+        if (lt == null || rt == null) return;
+        float sw = Mathf.Sin(phase) * amp;
+        var lp = lt.localPosition; lp.z = sw; lt.localPosition = lp;
+        var rp = rt.localPosition; rp.z = -sw; rt.localPosition = rp;
+    }
+
+    // advance a walk phase/amplitude from a view's ground speed between frames
+    static void StepGait(Vector3 cur, ref Vector3 prev, ref bool init, ref float phase, ref float amp, float y)
+    {
+        if (!init) { prev = cur; init = true; }
+        float dx = cur.x - prev.x, dz = cur.z - prev.z; prev = cur;
+        float dt = Mathf.Max(Time.deltaTime, 1e-4f);
+        float spd = Mathf.Sqrt(dx * dx + dz * dz) / dt;
+        bool moving = spd > 0.4f && y < 0.2f;
+        phase += spd * 2.2f * dt;
+        // target foot travel ~0.22 m fore/aft, matching tac-client.js drawLegs amp
+        amp += ((moving ? 0.22f : 0f) - amp) * Mathf.Min(1f, dt * 12f);
+        if (!moving && amp < 0.02f) phase = 0f;
+    }
+
     void UpdateViews()
     {
         var w = world;
@@ -1579,6 +1835,8 @@ public class TacGame : MonoBehaviour
         playerView.transform.rotation = Quaternion.Euler(0, pYaw, 0);
         playerView.transform.localScale = new Vector3(1, w.crouched ? 0.55f : 1f, 1);
         playerView.SetActive(w.pilot == null && !w.dead);
+        StepGait(pRender, ref playerLegPrevPos, ref playerLegInit, ref playerLegPhase, ref playerLegAmp, pRender.y);
+        SwingLegs(playerView, playerLegPhase, playerLegAmp);
 
         // enemies
         for (int i = 0; i < w.enemies.Count; i++)
@@ -1605,6 +1863,13 @@ public class TacGame : MonoBehaviour
                 v.transform.rotation = Quaternion.Euler(0, (float)(en.yawQ * 360.0 / 65536.0), 0);
             }
             v.transform.localScale = new Vector3(1, en.crouched ? 0.5f : 1f, 1);
+            // stiff-leg walk cycle (render-only). gatling(1)/drone(3) have no legs;
+            // SwingLegs no-ops on them (no legL/legR children).
+            while (enemyLegPhase.Count <= i) { enemyLegPhase.Add(0f); enemyLegAmp.Add(0f); enemyLegPrevPos.Add(v.transform.position); }
+            float legPh = enemyLegPhase[i], legAm = enemyLegAmp[i]; Vector3 legPrev = enemyLegPrevPos[i]; bool legInit = true;
+            StepGait(v.transform.position, ref legPrev, ref legInit, ref legPh, ref legAm, v.transform.position.y);
+            enemyLegPhase[i] = legPh; enemyLegAmp[i] = legAm; enemyLegPrevPos[i] = legPrev;
+            SwingLegs(v, legPh, legAm);
             if (en.type == 6)
             {
                 var plate = v.transform.Find("plate");
@@ -1768,8 +2033,8 @@ public class TacGame : MonoBehaviour
 
         // pilot drone — this is the HERO unit, so it gets the same live detail the
         // enemy drones have (spinning rotors) plus player-side flourishes: a teal
-        // sensor eye instead of a hostile red one, a glowing underlight, a pulsing
-        // halo ring, smoothed motion and a bank/tilt toward its travel direction.
+        // sensor eye instead of a hostile red one, smoothed motion and a bank/tilt
+        // toward its travel direction.
         if (w.pilot != null)
         {
             if (pilotView == null)
@@ -1779,13 +2044,10 @@ public class TacGame : MonoBehaviour
                 // recolor the sensor "eye": red = enemy, teal = yours
                 var eye = pilotView.transform.Find("eye");
                 if (eye != null) eye.GetComponent<Renderer>().sharedMaterial = TacRenderKit.UnlitMat(TacUi.Teal);
-                // soft glowing underlight so it reads as a powered hero drone
-                var glow = TacRenderKit.Sphere(pilotView.transform, new Vector3(0, 0.02f, 0), 0.5f, new Color(TacUi.Teal.r, TacUi.Teal.g, TacUi.Teal.b, 0.5f), true);
-                glow.name = "glow";
-                // pulsing halo ring on the ground plane
-                var halo = TacRenderKit.Cyl(pilotView.transform, new Vector3(0, -0.16f, 0), 1.15f, 0.02f, new Color(TacUi.Teal.r, TacUi.Teal.g, TacUi.Teal.b, 0.35f));
-                halo.GetComponent<Renderer>().sharedMaterial = TacRenderKit.TransMat(new Color(TacUi.Teal.r, TacUi.Teal.g, TacUi.Teal.b, 0.28f));
-                halo.name = "halo";
+                // NOTE: the glow sphere + halo ring were dropped — the Legacy
+                // transparent shader falls back to opaque on iOS device builds, so
+                // they rendered as a solid sphere + cylinder stuck to the drone
+                // instead of soft translucent flourishes. Ship the clean drone.
                 pilotPosInit = false;
             }
             pilotView.SetActive(true);
@@ -1812,11 +2074,9 @@ public class TacGame : MonoBehaviour
             // spin the rotors like the enemy drones do
             var prt = pilotView.transform.Find("rotors");
             if (prt != null) prt.localRotation = Quaternion.Euler(0, Time.time * 1600f % 360f, 0);
-            // pulse the halo + eye so the drone feels alive; dim as the battery drains
+            // pulse the sensor eye so the drone feels alive; dim as the battery drains
             float batt = Mathf.Clamp01(w.pilot.battery / (float)TAC.PILOT_BATTERY);
             float pulse = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.time * 3.4f));
-            var phalo = pilotView.transform.Find("halo");
-            if (phalo != null) phalo.localScale = new Vector3(1f + 0.12f * pulse, 1f, 1f + 0.12f * pulse) * Mathf.Lerp(0.7f, 1.15f, batt);
             var peye = pilotView.transform.Find("eye");
             if (peye != null) peye.GetComponent<Renderer>().sharedMaterial = TacRenderKit.UnlitMat(new Color(TacUi.Teal.r, TacUi.Teal.g, TacUi.Teal.b, 1f) * Mathf.Lerp(0.5f, 1f, batt * pulse));
         }

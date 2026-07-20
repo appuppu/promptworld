@@ -26,5 +26,14 @@ PromptWorld/[Cc]rashes/
 *.mdb.meta
 sysinfo.txt
 
+# Claude Code local state
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
+# .NET build output (crosscheck tool)
+scripts/tac-crosscheck/bin/
+scripts/tac-crosscheck/obj/
+
 # macOS
 .DS_Store

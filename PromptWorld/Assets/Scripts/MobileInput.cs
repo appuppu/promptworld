@@ -6,10 +6,16 @@ public static class MobileInput
 {
     public static bool LeftHeld;
     public static bool RightHeld;
+    // v2 action button (bit3). Additive — v1 never reads it.
+    public static bool ActionHeld;
+    // v2 free-move vertical (flight/swim). Additive — v1 never reads them.
+    public static bool UpHeld;
+    public static bool DownHeld;
 
     private static bool jumpQueued;
 
     public static float Axis => (RightHeld ? 1f : 0f) - (LeftHeld ? 1f : 0f);
+    public static float VAxis => (UpHeld ? 1f : 0f) - (DownHeld ? 1f : 0f);
 
     public static void QueueJump() => jumpQueued = true;
 

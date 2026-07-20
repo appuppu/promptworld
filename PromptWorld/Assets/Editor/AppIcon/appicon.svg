@@ -1,0 +1,48 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- App icon: the TAC hero (red blocky soldier), recreated from the in-game
+       look. Flat single-colour background (the game's cool sky grey) so it reads
+       cleanly at small sizes. Full-bleed, no transparency, no rounded corners —
+       the stores mask the corners themselves. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c3cad2"/>
+      <stop offset="1" stop-color="#aab3bd"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- The figure is scaled up and centred so it reads at 60px. Group transform
+       enlarges the original layout about the icon centre. -->
+  <g transform="translate(512 532) scale(1.32) translate(-512 -520)">
+    <!-- ground shadow under the figure -->
+    <ellipse cx="512" cy="880" rx="230" ry="46" fill="#000000" opacity="0.12"/>
+
+    <!-- ===== body (darker red block) ===== -->
+    <!-- front face -->
+    <rect x="372" y="452" width="280" height="392" fill="#b24a45"/>
+    <!-- right side (shaded) -->
+    <polygon points="652,452 712,412 712,804 652,844" fill="#8f3a36"/>
+    <!-- top of the body (lighter) -->
+    <polygon points="372,452 432,412 712,412 652,452" fill="#c05a54"/>
+
+    <!-- ===== gun (dark block at the hip) ===== -->
+    <rect x="300" y="616" width="74" height="150" fill="#2b2b2f"/>
+    <polygon points="300,616 330,596 404,596 374,616" fill="#3a3a40"/>
+    <polygon points="374,616 404,596 404,746 374,766" fill="#1f1f23"/>
+
+    <!-- ===== head (bright red block) ===== -->
+    <!-- front face -->
+    <rect x="392" y="196" width="240" height="240" fill="#d9605a"/>
+    <!-- right side (shaded) -->
+    <polygon points="632,196 688,150 688,390 632,436" fill="#b24a45"/>
+    <!-- top (lighter) -->
+    <polygon points="392,196 448,150 688,150 632,196" fill="#e8746e"/>
+
+    <!-- face: two eyes + mouth (dark blocks) -->
+    <rect x="452" y="300" width="46" height="30" fill="#1c1c20"/>
+    <rect x="528" y="300" width="46" height="30" fill="#1c1c20"/>
+    <rect x="486" y="360" width="60" height="34" fill="#1c1c20"/>
+  </g>
+</svg>

@@ -1,0 +1,434 @@
+Unity Editor version:    6000.5.3f1 (c2eb47b3a2a9)
+Branch:                  6000.5/staging
+Build type:              Release
+Batch mode:              YES
+macOS version:           Version 26.3.1 (a) (Build 25D771280a)
+Darwin version:          25.3.0
+Architecture:            arm64
+Running under Rosetta:   NO
+Available memory:        16384 MB
+Date:                    2026-07-12T15:38:02Z
+[Licensing::Module] Trying to connect to existing licensing client channel...
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-fukushimatakumi" at "2026-07-12T15:38:02.732779Z"
+Launching external process: /Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Helpers/PackageManager/Server/UnityPackageManager
+
+COMMAND LINE ARGUMENTS:
+/Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/MacOS/Unity
+-batchmode
+-nographics
+-quit
+-projectPath
+/Users/fukushimatakumi/develop/promptworld/PromptWorld
+-executeMethod
+BuildScript.RebuildScenes
+-logFile
+/Users/fukushimatakumi/develop/promptworld/scratchpad_batchfix.log.scenes
+Successfully changed project path to: /Users/fukushimatakumi/develop/promptworld/PromptWorld
+/Users/fukushimatakumi/develop/promptworld/PromptWorld
+[UnityMemory] Configuration Parameters - Can be set up in boot.config
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+    "memorysetup-temp-allocator-size-audio-worker=65536"
+    "memorysetup-temp-allocator-size-cloud-worker=32768"
+    "memorysetup-allocator-temp-initial-block-size-main=262144"
+    "memorysetup-allocator-temp-initial-block-size-worker=262144"
+    "memorysetup-temp-allocator-size-preload-manager=33554432"
+    "memorysetup-temp-allocator-size-gfx=262144"
+    "memorysetup-temp-allocator-size-background-worker=32768"
+    "memorysetup-temp-allocator-size-job-worker=262144"
+    "memorysetup-bucket-allocator-granularity=16"
+    "memorysetup-bucket-allocator-bucket-count=8"
+    "memorysetup-bucket-allocator-block-size=33554432"
+    "memorysetup-bucket-allocator-block-count=8"
+    "memorysetup-main-allocator-block-size=16777216"
+    "memorysetup-thread-allocator-block-size=16777216"
+    "memorysetup-main-allocator-mimalloc-enabled=0"
+    "memorysetup-gfx-main-allocator-block-size=16777216"
+    "memorysetup-gfx-thread-allocator-block-size=16777216"
+    "memorysetup-cache-allocator-block-size=4194304"
+    "memorysetup-typetree-allocator-block-size=2097152"
+    "memorysetup-profiler-bucket-allocator-granularity=16"
+    "memorysetup-profiler-bucket-allocator-bucket-count=8"
+    "memorysetup-profiler-bucket-allocator-block-size=33554432"
+    "memorysetup-profiler-bucket-allocator-block-count=8"
+    "memorysetup-profiler-allocator-block-size=16777216"
+    "memorysetup-profiler-editor-allocator-block-size=1048576"
+    "memorysetup-temp-allocator-size-main=16777216"
+    "memorysetup-job-temp-allocator-block-size=2097152"
+    "memorysetup-job-temp-allocator-block-size-background=1048576"
+    "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+Logging is directed to a specific file, skipping project log.Player connection [8500310272]  Target information:
+
+Player connection [8500310272]  * "[IP] 192.168.0.4 [Port] 55504 [Flags] 2 [Guid] 2442259421 [EditorId] 2442259421 [Version] 1048832 [Id] OSXEditor(0,fukushimatakuminoMacBook-Pro-2.local) [Debug] 1 [PackageName] OSXEditor [ProjectName] Editor" 
+
+Player connection [8500310272] Host joined multi-casting on [225.0.0.222:54997]...
+Player connection [8500310272] Host joined alternative multi-casting on [225.0.0.222:34997]...
+Input System module state changed to: Initialized.
+[Physics::Module] Initialized fallback backend.
+[Physics::Module] Id: 0xdecafbad
+[Licensing::Client] Error: HandshakeResponse reported an error:
+	ResponseCode: 505
+	ResponseStatus: Unsupported protocol version '1.18.1'.
+[Licensing::Module] Error: Failed to handshake to channel: "LicenseClient-fukushimatakumi"
+[Licensing::IpcConnector] LicenseClient-fukushimatakumi channel disconnected successfully.
+[Licensing::IpcConnector] Channel LicenseClient-fukushimatakumi-6000.5.3 doesn't exist
+Launching external process: /Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Helpers/UnityLicensingClient.app/Contents/MacOS/Unity.Licensing.Client
+[Licensing::Module] Successfully launched the LicensingClient (PId: 89476)
+[Package Manager] Connected to IPC stream "Upm-89470" after 0.3 seconds.
+[Licensing::Module] Licensing is not yet initialized.
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-fukushimatakumi-6000.5.3" at "2026-07-12T15:38:03.538222Z"
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.1+9fbee8e
+  Session Id:              4fc0d5db8490418383e39a36ddc47822
+  Correlation Id:          690092dddadb2f84014c556609d16a64
+  External correlation Id: 8216186582428258430
+  Machine Id:              UV97YfN2KGsu0vo6WSZ53rAGgog=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-fukushimatakumi-6000.5.3" (connect: 0.57s, validation: 0.03s, handshake: 0.21s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-fukushimatakumi-6000.5.3-notifications" at "2026-07-12T15:38:03.777672Z"
+[Licensing::Module] Connected to LicensingClient (PId: 89476, launch time: 0.00, total connection time: 0.81s)
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 15669729866047-UnityPersXXXX
+  Product: Unity Personal
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.00
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Licensing Background thread has ended after 1.05s
+[Licensing::Module] Licensing is initialized (took 0.65s).
+[Licensing::Client] Successfully resolved entitlement details
+Library Redirect Path: Library/
+[Physics::Module] Selected backend.
+[Physics::Module] Name: PhysX
+[Physics::Module] Id: 0xf2b8ea05
+[Physics::Module] SDK Version: 4.1.2
+[Physics::Module] Integration Version: 1.0.0
+[Physics::Module] Threading Mode: Multi-Threaded
+Initialize engine version: 6000.5.3f1 (c2eb47b3a2a9)
+[Subsystems] Discovering subsystems at path /Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Resources/UnitySubsystems
+[Subsystems] Discovering subsystems at path /Users/fukushimatakumi/develop/promptworld/PromptWorld/Assets
+Forcing GfxDevice: Null
+GfxDevice: creating device client; kGfxThreadingModeNonThreaded
+NullGfxDevice:
+    Version:  NULL 1.0 [1.0]
+    Renderer: Null Device
+    Vendor:   Unity Technologies
+Initialize mono
+Mono path[0] = '/Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Resources/Scripting/Managed'
+Mono path[1] = '/Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Resources/Scripting/BCLExtensions/runtime/netstandard2.1'
+Mono path[2] = '/Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Resources/Scripting/MonoBleedingEdge/lib/mono/unityjit-macos'
+Mono config path = '/Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Resources/Scripting/MonoBleedingEdge/etc'
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56470
+CodeReloadManager initialized
+ImportWorker Server TCP listen port: 0
+AcceleratorClientConnectionCallback - disconnected - :0
+Begin MonoManager ReloadAssembly
+Registering precompiled unity dll's ...
+Register platform support module: /Applications/Unity/Hub/Editor/6000.5.3f1/PlaybackEngines/WebGLSupport/UnityEditor.WebGL.Extensions.dll
+Register platform support module: /Applications/Unity/Hub/Editor/6000.5.3f1/PlaybackEngines/MacStandaloneSupport/UnityEditor.OSXStandalone.Extensions.dll
+[Licensing::Client] Successfully resolved entitlement details
+Register platform support module: /Applications/Unity/Hub/Editor/6000.5.3f1/PlaybackEngines/AndroidPlayer/UnityEditor.Android.Extensions.dll
+[Licensing::Client] Successfully resolved entitlement details
+Register platform support module: /Applications/Unity/Hub/Editor/6000.5.3f1/PlaybackEngines/iOSSupport/UnityEditor.iOS.Extensions.dll
+Registered in 0.004910 seconds.
+[usbmuxd] Start listen thread
+[usbmuxd] Listen thread started
+[usbmuxd] Send listen message
+Native extension for iOS target not found
+Native extension for Android target not found
+Native extension for OSXStandalone target not found
+Native extension for WebGL target not found
+Package Manager log level set to [2]
+ScheduleIndexationOnStartup MainProcess:False IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.225 seconds
+Domain Reload Profiling: 530ms
+	BeginReloadAssembly (88ms)
+	RebuildNativeTypeToScriptingClass (12ms)
+	initialDomainReloadingComplete (36ms)
+	LoadAllAssembliesAndSetupDomain (167ms)
+		LoadAssemblies (87ms)
+		AnalyzeDomain (128ms)
+			TypeCache.Refresh (127ms)
+				TypeCache.ScanAssembly (117ms)
+	FinalizeReload (226ms)
+		SetupLoadedEditorAssemblies (0ms)
+			InitializePlatformSupportModulesInManaged (39ms)
+			BeforeProcessingInitializeOnLoad (39ms)
+			ProcessInitializeOnLoadAttributes (46ms)
+			ProcessInitializeOnLoadMethodAttributes (68ms)
+[Licensing::Client] Successfully resolved entitlement details
+Application.AssetDatabase Initial Refresh Start
+[Package Manager] Restoring resolved packages state from cache
+[Licensing::Client] Successfully resolved entitlement details
+[Package Manager] Registered 38 packages:
+  Built-in packages:
+    com.unity.ugui@2.5.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.ugui@377fd60ad87b)
+    com.unity.multiplayer.center@1.0.1 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.multiplayer.center@b860850997d0)
+    com.unity.modules.accessibility@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.accessibility)
+    com.unity.modules.adaptiveperformance@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.adaptiveperformance)
+    com.unity.modules.ai@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.ai)
+    com.unity.modules.androidjni@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.androidjni)
+    com.unity.modules.animation@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.animation)
+    com.unity.modules.assetbundle@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.assetbundle)
+    com.unity.modules.audio@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.audio)
+    com.unity.modules.cloth@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.cloth)
+    com.unity.modules.director@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.director)
+    com.unity.modules.imageconversion@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.imageconversion)
+    com.unity.modules.imgui@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.imgui)
+    com.unity.modules.jsonserialize@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.jsonserialize)
+    com.unity.modules.particlesystem@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.particlesystem)
+    com.unity.modules.physics@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.physics)
+    com.unity.modules.physics2d@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.physics2d)
+    com.unity.modules.physicscore2d@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.physicscore2d)
+    com.unity.modules.screencapture@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.screencapture)
+    com.unity.modules.terrain@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.terrain)
+    com.unity.modules.terrainphysics@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.terrainphysics)
+    com.unity.modules.tilemap@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.tilemap)
+    com.unity.modules.ui@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.ui)
+    com.unity.modules.uielements@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.uielements)
+    com.unity.modules.umbra@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.umbra)
+    com.unity.modules.unityanalytics@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.unityanalytics)
+    com.unity.modules.unitywebrequest@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.unitywebrequest)
+    com.unity.modules.unitywebrequestassetbundle@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.unitywebrequestassetbundle)
+    com.unity.modules.unitywebrequestaudio@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.unitywebrequestaudio)
+    com.unity.modules.unitywebrequesttexture@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.unitywebrequesttexture)
+    com.unity.modules.unitywebrequestwww@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.unitywebrequestwww)
+    com.unity.modules.vectorgraphics@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.vectorgraphics)
+    com.unity.modules.vehicles@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.vehicles)
+    com.unity.modules.video@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.video)
+    com.unity.modules.wind@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.wind)
+    com.unity.modules.xr@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.xr)
+    com.unity.modules.subsystems@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.subsystems)
+    com.unity.modules.hierarchycore@1.0.0 (location: /Users/fukushimatakumi/develop/promptworld/PromptWorld/Library/PackageCache/com.unity.modules.hierarchycore)
+[Subsystems] No new subsystems found in resolved package list.
+[Package Manager] Done registering packages in 0.01 seconds
+[ScriptCompilation] Requested script compilation because: AssetDatabase observed changes in script compilation related files
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://unix:/tmp/ilpp.sock-11a47a343675f8552d899f599971cacd
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /Users/fukushimatakumi/develop/promptworld/PromptWorld
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/2 POST http://ilpp/UnityILPP.PostProcessing/Ping - application/grpc -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'gRPC - /UnityILPP.PostProcessing/Ping'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'gRPC - /UnityILPP.PostProcessing/Ping'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/2 POST http://ilpp/UnityILPP.PostProcessing/Ping - 200 - application/grpc 27.9089ms
+Starting: /Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/Resources/BuildPipeline/bee_backend --ipc --defer-dag-verification --dagfile="Library/Bee/2000b0aE.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssemblies
+WorkingDir: /Users/fukushimatakumi/develop/promptworld/PromptWorld
+DisplayProgressbar: Compiling Scripts
+ExitCode: 0 Duration: 2s319ms
+[206/249    0s] CopyFiles Library/ScriptAssemblies/UnityEngine.UI.dll
+[208/249    0s] CopyFiles Library/ScriptAssemblies/UnityEditor.UI.dll
+[211/249    0s] CopyFiles Library/ScriptAssemblies/UnityEngine.UI.pdb
+[212/249    0s] CopyFiles Library/ScriptAssemblies/UnityEditor.UI.pdb
+[217/249    0s] CopyFiles Library/ScriptAssemblies/Unity.Multiplayer.Center.Common.dll
+[218/249    0s] CopyFiles Library/ScriptAssemblies/Unity.InternalAPIEngineBridge.004.pdb
+[219/249    0s] CopyFiles Library/ScriptAssemblies/Unity.InternalAPIEngineBridge.004.dll
+[220/249    0s] CopyFiles Library/ScriptAssemblies/Unity.Multiplayer.Center.Common.pdb
+[227/249    0s] CopyFiles Library/ScriptAssemblies/Unity.Multiplayer.Center.Editor.pdb
+[228/249    0s] CopyFiles Library/ScriptAssemblies/Unity.Multiplayer.Center.Editor.dll
+[229/249    0s] CopyFiles Library/ScriptAssemblies/Unity.TextMeshPro.pdb
+[232/249    0s] CopyFiles Library/ScriptAssemblies/Unity.TextMeshPro.dll
+[239/249    0s] CopyFiles Library/ScriptAssemblies/UnityEditor.UI.Analytics.pdb
+[240/249    0s] CopyFiles Library/ScriptAssemblies/Unity.TextMeshPro.Editor.pdb
+[241/249    0s] CopyFiles Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll
+[242/249    0s] CopyFiles Library/ScriptAssemblies/UnityEditor.UI.Analytics.dll
+[243/249    2s] Csc Library/Bee/artifacts/2000b0aE.dag/Assembly-CSharp.dll (+2 others)
+Assets/Scripts/UI.cs(109,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/MenuController.cs(225,17): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/MenuController.cs(484,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/MenuController.cs(498,37): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/Loc.cs(18,25): warning CS0414: The field 'Loc.warmed' is assigned but its value is never used
+[244/249    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp.dll
+[245/249    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp.pdb
+[246/249    0s] Csc Library/Bee/artifacts/2000b0aE.dag/Assembly-CSharp-Editor.dll (+2 others)
+Assets/Editor/StageSceneBuilder.cs(104,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Editor/StageSceneBuilder.cs(108,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+[247/249    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp-Editor.pdb
+[248/249    0s] CopyFiles Library/ScriptAssemblies/Assembly-CSharp-Editor.dll
+*** Tundra build success (2.31 seconds), 22 items updated, 249 evaluated
+Assets/Scripts/UI.cs(109,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/MenuController.cs(225,17): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/MenuController.cs(484,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/MenuController.cs(498,37): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/Loc.cs(18,25): warning CS0414: The field 'Loc.warmed' is assigned but its value is never used
+Assets/Editor/StageSceneBuilder.cs(104,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Editor/StageSceneBuilder.cs(108,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+MenuController.cs(484,9): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/MenuController.cs(498,37): warning CS0618: 'TMP_Text.enableWordWrapping' is obsolete: 'The enabledWordWrapping property is now obsolete. Please use the textWrappingMode property instead.'
+Assets/Scripts/Loc.cs(18,25): warning CS0414: The field 'Loc.warmed' is assigned but its value is never used
+AssetDatabase: script compilation time: 2.827536s
+Total cache size 66522532
+Total cache size after purge 66522532, took 00:00:00.0257762
+Begin MonoManager ReloadAssembly
+Native extension for iOS target not found
+Native extension for Android target not found
+Native extension for OSXStandalone target not found
+Native extension for WebGL target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.182 seconds
+Domain Reload Profiling: 350ms
+	BeginReloadAssembly (80ms)
+		DisableScriptedObjects (8ms)
+		CreateAndSetChildDomain (16ms)
+	RebuildCommonClasses (4ms)
+	RebuildNativeTypeToScriptingClass (8ms)
+	initialDomainReloadingComplete (14ms)
+	LoadAllAssembliesAndSetupDomain (61ms)
+		LoadAssemblies (40ms)
+		AnalyzeDomain (16ms)
+			TypeCache.Refresh (12ms)
+				TypeCache.ScanAssembly (8ms)
+			BuildScriptInfoCaches (3ms)
+	FinalizeReload (182ms)
+		SetupLoadedEditorAssemblies (0ms)
+			InitializePlatformSupportModulesInManaged (7ms)
+			BeforeProcessingInitializeOnLoad (37ms)
+			ProcessInitializeOnLoadAttributes (29ms)
+			ProcessInitializeOnLoadMethodAttributes (33ms)
+		AwakeInstancesAfterBackupRestoration (9ms)
+Starting new worker id: 0 with log in /Users/fukushimatakumi/develop/promptworld/PromptWorld/Logs/AssetImportWorkerHW0.log
+
+Asset Pipeline Refresh (id=5dad4e80a021e4ceea291aa3cb08fbf1): Total: 3.330 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+	(Values over 0.05ms)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=278 ms
+		Asset DB Callback time: managed=35 ms, native=11 ms
+		Scripting: domain reloads=1, domain reload time=174 ms, compile time=2828 ms, other=2 ms
+		Project Asset Count: scripts=218, non-scripts=168
+		Asset File Changes: new=0, changed=3, moved=0, deleted=0
+		Scan Filter Count: 1
+	InvokePackagesCallback: 9.266ms
+	ApplyChangesToAssetFolders: 0.131ms
+	Scan: 60.478ms
+	Collect global state as custom dependencies: 2.795ms
+	OnSourceAssetsModified: 0.309ms
+	CategorizeScriptCompilationAssets: 0.767ms
+	ProcessAssetsWithTransientArtifactChanges: 4.369ms
+	CategorizeAssets: 1.795ms
+	CompileScripts: 2828.298ms
+	ImportOutOfDateAssets: 185.588ms (183.654ms without children)
+		UnloadImportedAssets: 0.107ms
+		ImportSchedulerStart: 1.786ms
+	PostProcessAllAssets: 35.778ms
+		VCAutoAddAssetPostprocess 0.507ms
+		MonoPostProcessAllAssets: 35.043ms
+			AssetPostprocessor.OnPostprocessAllAssets 13.921ms
+			StyleCatalogPostProcessor.OnPostprocessAllAssets 6.679ms
+			WindowAssetPostprocessingWatcher.OnPostprocessAllAssets 3.832ms
+			BuilderAssetPostprocessor.OnPostprocessAllAssets 2.891ms
+			AssetChangedListener.OnPostprocessAllAssets 0.835ms
+			RetainedModeAssetPostprocessor.OnPostprocessAllAssets 0.547ms
+			EditModeScopePostprocessor.OnPostprocessAllAssets 0.477ms
+			SyncVS.PostprocessSyncProject 0.460ms
+			SpeedTree9Postprocessor.OnPostprocessAllAssets 0.330ms
+			ArtifactBrowserPostProcessor.OnPostprocessAllAssets 0.252ms
+			TextAssetPostProcessor.OnPostprocessAllAssets 0.231ms
+			TMPro_TexturePostProcessor.OnPostprocessAllAssets 0.143ms
+			ReferencedClipsPostProcessor.OnPostprocessAllAssets 0.136ms
+			AssetEvents.OnPostprocessAllAssets 0.131ms
+			AudioMixerPostprocessor.OnPostprocessAllAssets 0.125ms
+			TerrainToolbarOverlayPostProcessor.OnPostprocessAllAssets 0.092ms
+			AssetDatabaseCallbacks.OnPostprocessAllAssets 0.064ms
+			SpeedTreePostProcessor.OnPostprocessAllAssets 0.062ms
+	PostAssetChangesProfiler: 1.824ms
+	UnloadStreamsBegin: 0.791ms
+	GenerateScriptTypeHashes: 0.134ms
+	GenerateScriptTypeSerializationHashes: 0.312ms
+	Untracked: 196.777ms
+
+Application.AssetDatabase Initial Refresh End
+Scanning for USB devices : 0.026ms
+Initializing Unity extensions:
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[MODES] Loading mode Default (0) for mode-current-id-Prompt World
+Unloading 17 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 493 unused Assets / (1.2 MB). Loaded Objects now: 1129.
+Memory consumption went from 127.0 MB to 125.7 MB.
+Total: 4.139792 ms (FindLiveObjects: 0.040792 ms CreateObjectMapping: 0.044416 ms MarkObjects: 3.701125 ms  DeleteObjects: 0.353209 ms)
+
+Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 0 unused Assets / (2.2 KB). Loaded Objects now: 1131.
+Memory consumption went from 117.2 MB to 117.2 MB.
+Total: 3.479334 ms (FindLiveObjects: 0.035209 ms CreateObjectMapping: 0.023875 ms MarkObjects: 3.416833 ms  DeleteObjects: 0.003167 ms)
+
+Importing 'GUID: d2d2464c9df8e4931840de183d4c4d73 - Path: Assets/Scenes/Menu.unity' with importer (DefaultImporter)
+Imported 'GUID: d2d2464c9df8e4931840de183d4c4d73' -> (Import Result ID: '8722b12ab0f4457901dd754bf8072f6a') in 0.003 seconds [static dependencies only]. Details - ImportResultOutputID=28d2e286e6fb327d3231196ee83de6ad DependenciesID=747cd1f0da65b21c03963b4cc3574b6d StaticDependenciesID=4dff0b9324344fe6ff9e342ed3c7b25f 
+Asset Pipeline Refresh (id=226fd9a18598844a0ac8b081d58f391e): Total: 0.011 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
+[PromptWorld] Menu scene built: Assets/Scenes/Menu.unity
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace () (at /Users/bokken/build/output/unity/unity/Runtime/Export/Scripting/StackTrace.cs:35)
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+MenuSceneBuilder:Build () (at Assets/Editor/MenuSceneBuilder.cs:127)
+BuildScript:RebuildScenes () (at Assets/Editor/BuildScript.cs:11)
+
+(Filename: Assets/Editor/MenuSceneBuilder.cs Line: 127)
+
+Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 3 unused Assets / (236.8 KB). Loaded Objects now: 1149.
+Memory consumption went from 141.4 MB to 141.1 MB.
+Total: 3.602333 ms (FindLiveObjects: 0.025292 ms CreateObjectMapping: 0.022333 ms MarkObjects: 3.543041 ms  DeleteObjects: 0.011458 ms)
+
+Worker ready: AssetImportWorkerHW0 0
+Importing 'GUID: dba7e602dfda7440c8de7a2f51d74643 - Path: Assets/Scenes/Stage.unity' with importer (DefaultImporter)
+Imported 'GUID: dba7e602dfda7440c8de7a2f51d74643' -> (Import Result ID: '19c689daf5338d904e92e8d2e31b8617') in 0.003 seconds [static dependencies only]. Details - ImportResultOutputID=989c0b2361877cbddeb7b4ddb9edf61c DependenciesID=4317bb5afcf5c5398dec55637e6a0068 StaticDependenciesID=52d581a280f75da161d97fc3325aac6a 
+Asset Pipeline Refresh (id=06c13d0eb6b9e4e1baf5cf7e50651b9f): Total: 0.009 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
+[PromptWorld] Stage scene built: Assets/Scenes/Stage.unity
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace () (at /Users/bokken/build/output/unity/unity/Runtime/Export/Scripting/StackTrace.cs:35)
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+StageSceneBuilder:Build () (at Assets/Editor/StageSceneBuilder.cs:167)
+BuildScript:RebuildScenes () (at Assets/Editor/BuildScript.cs:12)
+
+(Filename: Assets/Editor/StageSceneBuilder.cs Line: 167)
+
+Thread 0x1733a7000 may have been prematurely finalized
+Batchmode quit successfully invoked - shutting down!
+Curl error 42: Callback aborted
+Killing ADB server in 0.032495 seconds.
+Thread 0x16f883000 may have been prematurely finalized
+Input System module state changed to: ShutdownInProgress.
+Input Polling Thread exited.
+Input System module state changed to: Shutdown.
+[Physics::Module] Cleanup current backend.
+[Physics::Module] Id: 0xf2b8ea05
+[Licensing::IpcConnector] LicenseClient-fukushimatakumi-6000.5.3-notifications channel disconnected successfully.
+[Licensing::IpcConnector] LicenseClient-fukushimatakumi-6000.5.3 channel disconnected successfully.
+Thread 0x16fce3000 may have been prematurely finalized
+MSBuild サーバー をシャットダウンしています...
+VB/C# コンパイラ サーバー をシャットダウンしています...
+AcceleratorClientConnectionCallback - disconnected - :0
+Thread 0x1717f3000 may have been prematurely finalized
+Cleanup mono
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+CodeReloadManager destroyed
+debugger-agent: Unable to listen on 43
+[usbmuxd] Stop listen thread
+[usbmuxd] Error: 
+[usbmuxd] Listen thread exiting
+Exiting batchmode successfully now!
+[Package Manager] Server process was shutdown
+MSBuild サーバー は正常にシャットダウンしました。
+VB/C# コンパイラ サーバー は正常にシャットダウンしました。

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Custom AndroidManifest that adds deep-link intent filters to Unity's main
+  activity so shared stage URLs open the app:
+    - custom scheme:  promptworld://stage?stage=<id>
+    - app links:      https://promptworldgame.org/?stage=<id>
+  App links marked autoVerify require assetlinks.json hosted at the domain
+  (/.well-known/assetlinks.json). The custom scheme works without verification.
+  A tapped link reaches Unity via Application.deepLinkActivated (handled in
+  MenuController), or Application.absoluteURL at cold start.
+-->
+<!-- No package attribute: AGP 8 (Unity 6's Gradle) rejects it; the applicationId
+     comes from PlayerSettings per build (promptworld vs promptworldtac). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application android:allowBackup="true">
+    <activity android:name="com.unity3d.player.UnityPlayerActivity"
+              android:theme="@style/UnityThemeSelector"
+              android:exported="true"
+              android:launchMode="singleTask">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+
+      <!-- Custom scheme: promptworld://... -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="promptworld" />
+      </intent-filter>
+
+      <!-- App Links: https://promptworldgame.org/?stage=... -->
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="promptworldgame.org" />
+      </intent-filter>
+
+      <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
+    </activity>
+  </application>
+</manifest>

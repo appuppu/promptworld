@@ -19,7 +19,7 @@ public static class SimCrossCheck
     {
         var sb = new StringBuilder();
         string dir = Path.Combine(Application.streamingAssetsPath, "Stages");
-        string[] files = { "stage-001.json", "stage-002.json", "stage-003.json", "stage-test-parts.json" };
+        string[] files = { "stage-001.json", "stage-002.json", "stage-003.json", "stage-test-parts.json", "stage-test-gimmicks.json" };
 
         foreach (string file in files)
         {

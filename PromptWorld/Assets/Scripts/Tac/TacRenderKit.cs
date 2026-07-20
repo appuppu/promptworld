@@ -268,6 +268,19 @@ public static class TacRenderKit
         return g;
     }
 
+    // Minecraft-style stiff legs: two vertical leg cubes named legL/legR under
+    // the body. They do not bend; the walk cycle slides each foot fore/aft in
+    // counter-phase (driven every frame in TacGame.UpdateViews). legLen is the
+    // full leg height (cube center sits at legLen/2 so the foot touches y=0).
+    // The caller shortens its torso by legLen so total height is unchanged.
+    public static void AddLegs(Transform root, float legLen, float legW, float spread, Color c)
+    {
+        var l = Cube(root, new Vector3(-spread, legLen * 0.5f, 0), new Vector3(legW, legLen, legW), c);
+        l.name = "legL";
+        var r = Cube(root, new Vector3(spread, legLen * 0.5f, 0), new Vector3(legW, legLen, legW), c);
+        r.name = "legR";
+    }
+
     // low-poly enemy figure per type; root pivot at feet
     public static GameObject BuildEnemyView(Transform parent, TacEnemy en)
     {
@@ -303,7 +316,8 @@ public static class TacRenderKit
         }
         else if (en.type == 6)
         {
-            Cube(root.transform, new Vector3(0, 0.78f, 0), new Vector3(0.6f, 1.55f, 0.5f), new Color(0.34f, 0.36f, 0.4f));
+            AddLegs(root.transform, 0.5f, 0.24f, 0.16f, new Color(0.24f, 0.26f, 0.3f));
+            Cube(root.transform, new Vector3(0, 1.025f, 0), new Vector3(0.6f, 1.05f, 0.5f), new Color(0.34f, 0.36f, 0.4f));
             var shHead = Cube(root.transform, new Vector3(0, 1.7f, 0), new Vector3(0.36f, 0.3f, 0.36f), new Color(0.4f, 0.42f, 0.47f));
             var plate = Cube(root.transform, new Vector3(0, 0.95f, 0.55f), new Vector3(2.0f, 1.9f, 0.1f), new Color(0.5f, 0.53f, 0.58f));
             plate.name = "plate";
@@ -313,7 +327,10 @@ public static class TacRenderKit
         {
             Color c = en.type == 2 ? SniperCol : (en.type == 4 ? OperatorCol : (en.type == 5 ? BomberCol : SoldierCol));
             float bh = (float)en.h;
-            Cube(root.transform, new Vector3(0, bh * 0.45f, 0), new Vector3(0.55f, bh * 0.8f, 0.42f), c);
+            // stiff legs take the bottom 0.4*bh; torso is shortened and raised to sit on them
+            float legLen = bh * 0.4f;
+            AddLegs(root.transform, legLen, 0.2f, 0.14f, c * 0.7f);
+            Cube(root.transform, new Vector3(0, legLen + bh * 0.225f, 0), new Vector3(0.55f, bh * 0.45f, 0.42f), c);
             var head = Cube(root.transform, new Vector3(0, bh * 0.95f, 0), new Vector3(0.34f, 0.3f, 0.34f), c * 1.35f);
             // simple face: two eyes + mouth
             Cube(head.transform, new Vector3(-0.09f, 0.05f, 0.51f), new Vector3(0.16f, 0.16f, 0.06f), Color.black);
@@ -321,8 +338,9 @@ public static class TacRenderKit
             Cube(head.transform, new Vector3(0, -0.22f, 0.51f), new Vector3(0.3f, 0.1f, 0.06f), Color.black);
             if (en.type == 5)
             {
-                Cube(root.transform, new Vector3(0, bh * 0.35f, -0.4f), new Vector3(0.5f, 0.6f, 0.3f), new Color(0.15f, 0.12f, 0.1f));
-                Sphere(root.transform, new Vector3(0, bh * 0.62f, -0.4f), 0.16f, new Color(1f, 0.3f, 0.15f));
+                // bomb pack raised to ride on the shortened torso (clear of the legs)
+                Cube(root.transform, new Vector3(0, legLen + bh * 0.2f, -0.4f), new Vector3(0.5f, 0.6f, 0.3f), new Color(0.15f, 0.12f, 0.1f));
+                Sphere(root.transform, new Vector3(0, legLen + bh * 0.45f, -0.4f), 0.16f, new Color(1f, 0.3f, 0.15f));
             }
             else if (en.type == 2)
             {
@@ -330,7 +348,7 @@ public static class TacRenderKit
             }
             else if (en.type == 4)
             {
-                Cube(root.transform, new Vector3(0, bh * 0.5f, -0.35f), new Vector3(0.44f, 0.5f, 0.2f), new Color(0.2f, 0.22f, 0.26f));
+                Cube(root.transform, new Vector3(0, legLen + bh * 0.15f, -0.35f), new Vector3(0.44f, 0.5f, 0.2f), new Color(0.2f, 0.22f, 0.26f));
                 Cube(root.transform, new Vector3(0.1f, bh * 1.15f, -0.35f), new Vector3(0.04f, 0.7f, 0.04f), new Color(0.7f, 0.75f, 0.85f));
             }
             else if (en.type == 0)
@@ -348,7 +366,9 @@ public static class TacRenderKit
         var body = TacSkins.Current.body;
         var root = new GameObject("player");
         root.transform.SetParent(parent, false);
-        Cube(root.transform, new Vector3(0, 0.75f, 0), new Vector3(0.55f, 1.4f, 0.42f), body);
+        // stiff Minecraft-style legs; torso shortened and raised to sit on them
+        AddLegs(root.transform, 0.42f, 0.24f, 0.15f, body * 0.8f);
+        Cube(root.transform, new Vector3(0, 0.935f, 0), new Vector3(0.55f, 1.03f, 0.42f), body);
         var head = Cube(root.transform, new Vector3(0, 1.62f, 0), new Vector3(0.34f, 0.3f, 0.34f), body * 1.35f);
         // hero's eyes sit wider apart than the rank-and-file
         Cube(head.transform, new Vector3(-0.13f, 0.05f, 0.51f), new Vector3(0.16f, 0.16f, 0.06f), Color.black);

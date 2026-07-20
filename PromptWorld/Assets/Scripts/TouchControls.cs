@@ -1,6 +1,7 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// Touch input, split-screen scheme:
@@ -15,6 +16,7 @@ public class TouchControls : MonoBehaviour
     [SerializeField] private Canvas canvas;
 
     private const float DeadZoneDp = 15f;   // density-independent px
+    private const float HudStripPx = 90f;   // top HUD band (timer/lives/MENU) — taps here go to UI, not gameplay
 
     private int moveFingerId = -1;
     private float moveAnchorX;
@@ -37,17 +39,47 @@ public class TouchControls : MonoBehaviour
 
     private void Update()
     {
+        // Once the run is over (Cleared / Game Over), the result panel with its
+        // MENU / RETRY buttons is up. Stop consuming touches entirely so those
+        // buttons work — otherwise a tap gets eaten as a jump/move and the
+        // buttons never fire. (IsPointerOverGameObject alone is unreliable on
+        // WebGL, so we gate on game state, which is authoritative.)
+        var gm = GameManager.Instance;
+        if (gm != null && gm.State != GameState.Playing)
+        {
+            MobileInput.LeftHeld = false;
+            MobileInput.RightHeld = false;
+            moveFingerId = -1;
+            return;
+        }
+
         float halfWidth = Screen.width / 2f;
         float axis = 0f;
 
+        // LEFT half = a move stick (one finger). RIGHT half = jump (any finger
+        // that touches down there). These run INDEPENDENTLY so you can slide to
+        // move with one finger AND tap to jump with another at the same time.
         for (int i = 0; i < Input.touchCount; i++)
         {
             Touch touch = Input.GetTouch(i);
             switch (touch.phase)
             {
                 case TouchPhase.Began:
+                    // Ignore taps in the TOP HUD STRIP (timer/lives on the left,
+                    // MENU button on the right). Gameplay taps happen below it,
+                    // so excluding this band lets the in-play MENU button work
+                    // without a jump firing underneath — deterministic, unlike
+                    // IsPointerOverGameObject which is unreliable on WebGL. We
+                    // still also honor the EventSystem check as a backup.
+                    float topStrip = Screen.height - HudStripPx * dpiScale;
+                    if (touch.position.y > topStrip) break;
+                    if (EventSystem.current != null &&
+                        EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                        break;
+
                     if (touch.position.x < halfWidth)
                     {
+                        // claim the move finger only if we don't have one yet
                         if (moveFingerId == -1)
                         {
                             moveFingerId = touch.fingerId;
@@ -56,6 +88,7 @@ public class TouchControls : MonoBehaviour
                     }
                     else
                     {
+                        // right-half tap = jump, regardless of the move finger
                         MobileInput.QueueJump();
                     }
                     break;

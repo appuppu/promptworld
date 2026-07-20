@@ -22,7 +22,10 @@ public static class StagePreview
         foreach (PartData p in data.parts) Grow(p.x, p.y, p.w, p.h);
         Grow(data.goal.x, data.goal.y, data.goal.w, data.goal.h);
 
-        minX -= 1.5f; maxX += 1.5f; minY -= 1.5f; maxY += 1.5f;
+        // Padding around the stage bounds so the geometry never touches the
+        // thumbnail edge (which reads as "cut off"). Extra on X because stages
+        // are usually wide and would otherwise hug the left/right border.
+        minX -= 4f; maxX += 4f; minY -= 2.5f; maxY += 2.5f;
         float scale = Mathf.Min(texW / (maxX - minX), texH / (maxY - minY));
         float offX = (texW - (maxX - minX) * scale) / 2f;
         float offY = (texH - (maxY - minY) * scale) / 2f;
@@ -31,7 +34,43 @@ public static class StagePreview
         var pixels = new Color32[texW * texH];
         var black = new Color32(0, 0, 0, 255);
         var white = new Color32(255, 255, 255, 255);
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = black;
+
+        // Backdrop: if the stage has a 1-bit bg image, paint it (dimmed) behind
+        // the geometry so the thumbnail carries the course's atmosphere; else a
+        // plain black field. The gameplay shapes are drawn on top in pure white,
+        // so they stay legible against the darkened backdrop.
+        int[] bgBits = DecodeBg(data.bg);
+        if (bgBits != null)
+        {
+            int bw = data.bg.w, bh = data.bg.h;
+            // COVER-fit the bg into the thumbnail (crop overflow, no distortion).
+            float bgAspect = (float)bw / bh, thumbAspect = (float)texW / texH;
+            float uScale, vScale, uOff, vOff;
+            if (bgAspect > thumbAspect) { vScale = 1f; uScale = thumbAspect / bgAspect; }
+            else { uScale = 1f; vScale = bgAspect / thumbAspect; }
+            uOff = (1f - uScale) / 2f; vOff = (1f - vScale) / 2f;
+            // Dimmed backdrop tones — darker than in-game so white shapes pop.
+            var bgInk = new Color32(16, 17, 20, 255);
+            var bgPaper = new Color32(70, 73, 80, 255);
+            for (int y = 0; y < texH; y++)
+            {
+                for (int x = 0; x < texW; x++)
+                {
+                    float u = uOff + (x + 0.5f) / texW * uScale;
+                    float v = vOff + (y + 0.5f) / texH * vScale;
+                    int sx = Mathf.Clamp((int)(u * bw), 0, bw - 1);
+                    // bg data is top-down; thumbnail is bottom-up. Flip Y.
+                    int sy = Mathf.Clamp((int)((1f - v) * bh), 0, bh - 1);
+                    int bit = bgBits[sy * bw + sx];
+                    if (data.bg.invert) bit ^= 1;
+                    pixels[y * texW + x] = bit == 1 ? bgPaper : bgInk;
+                }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = black;
+        }
 
         void Fill(float cx, float cy, float w, float h)
         {
@@ -73,5 +112,40 @@ public static class StagePreview
         tex.Apply();
         tex.filterMode = FilterMode.Point;
         return tex;
+    }
+
+    /// <summary>Decode a BgData's RLE-varint stream into a row-major 0/1 bit grid
+    /// (top-down, same orientation as BackgroundArt). Returns null if absent or
+    /// malformed — the caller then falls back to a plain black backdrop.</summary>
+    private static int[] DecodeBg(BgData bg)
+    {
+        if (bg == null || string.IsNullOrEmpty(bg.data) || bg.w <= 0 || bg.h <= 0) return null;
+        if ((long)bg.w * bg.h > 4_000_000) return null;
+        byte[] stream;
+        try { stream = System.Convert.FromBase64String(bg.data); }
+        catch { return null; }
+        if (stream.Length < 2) return null;
+
+        int total = bg.w * bg.h;
+        var bits = new int[total];
+        int p = 0;
+        int cur = stream[0] & 1;
+        int i = 1;
+        while (i < stream.Length && p < total)
+        {
+            int run = 0, shift = 0;
+            while (i < stream.Length)
+            {
+                byte bb = stream[i++];
+                run |= (bb & 0x7f) << shift;
+                if ((bb & 0x80) == 0) break;
+                shift += 7;
+            }
+            int endP = p + run;
+            if (endP > total) endP = total;
+            for (; p < endP; p++) bits[p] = cur;
+            cur ^= 1;
+        }
+        return bits;
     }
 }

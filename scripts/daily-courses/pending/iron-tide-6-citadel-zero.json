@@ -1,0 +1,43 @@
+{
+  "_note": "IRON TIDE VI: CITADEL ZERO — 6本目。2026-07-20にレート上限(create 30/日)で投入できず保留。上限リセット後に create_stage (creatorToken 2cb4cff6-56e5-4fcb-ab47-728072a7f899) でこのstageをそのまま投入する。160x160はWorkerのCPU上限(error 1102)で落ちるため150x150に圧縮済み — これ以上広げない。",
+  "stage": {
+    "schemaVersion": "0.3", "game": "tac", "name": "IRON TIDE VI: CITADEL ZERO",
+    "timeLimit": 600, "lives": 3, "ammo": 0, "squad": true,
+    "arena": {"w": 150, "d": 150}, "playerStart": {"x": 80, "z": 6, "yaw": 0},
+    "palette": {"ground": "#6a7062", "sky": "#8a92a2", "water": "#24445e"},
+    "music": {"bpm": 140, "key": "D", "scale": "phrygian", "prog": [0, 1, -2, 0]},
+    "parts": [
+      {"type": "rock", "x": 40, "z": 20, "w": 4, "d": 3}, {"type": "rock", "x": 70, "z": 22, "w": 4, "d": 4}, {"type": "rock", "x": 100, "z": 18, "w": 4, "d": 3}, {"type": "rock", "x": 130, "z": 24, "w": 4, "d": 3}, {"type": "rock", "x": 20, "z": 30, "w": 3, "d": 3}, {"type": "rock", "x": 143, "z": 32, "w": 3, "d": 3},
+      {"type": "mine", "x": 56, "z": 32}, {"type": "mine", "x": 70, "z": 34}, {"type": "mine", "x": 84, "z": 30}, {"type": "mine", "x": 98, "z": 34}, {"type": "mine", "x": 112, "z": 32}, {"type": "mine", "x": 63, "z": 42}, {"type": "mine", "x": 91, "z": 42}, {"type": "mine", "x": 105, "z": 40},
+      {"type": "river", "x": 30, "z": 48, "w": 60, "d": 6}, {"type": "river", "x": 67, "z": 48, "w": 14, "d": 6}, {"type": "river", "x": 110, "z": 48, "w": 48, "d": 6}, {"type": "river", "x": 142, "z": 48, "w": 16, "d": 6},
+      {"type": "crackedWall", "x": 80, "z": 53, "w": 12, "d": 1.5, "h": 3},
+      {"type": "trench", "x": 40, "z": 70, "w": 24, "d": 3}, {"type": "trench", "x": 120, "z": 70, "w": 24, "d": 3}, {"type": "trench", "x": 80, "z": 82, "w": 24, "d": 3},
+      {"type": "rock", "x": 30, "z": 62, "w": 4, "d": 3}, {"type": "rock", "x": 60, "z": 64, "w": 4, "d": 4}, {"type": "rock", "x": 100, "z": 62, "w": 4, "d": 3}, {"type": "rock", "x": 140, "z": 66, "w": 4, "d": 3}, {"type": "rock", "x": 15, "z": 80, "w": 3, "d": 3}, {"type": "rock", "x": 50, "z": 88, "w": 4, "d": 3}, {"type": "rock", "x": 110, "z": 88, "w": 4, "d": 3}, {"type": "rock", "x": 143, "z": 84, "w": 3, "d": 3},
+      {"type": "barrel", "x": 14, "z": 58}, {"type": "barrel", "x": 144, "z": 58},
+      {"type": "wall", "x": 25, "z": 92, "w": 50, "d": 2, "h": 4}, {"type": "wall", "x": 80, "z": 92, "w": 40, "d": 2, "h": 4}, {"type": "wall", "x": 130, "z": 92, "w": 40, "d": 2, "h": 4},
+      {"type": "rock", "x": 55, "z": 107, "w": 4, "d": 3}, {"type": "rock", "x": 105, "z": 107, "w": 4, "d": 3}, {"type": "rock", "x": 80, "z": 116, "w": 5, "d": 3}, {"type": "rock", "x": 20, "z": 122, "w": 3, "d": 3}, {"type": "rock", "x": 140, "z": 122, "w": 3, "d": 3},
+      {"type": "platform", "x": 30, "z": 108, "w": 6, "d": 6, "h": 5}, {"type": "platform", "x": 130, "z": 108, "w": 6, "d": 6, "h": 5},
+      {"type": "block", "x": 80, "z": 140, "w": 40, "d": 20, "h": 3, "tint": "#55606a"}, {"type": "block", "x": 80, "z": 144, "w": 16, "d": 8, "h": 6, "tint": "#3a4450"},
+      {"type": "slope", "x": 56, "z": 140, "w": 8, "d": 12, "h": 3, "dir": 1}, {"type": "slope", "x": 104, "z": 140, "w": 8, "d": 12, "h": 3, "dir": 3},
+      {"type": "medkit", "x": 80, "z": 60}, {"type": "medkit", "x": 20, "z": 100}, {"type": "medkit", "x": 80, "z": 126}, {"type": "medkit", "x": 145, "z": 102}
+    ],
+    "enemies": [
+      {"type": "soldier", "x": 50, "z": 24, "yaw": 180, "patrolX": 90, "patrolZ": 24}, {"type": "soldier", "x": 110, "z": 26, "yaw": 180, "patrolX": 130, "patrolZ": 26}, {"type": "soldier", "x": 30, "z": 36, "yaw": 180, "patrolX": 30, "patrolZ": 16}, {"type": "soldier", "x": 140, "z": 40, "yaw": 270, "patrolX": 120, "patrolZ": 44},
+      {"type": "drone", "x": 60, "z": 26, "yaw": 90, "patrolX": 100, "patrolZ": 26, "group": 8}, {"type": "drone", "x": 120, "z": 36, "yaw": 270, "patrolX": 70, "patrolZ": 36, "group": 8},
+      {"type": "soldier", "x": 36, "z": 66, "yaw": 180, "entrench": true}, {"type": "soldier", "x": 48, "z": 74, "yaw": 180, "entrench": true}, {"type": "soldier", "x": 116, "z": 66, "yaw": 180, "entrench": true}, {"type": "soldier", "x": 126, "z": 74, "yaw": 180, "entrench": true}, {"type": "soldier", "x": 80, "z": 78, "yaw": 180, "entrench": true},
+      {"type": "soldier", "x": 60, "z": 60, "yaw": 180, "patrolX": 90, "patrolZ": 60}, {"type": "soldier", "x": 25, "z": 88, "yaw": 90, "patrolX": 60, "patrolZ": 88}, {"type": "soldier", "x": 100, "z": 88, "yaw": 90, "patrolX": 135, "patrolZ": 88}, {"type": "soldier", "x": 144, "z": 70, "yaw": 270},
+      {"type": "bomber", "x": 65, "z": 87, "yaw": 270, "patrolX": 40, "patrolZ": 87}, {"type": "bomber", "x": 95, "z": 87, "yaw": 90, "patrolX": 120, "patrolZ": 87},
+      {"type": "shield", "x": 52, "z": 94, "yaw": 180}, {"type": "shield", "x": 53.8, "z": 94, "yaw": 180}, {"type": "shield", "x": 55.6, "z": 94, "yaw": 180}, {"type": "shield", "x": 102, "z": 94, "yaw": 180}, {"type": "shield", "x": 103.8, "z": 94, "yaw": 180}, {"type": "shield", "x": 105.6, "z": 94, "yaw": 180},
+      {"type": "gatling", "x": 55, "z": 98, "yaw": 180}, {"type": "gatling", "x": 105, "z": 98, "yaw": 180},
+      {"type": "sniper", "x": 30, "z": 108, "yaw": 180}, {"type": "sniper", "x": 130, "z": 108, "yaw": 180},
+      {"type": "soldier", "x": 45, "z": 112, "yaw": 90, "patrolX": 65, "patrolZ": 112}, {"type": "soldier", "x": 95, "z": 112, "yaw": 90, "patrolX": 115, "patrolZ": 112}, {"type": "soldier", "x": 80, "z": 100, "yaw": 180}, {"type": "soldier", "x": 144, "z": 112, "yaw": 270},
+      {"type": "operator", "x": 80, "z": 120, "yaw": 180, "group": 8}, {"type": "drone", "x": 80, "z": 112, "yaw": 180, "patrolX": 80, "patrolZ": 60, "group": 8},
+      {"type": "gatling", "x": 80, "z": 134, "yaw": 180},
+      {"type": "sniper", "x": 68, "z": 142, "yaw": 180}, {"type": "sniper", "x": 92, "z": 142, "yaw": 180},
+      {"type": "shield", "x": 74, "z": 133, "yaw": 180}, {"type": "shield", "x": 75.8, "z": 133, "yaw": 180}, {"type": "shield", "x": 77.6, "z": 133, "yaw": 180}, {"type": "shield", "x": 79.4, "z": 133, "yaw": 180},
+      {"type": "operator", "x": 94, "z": 144, "yaw": 180, "group": 9},
+      {"type": "drone", "x": 60, "z": 132, "yaw": 90, "patrolX": 100, "patrolZ": 132, "group": 9}, {"type": "drone", "x": 100, "z": 144, "yaw": 270, "patrolX": 60, "patrolZ": 144, "group": 9},
+      {"type": "soldier", "x": 66, "z": 136, "yaw": 180}, {"type": "soldier", "x": 94, "z": 136, "yaw": 180}
+    ]
+  }
+}

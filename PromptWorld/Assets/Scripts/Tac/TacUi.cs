@@ -225,6 +225,23 @@ public static class TacUi
         return t;
     }
 
+    // Single-line text input with a placeholder — the stage-name search box.
+    // Uses legacy InputField to match the rest of the TAC UI (all legacy Text).
+    public static InputField Search(RectTransform parent, string placeholder, int size, Vector2 aMin, Vector2 aMax, Vector2 offMin, Vector2 offMax, System.Action<string> onChange)
+    {
+        var box = Box(parent, Panel, Line, aMin, aMax, offMin, offMax);
+        var input = box.gameObject.AddComponent<InputField>();
+        var ph = Label(box, placeholder, size, Dim, TextAnchor.MiddleLeft, Vector2.zero, Vector2.one, new Vector2(12, 0), new Vector2(-12, 0));
+        var txt = Label(box, "", size, Fg, TextAnchor.MiddleLeft, Vector2.zero, Vector2.one, new Vector2(12, 0), new Vector2(-12, 0));
+        txt.raycastTarget = false; ph.raycastTarget = false;
+        input.textComponent = txt;
+        input.placeholder = ph;
+        input.lineType = InputField.LineType.SingleLine;
+        input.characterLimit = 40;
+        if (onChange != null) input.onValueChanged.AddListener(v => onChange(v));
+        return input;
+    }
+
     // web .btn: transparent, 1px border, uppercase tracked label.
     // NOTE: one Graphic per GameObject — the fill Image doubles as the
     // raycast target; the border is a child.

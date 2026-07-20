@@ -7,16 +7,16 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// Builds the title / stage-select scene: title, search field, scrollable
-/// stage list (entries created at runtime by MenuController) and the
-/// creator-funnel button.
+/// Builds the title / stage-select scene with the UI design system (see UI.cs):
+/// a controls column (title, name, search, vertical sort, settings, create) and
+/// a stage list, arranged by MenuLayout into two columns (landscape) or stacked
+/// (portrait), inside a SafeArea. No hand-placed pixels — auto-layout only.
 /// Menu: Prompt World > Build Menu Scene, or CLI -executeMethod MenuSceneBuilder.Build.
 /// </summary>
 public static class MenuSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/Menu.unity";
 
-    [MenuItem("Prompt World/Build Menu Scene")]
     public static void Build()
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -37,26 +37,89 @@ public static class MenuSceneBuilder
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
+        canvasGo.AddComponent<ResponsiveCanvasScaler>();
 
         new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
 
-        CreateText(canvasGo.transform, "Title", "PROMPT WORLD", 76,
-            new Vector2(0.5f, 1f), new Vector2(0f, -95f), new Vector2(1400f, 110f));
+        // Safe-area root: everything lives under here, clear of notch/home bar.
+        var safe = UI.Stretch(canvasGo.transform, "SafeArea");
+        safe.gameObject.AddComponent<SafeAreaFitter>();
+        // Uniform screen padding.
+        var padRoot = UI.Stretch(safe, "Pad", new Vector4(UI.S4, UI.S3, UI.S4, UI.S3));
 
-        TMP_InputField nameInput = CreateInputField(canvasGo.transform, "PlayerName", "PLAYER NAME",
-            new Vector2(0.5f, 1f), new Vector2(-300f, -235f), new Vector2(280f, 58f), 24);
-        TMP_InputField searchInput = CreateInputField(canvasGo.transform, "Search", "SEARCH STAGES",
-            new Vector2(0.5f, 1f), new Vector2(150f, -235f), new Vector2(600f, 58f), 28);
-        RectTransform content = CreateScrollList(canvasGo.transform);
-        Button createButton = CreateFooterButton(canvasGo.transform);
+        // ---- controls column (auto-stacked) --------------------------------
+        var controls = UI.Box(padRoot, "Controls", UI.Clear);
+        // No inner gutters: controls and the stage list both fill the Pad width
+        // so the search box and the cards line up on BOTH edges. (In landscape
+        // the two columns are already separated by MenuLayout's 0-40% / 42-100%
+        // anchors, so no extra right gutter is needed here.)
+        var vlist = UI.VStack(controls, UI.S1 + 4f, TextAnchor.UpperLeft,
+            new RectOffset(0, 0, 0, 0));
+
+        var title = UI.Text(controls, "Title", "PROMPT WORLD", UI.FontTitle, UI.Fg, TextAlignmentOptions.Left, 2f, true);
+        UI.Sized(title.gameObject, minH: 68f);
+        var tagline = UI.Text(controls, "Tagline", "WORLDS MADE OF PROMPTS", 14f, UI.Dim, TextAlignmentOptions.Left, 4f);
+        UI.Sized(tagline.gameObject, minH: 20f);
+
+        var nameInput = UI.Input(controls, "PlayerName", "PLAYER NAME", 26f);
+        UI.Sized(nameInput.gameObject, minH: 56f);
+        var searchInput = UI.Input(controls, "Search", "SEARCH STAGES…", 26f);
+        UI.Sized(searchInput.gameObject, minH: 56f);
+
+        // Sort buttons (NEW/TOP/HARD/EASY) are built at runtime; the layout group
+        // (horizontal on portrait/mobile, vertical on wide desktop) is chosen by
+        // MenuController based on aspect.
+        var sortHolder = UI.Box(controls, "SortHolder", UI.Clear);
+        UI.Sized(sortHolder.gameObject, minH: 48f, flexH: 0f);
+
+        // ---- stage list (scroll, fixed frame) ------------------------------
+        RectTransform listContent = BuildScrollList(padRoot, out RectTransform listPanel);
+
+        // ---- CREATE bar: its OWN block so MenuLayout can pin it below the list
+        // (portrait) or in the controls column (landscape). Always visible.
+        // It holds the CREATE button (fills the width) plus a SETTINGS button
+        // pinned to its right — so settings sits next to "create your own world"
+        // instead of floating over the stage list (where it overlapped cards).
+        var createBar = UI.Box(padRoot, "CreateBar", UI.Clear);
+        const float SettingsW = 92f;   // wide enough for the localized "SETTINGS"
+        var createButton = UI.Button(createBar, "CreateButton", "CREATE YOUR OWN WORLD  →", 24f);
+        var cbRect = (RectTransform)createButton.transform;
+        cbRect.anchorMin = Vector2.zero; cbRect.anchorMax = Vector2.one;
+        cbRect.offsetMin = Vector2.zero;
+        cbRect.offsetMax = new Vector2(-(SettingsW + UI.S1), 0f); // leave room for settings
+
+        // SETTINGS button — visible bordered button, right of the CREATE button.
+        // Label set to the localized "settings" word at runtime; smaller font so
+        // it fits the button width without clipping.
+        var settingsButton = UI.Button(createBar, "SettingsButton", "SETTINGS", 15f, ghost: false,
+            align: TextAlignmentOptions.Center);
+        var sbRect = (RectTransform)settingsButton.transform;
+        sbRect.anchorMin = new Vector2(1f, 0f); sbRect.anchorMax = new Vector2(1f, 1f);
+        sbRect.pivot = new Vector2(1f, 0.5f);
+        sbRect.sizeDelta = new Vector2(SettingsW, 0f);
+        sbRect.anchoredPosition = Vector2.zero;
+
+        // ---- settings sheet/modal (hidden) ---------------------------------
+        RectTransform settingsPanel = BuildSettingsPanel(safe);
+
+        // ---- layout driver --------------------------------------------------
+        var layout = canvasGo.AddComponent<MenuLayout>();
+        var layoutSo = new SerializedObject(layout);
+        layoutSo.FindProperty("controls").objectReferenceValue = controls;
+        layoutSo.FindProperty("list").objectReferenceValue = listPanel;
+        layoutSo.FindProperty("createBar").objectReferenceValue = createBar;
+        layoutSo.ApplyModifiedPropertiesWithoutUndo();
 
         var controllerGo = new GameObject("MenuController");
         var controller = controllerGo.AddComponent<MenuController>();
         var so = new SerializedObject(controller);
-        so.FindProperty("listRoot").objectReferenceValue = content;
+        so.FindProperty("listRoot").objectReferenceValue = listContent;
         so.FindProperty("searchInput").objectReferenceValue = searchInput;
         so.FindProperty("nameInput").objectReferenceValue = nameInput;
         so.FindProperty("createButton").objectReferenceValue = createButton;
+        so.FindProperty("sortHolder").objectReferenceValue = sortHolder;
+        so.FindProperty("settingsButton").objectReferenceValue = settingsButton;
+        so.FindProperty("settingsPanel").objectReferenceValue = settingsPanel;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         Directory.CreateDirectory("Assets/Scenes");
@@ -64,145 +127,66 @@ public static class MenuSceneBuilder
         Debug.Log($"[PromptWorld] Menu scene built: {ScenePath}");
     }
 
-    private static TMP_InputField CreateInputField(Transform parent, string name, string placeholderText,
-        Vector2 anchor, Vector2 anchoredPos, Vector2 size, float fontSize)
-    {
-        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-        go.transform.SetParent(parent, false);
-        var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = anchor;
-        rect.anchorMax = anchor;
-        rect.pivot = anchor;
-        rect.anchoredPosition = anchoredPos;
-        rect.sizeDelta = size;
-        go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.08f);
-
-        var input = go.AddComponent<TMP_InputField>();
-
-        var areaGo = new GameObject("TextArea", typeof(RectTransform), typeof(RectMask2D));
-        areaGo.transform.SetParent(go.transform, false);
-        var areaRect = areaGo.GetComponent<RectTransform>();
-        areaRect.anchorMin = Vector2.zero;
-        areaRect.anchorMax = Vector2.one;
-        areaRect.offsetMin = new Vector2(20f, 6f);
-        areaRect.offsetMax = new Vector2(-20f, -6f);
-
-        TextMeshProUGUI text = CreateInputText(areaGo.transform, "Text", "", 1f, fontSize);
-        TextMeshProUGUI placeholder = CreateInputText(areaGo.transform, "Placeholder", placeholderText, 0.35f, fontSize);
-
-        input.textViewport = areaRect;
-        input.textComponent = text;
-        input.placeholder = placeholder;
-        input.caretColor = Color.white;
-        input.customCaretColor = true;
-        input.selectionColor = new Color(1f, 1f, 1f, 0.3f);
-        return input;
-    }
-
-    private static TextMeshProUGUI CreateInputText(Transform parent, string name, string content, float alpha, float fontSize = 28)
-    {
-        var go = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(parent, false);
-        var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-
-        var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text = content;
-        tmp.fontSize = fontSize;
-        tmp.alignment = TextAlignmentOptions.MidlineLeft;
-        tmp.color = new Color(1f, 1f, 1f, alpha);
-        return tmp;
-    }
-
-    private static RectTransform CreateScrollList(Transform parent)
+    private static RectTransform BuildScrollList(Transform parent, out RectTransform panel)
     {
         var scrollGo = new GameObject("Scroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
         scrollGo.transform.SetParent(parent, false);
-        var scrollRect = scrollGo.GetComponent<RectTransform>();
-        scrollRect.anchorMin = new Vector2(0.5f, 0f);
-        scrollRect.anchorMax = new Vector2(0.5f, 1f);
-        scrollRect.pivot = new Vector2(0.5f, 0.5f);
-        scrollRect.sizeDelta = new Vector2(960f, -530f);
-        scrollRect.anchoredPosition = new Vector2(0f, -115f);
+        panel = scrollGo.GetComponent<RectTransform>();
+        // MenuLayout sets its anchors; start filled.
+        panel.anchorMin = new Vector2(0.42f, 0f); panel.anchorMax = Vector2.one;
+        panel.offsetMin = Vector2.zero; panel.offsetMax = Vector2.zero;
         scrollGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f);
 
-        var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
-        viewportGo.transform.SetParent(scrollGo.transform, false);
-        var viewportRect = viewportGo.GetComponent<RectTransform>();
-        viewportRect.anchorMin = Vector2.zero;
-        viewportRect.anchorMax = Vector2.one;
-        viewportRect.offsetMin = Vector2.zero;
-        viewportRect.offsetMax = Vector2.zero;
+        var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+        viewport.transform.SetParent(scrollGo.transform, false);
+        var vr = viewport.GetComponent<RectTransform>();
+        vr.anchorMin = Vector2.zero; vr.anchorMax = Vector2.one; vr.offsetMin = Vector2.zero; vr.offsetMax = Vector2.zero;
 
-        var contentGo = new GameObject("Content", typeof(RectTransform));
-        contentGo.transform.SetParent(viewportGo.transform, false);
-        var contentRect = contentGo.GetComponent<RectTransform>();
-        contentRect.anchorMin = new Vector2(0f, 1f);
-        contentRect.anchorMax = new Vector2(1f, 1f);
-        contentRect.pivot = new Vector2(0.5f, 1f);
-        contentRect.sizeDelta = new Vector2(0f, 0f);
-        var layout = contentGo.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 14f;
-        layout.childAlignment = TextAnchor.UpperCenter;
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = false;
-        var fitter = contentGo.AddComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        var content = new GameObject("Content", typeof(RectTransform));
+        content.transform.SetParent(viewport.transform, false);
+        var cr = content.GetComponent<RectTransform>();
+        // Left-top pivot (not center) so childForceExpandWidth measures the
+        // content width from the left edge and cards match the viewport width
+        // exactly — a 0.5 pivot let the width drift and shaved the left edge.
+        cr.anchorMin = new Vector2(0f, 1f); cr.anchorMax = new Vector2(1f, 1f); cr.pivot = new Vector2(0f, 1f);
+        var vlg = content.AddComponent<VerticalLayoutGroup>();
+        vlg.spacing = 12f;
+        // Left/right padding so cards sit INSET from the viewport's RectMask2D
+        // edge — otherwise the card (and its left accent bar / thumbnail frame)
+        // hugs the clip boundary and the left edge gets shaved off on PC.
+        vlg.padding = new RectOffset(16, 16, 4, 4);
+        vlg.childAlignment = TextAnchor.UpperCenter;
+        vlg.childControlWidth = true; vlg.childControlHeight = false;
+        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
+        var fit = content.AddComponent<ContentSizeFitter>();
+        fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         var scroll = scrollGo.GetComponent<ScrollRect>();
-        scroll.content = contentRect;
-        scroll.viewport = viewportRect;
-        scroll.horizontal = false;
-        scroll.vertical = true;
-        scroll.scrollSensitivity = 40f;
-
-        return contentRect;
+        scroll.content = cr; scroll.viewport = vr;
+        scroll.horizontal = false; scroll.vertical = true; scroll.scrollSensitivity = 40f;
+        return cr;
     }
 
-    private static Button CreateFooterButton(Transform parent)
+    private static RectTransform BuildSettingsPanel(Transform parent)
     {
-        var go = new GameObject("CreateButton", typeof(RectTransform));
-        go.transform.SetParent(parent, false);
-        var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0f);
-        rect.anchorMax = new Vector2(0.5f, 0f);
-        rect.pivot = new Vector2(0.5f, 0f);
-        rect.anchoredPosition = new Vector2(0f, 44f);
-        rect.sizeDelta = new Vector2(640f, 64f);
+        // Dim backdrop covering the whole safe area, catches taps to close via a button.
+        var backdrop = new GameObject("SettingsPanel", typeof(RectTransform), typeof(Image));
+        backdrop.transform.SetParent(parent, false);
+        var br = backdrop.GetComponent<RectTransform>();
+        br.anchorMin = Vector2.zero; br.anchorMax = Vector2.one; br.offsetMin = Vector2.zero; br.offsetMax = Vector2.zero;
+        backdrop.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.72f);
 
-        var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text = "CREATE YOUR OWN WORLD  →";
-        tmp.fontSize = 27;
-        tmp.characterSpacing = 6f;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = new Color(1f, 1f, 1f, 0.85f);
+        // Centered card; MenuController fills its content at runtime.
+        var card = new GameObject("Card", typeof(RectTransform), typeof(Image));
+        card.transform.SetParent(backdrop.transform, false);
+        var crd = card.GetComponent<RectTransform>();
+        crd.anchorMin = new Vector2(0.5f, 0.5f); crd.anchorMax = new Vector2(0.5f, 0.5f);
+        crd.pivot = new Vector2(0.5f, 0.5f);
+        crd.sizeDelta = new Vector2(720f, 480f);
+        card.GetComponent<Image>().color = new Color(0.05f, 0.05f, 0.05f, 1f);
+        UI.AddBorder(card.transform, UI.Line);
 
-        var button = go.AddComponent<Button>();
-        button.targetGraphic = tmp;
-        return button;
-    }
-
-    private static void CreateText(Transform parent, string name, string text, float fontSize,
-        Vector2 anchor, Vector2 anchoredPos, Vector2 size)
-    {
-        var go = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(parent, false);
-        var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = anchor;
-        rect.anchorMax = anchor;
-        rect.pivot = anchor;
-        rect.anchoredPosition = anchoredPos;
-        rect.sizeDelta = size;
-
-        var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text = text;
-        tmp.fontSize = fontSize;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.white;
+        backdrop.SetActive(false);
+        return br;
     }
 }

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Prompt World MCP server specification — six tools, the human-clear gate, limits, and the 24-part vocabulary.">
+<title>Prompt World — MCP Specification</title>
+<style>
+  :root {
+    --ink: #0b0c0e;
+    --ink-2: #16181c;
+    --paper: #f6f7f9;
+    --paper-dim: #e7e9ee;
+    --grey-1: #9aa0ab;
+    --grey-2: #6b7078;
+    --grey-3: #3a3d44;
+    --line: #26282e;
+    --line-soft: #1c1e22;
+    --accent: #63e6c3;      /* single restrained accent — a cold mint, reads as "signal" on near-black */
+    --accent-dim: #2f8a76;
+    --read: #7d8794;        /* read-only method tag */
+    --write: #d9b25a;       /* write method tag */
+    --gate: #d98a6a;        /* human-gate tag */
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --maxw: 940px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+
+  /* ---- masthead ---- */
+  header.top {
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(99,230,195,0.07), transparent 60%),
+      var(--ink);
+  }
+  .top-inner { padding: 68px 0 44px; }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 20px;
+  }
+  h1.title {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 58px);
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  h1.title .bw {
+    display: inline-block;
+    background: var(--paper);
+    color: var(--ink);
+    padding: 0 0.18em;
+  }
+  .standfirst {
+    font-size: 18px;
+    color: var(--grey-1);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .endpoint-bar {
+    margin-top: 34px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 13.5px;
+  }
+  .endpoint-bar .verb {
+    color: var(--ink);
+    background: var(--accent);
+    padding: 3px 9px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .endpoint-bar .url { color: var(--paper); }
+  .endpoint-bar .sep { color: var(--grey-3); }
+  .endpoint-bar .proto { color: var(--grey-2); }
+
+  /* ---- section rhythm ---- */
+  section { padding: 56px 0; border-top: 1px solid var(--line-soft); }
+  section:first-of-type { border-top: none; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--grey-2);
+    margin: 0 0 14px;
+  }
+  h2 {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: clamp(22px, 3.4vw, 30px);
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  h2 .n { color: var(--accent); margin-right: 0.5em; }
+  section > .wrap > p { color: var(--grey-1); max-width: 66ch; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-dim); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---- flow steps ---- */
+  .flow { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); margin-top: 26px; }
+  .flow .step { background: var(--ink); padding: 20px 22px; display: grid; grid-template-columns: 44px 1fr; gap: 18px; align-items: start; }
+  .flow .step .idx { font-family: var(--mono); font-size: 22px; color: var(--accent); line-height: 1; padding-top: 2px; }
+  .flow .step h4 { margin: 0 0 4px; font-size: 16px; font-family: var(--mono); font-weight: 600; }
+  .flow .step p { margin: 0; color: var(--grey-1); font-size: 14.5px; }
+  .flow .step .who { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--grey-2); }
+
+  /* ---- tool cards ---- */
+  .tool {
+    border: 1px solid var(--line);
+    margin-top: 26px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent 30%);
+  }
+  .tool > .head {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 14px;
+    padding: 18px 22px; border-bottom: 1px solid var(--line-soft);
+  }
+  .tool .name { font-family: var(--mono); font-size: 19px; font-weight: 600; color: var(--paper); }
+  .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 3px 8px; border: 1px solid currentColor; line-height: 1;
+  }
+  .tag.read { color: var(--read); }
+  .tag.write { color: var(--write); }
+  .tag.gate { color: var(--gate); }
+  .tool .head .summary { color: var(--grey-1); font-size: 14.5px; flex-basis: 100%; margin: 2px 0 0; }
+  .tool > .body { padding: 6px 22px 22px; }
+
+  .params { width: 100%; border-collapse: collapse; margin: 14px 0 6px; font-size: 14px; }
+  .params caption {
+    text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--grey-2); padding: 14px 0 8px;
+  }
+  .params th { text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-2); font-weight: 500; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); }
+  .params td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; color: var(--grey-1); }
+  .params td.pn { font-family: var(--mono); color: var(--paper); white-space: nowrap; }
+  .params td.pt { font-family: var(--mono); color: var(--accent); font-size: 12.5px; white-space: nowrap; }
+  .req { color: var(--write); font-family: var(--mono); font-size: 11px; }
+  .opt { color: var(--grey-2); font-family: var(--mono); font-size: 11px; }
+  .returns { font-size: 14px; color: var(--grey-1); margin: 12px 0 0; }
+  .returns b { color: var(--paper); font-weight: 600; font-family: var(--mono); font-size: 13px; }
+
+  /* ---- code ---- */
+  .code-wrap { overflow-x: auto; border: 1px solid var(--line); background: #08090b; margin: 16px 0 0; }
+  pre { margin: 0; padding: 16px 18px; font-family: var(--mono); font-size: 13px; line-height: 1.65; color: #c9cdd4; min-width: max-content; }
+  pre .k { color: var(--accent); }        /* json keys */
+  pre .s { color: #d9b28a; }               /* strings */
+  pre .n { color: #8fb4ff; }               /* numbers */
+  pre .c { color: var(--grey-2); }         /* comments */
+  pre .m { color: #e08f6f; }               /* method / emphasis */
+  code.inline { font-family: var(--mono); font-size: 0.9em; background: var(--ink-2); padding: 1px 6px; border: 1px solid var(--line-soft); color: var(--paper); }
+
+  /* ---- limits grid ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); margin-top: 24px; }
+  .cell { background: var(--ink); padding: 18px 20px; }
+  .cell .v { font-family: var(--mono); font-size: 26px; color: var(--paper); font-variant-numeric: tabular-nums; line-height: 1; }
+  .cell .v small { font-size: 14px; color: var(--grey-2); }
+  .cell .l { font-size: 13px; color: var(--grey-1); margin-top: 8px; }
+  .cell .l b { color: var(--accent); font-weight: 600; }
+
+  /* ---- parts chips ---- */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .chip { font-family: var(--mono); font-size: 12.5px; color: var(--paper); border: 1px solid var(--line); padding: 5px 11px; background: var(--ink-2); }
+  .chip.hot { border-color: var(--accent-dim); color: var(--accent); }
+
+  /* ---- callout ---- */
+  .note { border-left: 2px solid var(--accent); background: rgba(99,230,195,0.05); padding: 14px 18px; margin: 22px 0 0; font-size: 14.5px; color: var(--paper); }
+  .note.warn { border-left-color: var(--gate); background: rgba(217,138,106,0.06); }
+  .note b { color: var(--paper); }
+
+  footer { border-top: 1px solid var(--line); padding: 40px 0 60px; color: var(--grey-2); font-family: var(--mono); font-size: 12.5px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+  ul.clean { list-style: none; padding: 0; margin: 18px 0 0; }
+  ul.clean li { padding: 8px 0 8px 22px; position: relative; color: var(--grey-1); font-size: 14.5px; border-bottom: 1px solid var(--line-soft); }
+  ul.clean li:before { content: "▸"; position: absolute; left: 0; color: var(--accent); }
+  ul.clean li b { color: var(--paper); font-weight: 600; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <p class="kicker">Prompt World · Model Context Protocol</p>
+    <h1 class="title">Build a stage by <span class="bw">talking</span> to your AI.</h1>
+    <p class="standfirst">Prompt World is a black-and-white 2D physics platformer where anyone's Claude can design a playable course as JSON and publish it as a URL. This is the MCP server that makes that possible — six tools, one endpoint, one hard rule: a real human must clear a stage before it goes live.</p>
+    <div class="endpoint-bar">
+      <span class="verb">POST</span>
+      <span class="url">https://promptworldgame.org/mcp</span>
+      <span class="sep">·</span>
+      <span class="proto">JSON-RPC 2.0 over Streamable HTTP · no auth to connect</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>Six tools, front to back</h2>
+    <p>The whole surface is six JSON-RPC methods behind <code class="inline">tools/call</code>. You learn the format, build the stage, hand a human a link to clear, then publish. Nothing reaches other players until a person has actually beaten it in the browser.</p>
+    <div class="flow">
+      <div class="step"><span class="idx">1</span><div><span class="who">AI</span><h4>get_toolbox</h4><p>Read the stage schema, the full parts vocabulary, physics constants, and design guidance — always call this first.</p></div></div>
+      <div class="step"><span class="idx">2</span><div><span class="who">AI · asks the human</span><h4>create_stage</h4><p>Save a new draft. Returns an <code class="inline">id</code>, a secret <code class="inline">editKey</code>, and a <b>testUrl</b> for the human to play.</p></div></div>
+      <div class="step"><span class="idx">3</span><div><span class="who">AI · iterate</span><h4>update_stage</h4><p>Edit that same stage in place while tuning it — same URL, doesn't spend the daily create quota.</p></div></div>
+      <div class="step"><span class="idx">4</span><div><span class="who">Human</span><h4>Play the testUrl</h4><p>The creator clears it in the browser. The run is replay-verified server-side and becomes the ghost + par time.</p></div></div>
+      <div class="step"><span class="idx">5</span><div><span class="who">AI</span><h4>stage_status</h4><p>Poll until <code class="inline">cleared: true</code> — proof the human beat it.</p></div></div>
+      <div class="step"><span class="idx">6</span><div><span class="who">AI · asks the human</span><h4>publish_stage</h4><p>Go live under a creator-approved name. Blocked until a verified clear exists.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Reference</p>
+    <h2>The six tools</h2>
+    <p>Every call is <code class="inline">{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"…","arguments":{…}}}</code>. Tags mark each tool <span class="tag read">read</span> (safe, no writes), <span class="tag write">write</span> (creates or changes data), or <span class="tag gate">human-gate</span> (needs a real human clear).</p>
+
+    <!-- get_toolbox -->
+    <div class="tool">
+      <div class="head">
+        <span class="name">get_toolbox</span>
+        <span class="tag read">read</span>
+        <p class="summary">The single source of truth for the stage format: JSON schema, all 24 part types, physics constants, size/coordinate limits, background &amp; music recipes, and design rules. Call it first, every session.</p>
+      </div>
+      <div class="body">
+        <p class="returns"><b>Arguments</b> — none.</p>
+        <p class="returns"><b>Returns</b> — one long text document (the toolbox). Not machine-structured; it's written for the AI to read and follow.</p>
+      </div>
+    </div>
+
+    <!-- create_stage -->
+    <div class="tool">
+      <div class="head">
+        <span class="name">create_stage</span>
+        <span class="tag write">write</span>
+        <p class="summary">Validate and save a new stage as a draft. Returns the id, a secret editKey (keep it), a testUrl for the human to clear, and a playUrl for after publishing.</p>
+      </div>
+      <div class="body">
+        <table class="params">
+          <caption>Arguments</caption>
+          <thead><tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="pn">stage</td><td class="pt">object</td><td><span class="req">required</span></td><td>The full stage JSON — playerStart, goal, parts, and optional bg / music / hideGhost. See the toolbox schema.</td></tr>
+            <tr><td class="pn">creatorToken</td><td class="pt">string</td><td><span class="opt">optional</span></td><td>Your identity token from a previous create. Omit on first use — one is minted and returned.</td></tr>
+            <tr><td class="pn">creatorName</td><td class="pt">string</td><td><span class="opt">optional</span></td><td>The "made by ___" credit (≤30 chars). Always asked of the human on first use; only used when a new identity is minted.</td></tr>
+          </tbody>
+        </table>
+        <p class="returns"><b>Returns</b> — <code class="inline">id</code>, <code class="inline">editKey</code>, <code class="inline">testUrl</code>, <code class="inline">playUrl</code>, <code class="inline">status: "draft"</code>, and on first use a <code class="inline">creatorToken</code> to reuse.</p>
+        <div class="code-wrap"><pre><span class="c">// request</span>
+{
+  <span class="k">"name"</span>: <span class="m">"tools/call"</span>,
+  <span class="k">"arguments"</span>: {
+    <span class="k">"stage"</span>: {
+      <span class="k">"schemaVersion"</span>: <span class="s">"0.3"</span>,
+      <span class="k">"name"</span>: <span class="s">"Split Second"</span>,
+      <span class="k">"timeLimit"</span>: <span class="n">60</span>,
+      <span class="k">"playerStart"</span>: { <span class="k">"x"</span>: <span class="n">-12</span>, <span class="k">"y"</span>: <span class="n">-2.5</span> },
+      <span class="k">"goal"</span>: { <span class="k">"x"</span>: <span class="n">20</span>, <span class="k">"y"</span>: <span class="n">-2.3</span>, <span class="k">"w"</span>: <span class="n">1.4</span>, <span class="k">"h"</span>: <span class="n">2.6</span> },
+      <span class="k">"parts"</span>: [ { <span class="k">"type"</span>: <span class="s">"solid"</span>, <span class="k">"x"</span>: <span class="n">0</span>, <span class="k">"y"</span>: <span class="n">-4</span>, <span class="k">"w"</span>: <span class="n">40</span>, <span class="k">"h"</span>: <span class="n">1</span> } ]
+    },
+    <span class="k">"creatorName"</span>: <span class="s">"Aki"</span>
+  }
+}</pre></div>
+      </div>
+    </div>
+
+    <!-- update_stage -->
+    <div class="tool">
+      <div class="head">
+        <span class="name">update_stage</span>
+        <span class="tag write">write</span>
+        <p class="summary">Edit an existing stage in place — same id, same URL — instead of minting a new draft. This is how you iterate on a course without burning the daily create quota.</p>
+      </div>
+      <div class="body">
+        <table class="params">
+          <caption>Arguments</caption>
+          <thead><tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="pn">id</td><td class="pt">string</td><td><span class="req">required</span></td><td>The stage to update.</td></tr>
+            <tr><td class="pn">editKey</td><td class="pt">string</td><td><span class="req">required</span></td><td>The editKey from create — only the creator holds it.</td></tr>
+            <tr><td class="pn">stage</td><td class="pt">object</td><td><span class="req">required</span></td><td>The full replacement stage JSON (same schema as create_stage).</td></tr>
+            <tr><td class="pn">creatorToken</td><td class="pt">string</td><td><span class="opt">optional</span></td><td>Attributes the edit; for the operator, exempts it from rate limits.</td></tr>
+          </tbody>
+        </table>
+        <div class="note warn"><b>Updating a published stage sends it back to draft.</b> The content changed, so its old clear and ghost are discarded — it must be re-cleared and re-published. This keeps every published clear record honest.</div>
+      </div>
+    </div>
+
+    <!-- stage_status -->
+    <div class="tool">
+      <div class="head">
+        <span class="name">stage_status</span>
+        <span class="tag read">read</span>
+        <p class="summary">Check where a stage stands: draft or published, whether a clear has been recorded, and the clear time. Poll this after handing the human the testUrl.</p>
+      </div>
+      <div class="body">
+        <table class="params">
+          <caption>Arguments</caption>
+          <thead><tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr></thead>
+          <tbody><tr><td class="pn">id</td><td class="pt">string</td><td><span class="req">required</span></td><td>The stage id.</td></tr></tbody>
+        </table>
+        <div class="code-wrap"><pre><span class="c">// response text</span>
+{
+  <span class="k">"id"</span>: <span class="s">"bda3rcez"</span>,
+  <span class="k">"name"</span>: <span class="s">"Ukiyo-e Orbit"</span>,
+  <span class="k">"status"</span>: <span class="s">"draft"</span>,
+  <span class="k">"cleared"</span>: <span class="n">true</span>,        <span class="c">// ← the human beat it</span>
+  <span class="k">"clearTimeMs"</span>: <span class="n">14000</span>,
+  <span class="k">"playUrl"</span>: <span class="n">null</span>       <span class="c">// set once published</span>
+}</pre></div>
+      </div>
+    </div>
+
+    <!-- publish_stage -->
+    <div class="tool">
+      <div class="head">
+        <span class="name">publish_stage</span>
+        <span class="tag write">write</span>
+        <span class="tag gate">human-gate</span>
+        <p class="summary">Make a cleared stage public. Blocked until a verified human clear exists. Before calling, the AI asks the human to confirm the final name and passes it as confirmedName.</p>
+      </div>
+      <div class="body">
+        <table class="params">
+          <caption>Arguments</caption>
+          <thead><tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="pn">id</td><td class="pt">string</td><td><span class="req">required</span></td><td>The stage to publish.</td></tr>
+            <tr><td class="pn">editKey</td><td class="pt">string</td><td><span class="req">required</span></td><td>Proof of authorship.</td></tr>
+            <tr><td class="pn">confirmedName</td><td class="pt">string</td><td><span class="req">required</span></td><td>The name the human explicitly approved (1–60 chars). The stage is renamed to this. Never invented by the AI.</td></tr>
+          </tbody>
+        </table>
+        <p class="returns"><b>Returns</b> — <code class="inline">status: "published"</code>, the public <code class="inline">playUrl</code>, plus share text and a search hint.</p>
+      </div>
+    </div>
+
+    <!-- list_stages -->
+    <div class="tool">
+      <div class="head">
+        <span class="name">list_stages</span>
+        <span class="tag read">read</span>
+        <p class="summary">Return every published community stage with its play URL. Read-only.</p>
+      </div>
+      <div class="body">
+        <p class="returns"><b>Arguments</b> — none. <b>Returns</b> — the published stage list.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">The rule you can't skip</p>
+    <h2><span class="n">↯</span>Publishing needs a human clear</h2>
+    <p>An AI cannot bot-solve or auto-verify a stage. The only path to publish is: a real person opens the testUrl, beats it in the browser, and their run is re-simulated server-side against the exact deterministic physics. That verified run becomes the stage's ghost and par time. No clear, no publish — for everyone, including the operator.</p>
+    <div class="note">Why it holds: the clear is a <b>replay certificate</b> re-run through the same 50 Hz deterministic sim the browser used. A forged or impossible run fails re-simulation and is rejected. Editing a live stage voids its clear precisely because the old certificate no longer matches the new layout.</div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Abuse controls</p>
+    <h2><span class="n">⊘</span>Limits &amp; capacity</h2>
+    <p>The endpoint is open — no key to connect — so limits are per-IP-per-day, with platform-wide circuit breakers behind them. Honest iteration is cheap; flooding is bounded.</p>
+    <div class="grid">
+      <div class="cell"><div class="v">30<small> /day</small></div><div class="l"><b>create</b> — new drafts per IP</div></div>
+      <div class="cell"><div class="v">300<small> /day</small></div><div class="l"><b>update</b> — edits to your own stage per IP</div></div>
+      <div class="cell"><div class="v">10<small> /day</small></div><div class="l"><b>publish</b> — per IP</div></div>
+      <div class="cell"><div class="v">5<small> /day</small></div><div class="l"><b>publish</b> — per creator identity</div></div>
+      <div class="cell"><div class="v">7<small> days</small></div><div class="l">unpublished <b>drafts</b> auto-deleted</div></div>
+      <div class="cell"><div class="v">300<small> parts</small></div><div class="l">max parts per stage</div></div>
+      <div class="cell"><div class="v">5,000</div><div class="l">published-stage <b>ceiling</b></div></div>
+      <div class="cell"><div class="v">15,000</div><div class="l">draft pool (oldest evicted first)</div></div>
+    </div>
+    <ul class="clean">
+      <li><b>Distributed floods</b> can't lock out honest creators: drafts self-trim (oldest first) and the published pool is reserved — an attacker can only make drafts, and drafts are short-lived.</li>
+      <li><b>The operator (admin token)</b> bypasses the create &amp; update limits — but still cannot skip the human-clear gate to publish.</li>
+      <li><b>Cloudflare</b> sits in front with its own DDoS/WAF and a per-IP rate-limiting rule on <code class="inline">/mcp</code>.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Vocabulary</p>
+    <h2><span class="n">▦</span>24 part types</h2>
+    <p>Everything a stage is built from. Coordinates are world units (centres); sizes 0.05–100; up to 300 parts. Full behaviour, arguments, and limits live in <code class="inline">get_toolbox</code>.</p>
+    <div class="chips">
+      <span class="chip hot">solid</span><span class="chip hot">hazard</span><span class="chip">jumpPad</span><span class="chip">boost</span>
+      <span class="chip">movingPlatform</span><span class="chip">crumble</span><span class="chip">faller</span><span class="chip">conveyor</span>
+      <span class="chip">gravitySet</span><span class="chip">gravityFlip</span><span class="chip">timedGate</span><span class="chip">key</span>
+      <span class="chip">door</span><span class="chip">launcher</span><span class="chip">cannon</span><span class="chip">checkpoint</span>
+      <span class="chip">rotatingHazard</span><span class="chip">teleporter</span><span class="chip">fan</span><span class="chip">switch</span>
+      <span class="chip">switchGate</span><span class="chip hot">enemy</span><span class="chip hot">bossDoor</span>
+    </div>
+    <p style="margin-top:26px">Plus three purely-decorative, sim-independent layers on any stage:</p>
+    <ul class="clean">
+      <li><b>bg</b> — a 1-bit black/white backdrop image (RLE + base64). Default 256×144, ~6 KB. Never touches physics.</li>
+      <li><b>music</b> — a tiny synthesized BGM recipe (tempo, key/scale, drums, bass, lead voice, chord preset). A few hundred bytes; the game renders it at runtime.</li>
+      <li><b>hideGhost</b> — <code class="inline">true</code> hides the creator's ghost + par, for trick / blind / fake-out stages where showing the answer spoils it.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Prompt World · MCP specification</span>
+    <span>POST /mcp · JSON-RPC 2.0 · get_toolbox is the living source of truth</span>
+  </div>
+</footer>
+</body>
+</html>
