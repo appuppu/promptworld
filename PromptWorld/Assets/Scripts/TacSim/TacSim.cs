@@ -133,6 +133,8 @@ public static class TAC
     public const double DRONE_BOOM_AT = 1.1;
     public const double DRONE_BLAST_R = 1.6;
     public const double DRONE_CRASH_SPEED = 3.5;
+    public const double DRONE_ENGAGE_Y = 1.4;
+    public const double DRONE_DESCEND = 3.5;
 
     public const int OPERATOR_HP = 1;
     public const double OPERATOR_R = 0.4;
@@ -3101,6 +3103,14 @@ public class TacWorld
             else
             {
                 w.MoveEnemy(en, en.tx, en.tz, TAC.DRONE_CHASE_SPEED, true);
+                // alerted: drop to the player's eye line FIRST and chase there — the
+                // hover-then-vertical-drop was an unavoidable overhead kill on touch
+                // controls; at aim height the drone can be intercepted (2026-07-20)
+                double egy = w.GroundY(en.x, en.z, en.y, en.r) + TAC.DRONE_ENGAGE_Y;
+                double drop = TAC.DRONE_DESCEND * TAC.TICK;
+                if (en.y > egy + drop) en.y = en.y - drop;
+                else if (en.y < egy - drop) en.y = en.y + drop;
+                else en.y = egy;
                 if (!en.seesPlayer)
                 {
                     double ldx = en.tx - en.x;

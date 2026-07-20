@@ -57,14 +57,50 @@ public static class BuildScript
         PlayerSettings.iOS.appleDeveloperTeamID = "M86QCKBHW8";
         PlayerSettings.SetScriptingBackend(NamedBuildTarget.iOS, ScriptingImplementation.IL2CPP);
 
+        // Dev and release builds must NOT append over each other: mixing
+        // Development/non-Development artifacts in one Xcode project leaves
+        // inconsistent object files behind (seen as "GenerateDSYMFile failed"
+        // at Archive). If the existing output was built in the other mode,
+        // regenerate fresh — the user must close/reopen the Xcode workspace once.
+        const string modeMarker = "Builds/iOS-Tac/.pw_buildmode";
+        string wantMode = TacIosDev ? "dev" : "release";
+        if (System.IO.Directory.Exists("Builds/iOS-Tac"))
+        {
+            // no marker = built before this guard existed (mode unknown, and
+            // today's release→dev appends DID mix) — always regenerate once
+            string prevMode = System.IO.File.Exists(modeMarker) ? System.IO.File.ReadAllText(modeMarker).Trim() : "unknown";
+            if (prevMode != wantMode)
+            {
+                Debug.Log("[BuildScript] build mode changed (" + prevMode + " -> " + wantMode + ") — regenerating Builds/iOS-Tac fresh. Close and reopen the Xcode workspace after this build.");
+                System.IO.Directory.Delete("Builds/iOS-Tac", true);
+            }
+        }
         // Append into the existing Xcode project when present so Xcode can stay
         // open across rebuilds (script/scene changes flow in; just press Run).
         var opts = System.IO.Directory.Exists("Builds/iOS-Tac")
             ? BuildOptions.AcceptExternalModificationsToPlayer
             : BuildOptions.None;
+        if (TacIosDev) opts |= BuildOptions.Development;
         BuildReport report = BuildPipeline.BuildPlayer(
             new[] { "Assets/Scenes/Tac.unity" }, "Builds/iOS-Tac", BuildTarget.iOS, opts);
-        Finish(report, "Builds/iOS-Tac (Xcode project, " + (opts == BuildOptions.None ? "fresh" : "append") + ")");
+        if (report.summary.result == BuildResult.Succeeded)
+            System.IO.File.WriteAllText(modeMarker, wantMode);
+        Finish(report, "Builds/iOS-Tac (Xcode project, " + (opts.HasFlag(BuildOptions.AcceptExternalModificationsToPlayer) ? "append" : "fresh")
+            + (TacIosDev ? ", DEVELOPMENT build → TEST ads" : ", release → LIVE ads") + ")");
+        TacIosDev = false;
+    }
+
+    static bool TacIosDev;
+
+    // Development twin of BuildTacIOS: same Xcode project, but flagged as a
+    // Unity Development Build — Debug.isDebugBuild turns true on device, which
+    // flips AdMobBridge onto Google's always-fill TEST ad units automatically
+    // (clicking live ads on a dev device risks invalid-traffic flags). Use for
+    // day-to-day device runs; ship with plain BuildTacIOS.
+    public static void BuildTacIOSDev()
+    {
+        TacIosDev = true;
+        BuildTacIOS();
     }
 
     // Android twin of BuildTacIOS: same portrait-only TAC-only app, straight to
@@ -87,10 +123,13 @@ public static class BuildScript
         // second, filter-less launcher.
         PlayerSettings.Android.applicationEntry = AndroidApplicationEntry.Activity;
 
+        // The debug-signed APK is a local-testing artifact — build it as a
+        // Development Build so AdMobBridge serves TEST ads on it (the release
+        // AAB below stays non-development → live ads).
         BuildReport report = BuildPipeline.BuildPlayer(
             new[] { "Assets/Scenes/Tac.unity" },
-            "Builds/Android-Tac/PromptWorldTac.apk", BuildTarget.Android, BuildOptions.None);
-        Finish(report, "Builds/Android-Tac/PromptWorldTac.apk");
+            "Builds/Android-Tac/PromptWorldTac.apk", BuildTarget.Android, BuildOptions.Development);
+        Finish(report, "Builds/Android-Tac/PromptWorldTac.apk (DEVELOPMENT build → TEST ads)");
     }
 
     // Play Store upload build: a RELEASE-SIGNED .aab (App Bundle). Play requires

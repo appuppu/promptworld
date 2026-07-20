@@ -3,94 +3,97 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Create — Prompt World</title>
-<meta property="og:title" content="Create your own world — Prompt World">
-<meta property="og:description" content="Build a playable stage by talking to any MCP-capable AI. No tools, no signup — just a prompt.">
+<title>Create — Prompt World TACTICAL</title>
+<meta property="og:title" content="Create your own arena — Prompt World TACTICAL">
+<meta property="og:description" content="Build a playable 3D stealth-shooter stage by talking to any MCP-capable AI. No tools, no signup — just a prompt.">
 <meta property="og:image" content="https://promptworldgame.org/og-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <style>
+  /* Creator guide for the MAIN game (3D tactical stealth shooter) — same design
+     tokens as tac.html / tac-home.html: bg #0b0d10, panel #12151b, hairline
+     #2a2f38, teal #4dd2c3. The classic 2D guide lives on at /create-classic. */
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #000; color: #fff; font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", "Noto Sans CJK", Arial, sans-serif;
+  :root { --bg:#0b0d10; --panel:#12151b; --line:#2a2f38; --fg:#f2f4f6; --dim:#9aa3ad; --teal:#4dd2c3; }
+  body { background: var(--bg); color: var(--fg);
+         font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", "Noto Sans CJK", Arial, sans-serif;
          line-height: 1.7; padding: 24px 24px 96px; }
   main { max-width: 640px; margin: 0 auto; }
-  h1 { font-size: 40px; letter-spacing: 2px; margin-bottom: 8px; }
-  .tagline { opacity: .55; margin-bottom: 44px; }
-  h2 { font-size: 15px; letter-spacing: 3px; opacity: .5; margin: 44px 0 12px; }
-  p { margin-bottom: 12px; }
-  code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14px; }
-  pre { background: #111; border: 1px solid #333; padding: 14px 16px; overflow-x: auto;
-        margin: 12px 0; white-space: pre-wrap; word-break: break-all; }
-  .rule { border-left: 3px solid #fff; padding-left: 14px; margin: 10px 0; }
-  a { color: #fff; }
-  .play { display: inline-block; border: 2px solid #fff; padding: 12px 28px; margin-top: 40px;
-          text-decoration: none; letter-spacing: 2px; }
-  .play:hover { background: #fff; color: #000; }
+  h1 { font-size: clamp(26px, 7vw, 40px); letter-spacing: .1em; margin-bottom: 8px; font-weight: 800; }
+  h1 b { color: var(--teal); font-weight: 800; }
+  .tagline { color: var(--dim); margin-bottom: 36px; }
+  h2 { font-size: 14px; letter-spacing: 3px; color: var(--teal); margin: 44px 0 12px; }
+  p { margin-bottom: 12px; color: #cfd6de; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+  pre { background: #07090c; border: 1px solid var(--line); padding: 14px 16px; overflow-x: auto;
+        margin: 12px 0; white-space: pre-wrap; word-break: break-all; color: var(--teal); }
+  .rule { border-left: 3px solid var(--teal); padding-left: 14px; margin: 10px 0; }
+  a { color: var(--fg); }
+  .play { display: inline-block; border: 1px solid var(--teal); color: var(--teal); padding: 12px 28px;
+          margin-top: 40px; text-decoration: none; letter-spacing: 2px; }
+  .play:hover { background: var(--teal); color: #04110f; }
 
   /* language switcher */
   .langbar { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
-  .langbar button { background: none; border: 1px solid #333; color: #888; padding: 5px 11px;
+  .langbar button { background: none; border: 1px solid var(--line); color: #888; padding: 5px 11px;
                     font-size: 12px; letter-spacing: 1px; cursor: pointer; font-family: inherit; }
-  .langbar button:hover { color: #fff; border-color: #666; }
-  .langbar button.active { color: #000; background: #fff; border-color: #fff; }
+  .langbar button:hover { color: var(--fg); border-color: #666; }
+  .langbar button.active { color: #04110f; background: var(--teal); border-color: var(--teal); }
 
-  /* living gimmick hero */
-  .hero { position: relative; height: 200px; margin: 0 0 44px; border: 1px solid #222; overflow: hidden; }
+  /* radar hero: sweeping cone + patrol blips, pure CSS */
+  .hero { position: relative; height: 210px; margin: 0 0 44px; border: 1px solid var(--line);
+          overflow: hidden; background: radial-gradient(circle at 50% 55%, #10171a 0%, #0b0d10 70%); }
   .hero * { position: absolute; }
-  .ground { left: 0; right: 0; bottom: 24px; height: 10px; background: #fff; }
-  .player { width: 26px; height: 26px; background: #fff; bottom: 34px; left: -30px; animation: run 7s linear infinite; }
-  @keyframes run { 0%{left:-30px;bottom:34px} 22%{left:20%;bottom:34px} 28%{left:25%;bottom:104px} 34%{left:30%;bottom:34px} 54%{left:52%;bottom:34px} 60%{left:57%;bottom:114px} 66%{left:62%;bottom:34px} 88%{left:86%;bottom:34px} 100%{left:104%;bottom:34px} }
-  .faller { width: 44px; height: 44px; background: #fff; left: 24%; top: 8px; animation: slam 3.5s ease-in infinite; }
-  .faller::before, .faller::after { content: ""; position: absolute; top: 9px; width: 7px; height: 9px; background: #000; }
-  .faller::before { left: 9px; } .faller::after { right: 9px; }
-  @keyframes slam { 0%,55%{top:8px} 62%,74%{top:122px} 100%{top:8px} }
-  .gate { width: 16px; height: 54px; background: #fff; left: 45%; bottom: 34px; animation: blink 2s steps(1) infinite; }
-  @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
-  .mover { width: 70px; height: 10px; background: #fff; bottom: 92px; left: 56%; animation: slide 4s ease-in-out infinite alternate; }
-  @keyframes slide { from{left:56%} to{left:72%} }
-  .key { width: 16px; height: 16px; background: #fff; left: 84%; top: 46px; animation: bob 1.6s ease-in-out infinite alternate; }
-  .key::after { content:""; position:absolute; inset:5px; background:#000; }
-  @keyframes bob { from{top:46px} to{top:60px} }
-  .goal { width: 34px; height: 66px; border: 5px solid #fff; right: 18px; bottom: 34px; }
-  .spike { width: 18px; height: 18px; background: #fff; transform: rotate(45deg); bottom: 28px; left: 38%; }
+  .ring { border: 1px solid rgba(77,210,195,.22); border-radius: 50%; left: 50%; top: 55%;
+          transform: translate(-50%,-50%); }
+  .r1 { width: 110px; height: 110px; } .r2 { width: 210px; height: 210px; } .r3 { width: 320px; height: 320px; }
+  .sweep { left: 50%; top: 55%; width: 170px; height: 170px; margin: -85px 0 0 -85px; border-radius: 50%;
+           background: conic-gradient(rgba(77,210,195,.28), transparent 18%);
+           animation: spin 4s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .blip { width: 8px; height: 8px; border-radius: 50%; }
+  .me { background: var(--teal); left: 50%; top: 55%; margin: -4px 0 0 -4px; box-shadow: 0 0 10px var(--teal); }
+  .foe { background: #ff5a48; animation: patrol 6s ease-in-out infinite alternate; }
+  .f1 { left: 26%; top: 34%; } .f2 { left: 68%; top: 66%; animation-delay: -2s; }
+  .f3 { left: 74%; top: 30%; animation-delay: -4s; }
+  @keyframes patrol { from { transform: translateX(0); } to { transform: translateX(46px); } }
+  .wall { background: #39424d; }
+  .w1 { left: 18%; top: 52%; width: 54px; height: 8px; }
+  .w2 { left: 60%; top: 44%; width: 8px; height: 42px; }
 
-  /* gimmick-showcase call-to-action (links to the Sandbox demo stage) */
-  .showcase { display: block; position: relative; text-decoration: none; color: #fff;
-              border: 1px solid #fff; padding: 22px 24px; margin: 8px 0 12px; overflow: hidden;
-              background: #0a0a0a; transition: background .15s, transform .15s; }
+  /* showcase call-to-action (links to a live published stage) */
+  .showcase { display: block; position: relative; text-decoration: none; color: var(--fg);
+              border: 1px solid var(--teal); padding: 22px 24px; margin: 8px 0 12px; overflow: hidden;
+              background: #0d1216; transition: background .15s, transform .15s; }
   .showcase::before { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
-              background: linear-gradient(100deg, transparent, rgba(255,255,255,.14), transparent);
-              animation: sweep 4.5s linear infinite; pointer-events: none; }
-  @keyframes sweep { 0% { left: -60%; } 60%,100% { left: 130%; } }
-  .showcase:hover { background: #fff; color: #000; transform: translateY(-1px); }
+              background: linear-gradient(100deg, transparent, rgba(77,210,195,.16), transparent);
+              animation: sweepx 4.5s linear infinite; pointer-events: none; }
+  @keyframes sweepx { 0% { left: -60%; } 60%,100% { left: 130%; } }
+  .showcase:hover { background: var(--teal); color: #04110f; transform: translateY(-1px); }
   .showcase:hover::before { display: none; }
   .showcase span { display: block; position: relative; }
-  .showcase-eyebrow { font-size: 11px; letter-spacing: 3px; opacity: .55; margin-bottom: 6px; }
+  .showcase-eyebrow { font-size: 11px; letter-spacing: 3px; opacity: .6; margin-bottom: 6px; }
   .showcase-title { font-size: 22px; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
-  .showcase-sub { font-size: 14px; opacity: .7; line-height: 1.55; margin-bottom: 12px; }
+  .showcase-sub { font-size: 14px; opacity: .75; line-height: 1.55; margin-bottom: 12px; }
   .showcase-cta { font-size: 13px; letter-spacing: 2px; font-weight: 700; }
-
 </style>
 </head>
 <body>
-<!-- The platform's main game is now the 3D stealth shooter; this page documents
-     the classic 2D platformer, which remains fully creatable. -->
-<a href="/" style="display:block;background:#0b0d10;color:#4dd2c3;text-align:center;padding:12px 16px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;text-decoration:none;border-bottom:1px solid #2a2f38;">
-  ★ NEW MAIN GAME — 3D STEALTH SHOOTER / 新メインゲーム「3Dステルスシューター」はこちら →
-</a>
 <main>
   <div class="langbar" id="langbar"></div>
 
-  <h1>PROMPT WORLD</h1>
+  <h1>PROMPT <b>WORLD</b></h1>
   <p class="tagline" data-i="tagline1"></p>
 
   <div class="hero" aria-hidden="true">
-    <div class="ground"></div><div class="player"></div><div class="faller"></div>
-    <div class="spike"></div><div class="gate"></div><div class="mover"></div>
-    <div class="key"></div><div class="goal"></div>
+    <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
+    <div class="sweep"></div>
+    <div class="wall w1"></div><div class="wall w2"></div>
+    <div class="blip me"></div>
+    <div class="blip foe f1"></div><div class="blip foe f2"></div><div class="blip foe f3"></div>
   </div>
   <p class="tagline" data-i="tagline2"></p>
 
-  <a class="showcase" href="/?stage=xxhytrh2">
+  <a class="showcase" href="/?stage=19w3m6hj">
     <span class="showcase-eyebrow" data-i="showcaseEyebrow"></span>
     <span class="showcase-title" data-i="showcaseTitle"></span>
     <span class="showcase-sub" data-i="showcaseSub"></span>
@@ -116,25 +119,25 @@
   <p data-i="step4a"></p>
   <p data-i="step4b"></p>
 
-  <h2 data-i="gimmicksh"></h2>
-  <p data-i="gimmicksa"></p>
-  <a class="showcase" href="/?stage=xxhytrh2" style="margin-top:8px">
-    <span class="showcase-eyebrow" data-i="gimmicksEyebrow"></span>
-    <span class="showcase-title" data-i="gimmicksTitle"></span>
-    <span class="showcase-cta" data-i="gimmicksCta"></span>
-  </a>
+  <h2 data-i="partsh"></h2>
+  <p data-i="partsa"></p>
 
   <h2 data-i="limitsh"></h2>
   <p data-i="limits"></p>
 
   <a class="play" href="/" data-i="playnow"></a>
 
-  <p style="margin-top:48px;opacity:.4;font-size:13px;letter-spacing:1px">
-    <a href="/privacy.html" style="color:#fff" data-i="privacyLink"></a>
+  <p style="margin-top:48px;opacity:.5;font-size:13px;letter-spacing:1px">
+    <a href="/create-classic" data-i="classicLink"></a>
+  </p>
+  <p style="margin-top:12px;opacity:.4;font-size:13px;letter-spacing:1px">
+    <a href="/support" data-i="supportLink"></a>
     &nbsp;·&nbsp;
-    <a href="/terms.html" style="color:#fff" data-i="termsLink"></a>
+    <a href="/privacy.html" data-i="privacyLink"></a>
     &nbsp;·&nbsp;
-    <a href="/mcp-spec" style="color:#fff">MCP Spec</a>
+    <a href="/terms.html" data-i="termsLink"></a>
+    &nbsp;·&nbsp;
+    <a href="/mcp-spec">MCP Spec</a>
   </p>
 </main>
 
@@ -142,166 +145,161 @@
 const I18N = {
   en: {
     _name: 'English',
-    tagline1: 'Worlds made of prompts. You describe a stage — your AI assistant builds it — anyone plays it from a URL.',
-    tagline2: 'Crushers, conveyors, timed gates, gravity flips, keys & doors — all of it is yours to combine, with a sentence.',
+    tagline1: '3D tactical stealth arenas made of prompts. Describe a mission — your AI assistant builds it — anyone plays it from a URL.',
+    tagline2: 'Patrolling soldiers, snipers, kamikaze drones, gatling nests, shield bearers, APCs — trenches, searchlights, night ops, EMP veils. All yours to combine, with a sentence.',
     showcaseEyebrow: 'SEE WHAT YOU CAN BUILD',
-    showcaseTitle: 'Play the Gimmick Sandbox →',
-    showcaseSub: 'One stage with every gimmick in it — crushers, cannons, boosts, gravity setters, keys & doors, launchers. Feel how each one plays before you design your own.',
-    showcaseCta: 'TRY IT NOW →',
+    showcaseTitle: 'Play a live arena →',
+    showcaseSub: 'A published stage, built entirely by prompting an AI: layered defenses, gatling nests, a lone sniper. Feel the game before you design your own mission.',
+    showcaseCta: 'DEPLOY NOW →',
     step1h: 'STEP 1 — CONNECT AN MCP CLIENT',
     step1a: 'Prompt World is an MCP server. Add this endpoint to any MCP-capable AI client (Claude, or anything that speaks MCP):',
     step1b: 'Example — Claude Code:',
     step2h: 'STEP 2 — SAY WHAT YOU WANT',
-    step2a: 'Just describe a stage. For example:',
-    step2ex: 'Create a Prompt World stage: a gravity-flip corridor where I run\non the ceiling to dodge spikes, then a big launch into the goal.\nTime limit 60 seconds.',
-    step2b: 'Your assistant reads the toolbox, designs the level, and hands you a test link.',
+    step2a: 'Just describe a mission. For example:',
+    step2ex: 'Create a Prompt World tac stage: a night warehouse district.\nPatrols between crates, a sniper on the tower, searchlights on\nthe yard. I sneak to three intel pickups, then reach the exit.',
+    step2b: 'Your assistant reads the toolbox, designs the arena, and hands you a test link.',
     step3h: 'STEP 3 — PLAY IT, THEN PUBLISH',
     ruleLabel: 'The one rule:',
     rule: 'a stage can only be published after YOU clear it in the browser. Your run is recorded and mathematically verified by the server — impossible stages cannot exist here.',
     step3a: 'Clear your test link, ask your assistant to publish, then find your stage by searching its name — or share the play URL. Friends open it and play instantly. No install, no account, free.',
     step4h: 'STEP 4 — SHARE IT',
     step4a: 'A stage only grows if people see it. Post your play URL on X/Twitter and Instagram — a short screen-recording of your run works best.',
-    step4b: 'When you publish, your assistant hands you a ready-to-post caption and a one-tap X link. In-game, the SHARE button on the clear screen opens your phone\u2019s share sheet so you can send it straight to Instagram, X, or messages.',
-    gimmicksh: 'GIMMICK CATALOG',
-    gimmicksa: 'Every part you can place — terrain, hazards, gravity, keys & doors, wind, warps, and monsters. Your assistant knows them all; just describe what you want. Want to feel them? Play the Sandbox below — it has one of every part.',
-    gimmicksEyebrow: 'EVERY PART, LIVE',
-    gimmicksTitle: 'Play the Gimmick Sandbox →',
-    gimmicksCta: 'SEE THEM ALL →',
+    step4b: 'When you publish, your assistant hands you a ready-to-post caption and a one-tap X link.',
+    partsh: 'WHAT YOU CAN PLACE',
+    partsa: 'Eight enemy types (riflemen, gatling nests, snipers, kamikaze drones, drone operators, satchel bombers, shield bearers, APCs), terrain (rocks, walls, platforms, stairs, trenches, rivers), tools of the trade (mines, explosive barrels, medkits, EMP switches, intel objectives, exit zones) and full night ops with lamps and sweeping searchlights. Your assistant knows every part — just describe the mission.',
     limitsh: 'LIMITS',
-    limits: 'Time limit 5s–30min · up to 300 parts per stage · 5 publishes per day. Stages clearable in under 3 seconds are too trivial to publish.',
+    limits: 'Arena 10–200 m · up to 2000 parts and 200 enemies per stage · published stages get a fixed 5-minute clear limit. Verified clears only — the server re-simulates your run.',
     playnow: 'PLAY NOW →',
+    classicLink: 'Looking for the classic 2D platformer guide? → /create-classic',
+    supportLink: 'Support',
     privacyLink: 'Privacy Policy',
     termsLink: 'Terms of Service',
   },
   ja: {
     _name: '日本語',
-    tagline1: 'プロンプトでできた世界。ステージを言葉で説明すると、あなたのAIアシスタントが組み立て、誰でもURLから遊べます。',
-    tagline2: 'クラッシャー、ベルトコンベア、時限ゲート、重力反転、鍵と扉——ぜんぶ一文で組み合わせられます。',
+    tagline1: 'プロンプトでできた3D戦術ステルスアリーナ。ミッションを言葉で説明すると、あなたのAIアシスタントが組み立て、誰でもURLから遊べます。',
+    tagline2: '巡回兵、スナイパー、自爆ドローン、ガトリング砲台、盾持ち、装甲車——塹壕、サーチライト、夜間作戦、EMPヴェール。ぜんぶ一文で組み合わせられます。',
     showcaseEyebrow: 'どんなものが作れるか見てみる',
-    showcaseTitle: 'ギミック見本コースで遊ぶ →',
-    showcaseSub: '全ギミックを詰め込んだ1コース——クラッシャー、大砲、ブースト、重力セット、鍵と扉、ランチャー。自分で作る前に、各ギミックの手触りを体験できます。',
-    showcaseCta: '今すぐ試す →',
+    showcaseTitle: '公開中のアリーナで遊ぶ →',
+    showcaseSub: 'AIへのプロンプトだけで作られた公開ステージ——多層防衛、ガトリング陣地、一匹狼のスナイパー。自分のミッションを設計する前に、実際の手触りを体験できます。',
+    showcaseCta: '今すぐ出撃 →',
     step1h: 'STEP 1 — MCPクライアントをつなぐ',
     step1a: 'Prompt Worldは MCP サーバーです。MCP対応のAIクライアント（Claude など、MCPを話せるものなら何でも）に次のエンドポイントを追加:',
     step1b: '例 — Claude Code の場合:',
     step2h: 'STEP 2 — 作りたいものを伝える',
-    step2a: 'ステージを言葉で説明するだけ。例えば:',
-    step2ex: 'Prompt Worldのステージを作って: 天井を走ってトゲをよけ、\n最後に大きく打ち上げられてゴールへ。制限時間60秒。',
-    step2b: 'あなたのアシスタントが道具箱を読み、レベルを設計し、テスト用リンクを渡してくれます。',
+    step2a: 'ミッションを言葉で説明するだけ。例えば:',
+    step2ex: 'Prompt Worldのtacステージを作って: 夜の倉庫街。コンテナの間を\n巡回する兵、塔の上にスナイパー、庭にサーチライト。インテルを\n3つ回収して脱出ゾーンへ。',
+    step2b: 'あなたのアシスタントが道具箱を読み、アリーナを設計し、テスト用リンクを渡してくれます。',
     step3h: 'STEP 3 — プレイして、公開する',
     ruleLabel: 'たった一つのルール:',
     rule: 'ステージは、あなた自身がブラウザでクリアして初めて公開できます。プレイ記録はサーバーが数学的に検証——クリア不能なステージは存在できません。',
     step3a: 'テストリンクをクリアしたらアシスタントに公開を頼み、名前で検索して自分のステージを見つけましょう。プレイURLを共有すれば、友達もすぐ遊べます。インストール不要・アカウント不要・無料。',
     step4h: 'STEP 4 — シェアする',
     step4a: 'ステージは見てもらえないと広がりません。プレイURLを X（Twitter）や Instagram に投稿しましょう。プレイの短い画面録画が一番効果的です。',
-    step4b: '公開すると、あなたのアシスタントがそのまま投稿できるキャプションとワンタップのX投稿リンクを渡します。ゲーム内では、クリア画面のSHAREボタンでスマホの共有シートが開き、Instagram・X・メッセージなどにそのまま送れます。',
-    gimmicksh: 'ギミック一覧',
-    gimmicksa: '置ける全パーツ — 地形・ハザード・重力・鍵と扉・風・ワープ・敵まで。アシスタントは全部知っているので、やりたいことを伝えるだけでOK。実際の動きを見たいなら下のSandboxへ（全パーツが1つずつ入っています）。',
-    gimmicksEyebrow: '全パーツを実物で',
-    gimmicksTitle: 'ギミックSandboxで遊ぶ →',
-    gimmicksCta: '全部見る →',
+    step4b: '公開すると、あなたのアシスタントがそのまま投稿できるキャプションとワンタップのX投稿リンクを渡します。',
+    partsh: '置けるもの',
+    partsa: '8種の敵（ライフル兵・ガトリング砲台・スナイパー・自爆ドローン・ドローンオペレーター・爆弾兵・盾持ち・装甲車）、地形（岩・壁・足場・階段・塹壕・川）、仕掛け（地雷・爆発バレル・メドキット・EMPスイッチ・インテル目標・脱出ゾーン）、そしてランプとサーチライトの夜間作戦。アシスタントは全パーツを知っているので、ミッションを説明するだけでOK。',
     limitsh: '制限',
-    limits: '制限時間 5秒〜30分 · ステージあたり最大300パーツ · 1日5回まで公開可能。3秒未満でクリアできるステージは公開できません。',
+    limits: 'アリーナ 10〜200m · 1ステージ最大2000パーツ・敵200体 · 公開ステージの制限時間は一律5分。クリアはサーバーがリプレイを再シミュレートして検証します。',
     playnow: '今すぐプレイ →',
+    classicLink: 'クラシック2D版のガイドはこちら → /create-classic',
+    supportLink: 'サポート',
     privacyLink: 'プライバシーポリシー',
     termsLink: '利用規約',
   },
   zh: {
     _name: '中文',
-    tagline1: '用提示词构建的世界。你描述一个关卡——你的AI助手来搭建——任何人都能通过网址游玩。',
-    tagline2: '碾压块、传送带、定时门、重力反转、钥匙与门——只需一句话即可自由组合。',
+    tagline1: '用提示词构建的3D战术潜行竞技场。你描述一个任务——你的AI助手来搭建——任何人都能通过网址游玩。',
+    tagline2: '巡逻兵、狙击手、自爆无人机、加特林火力点、盾牌兵、装甲车——战壕、探照灯、夜间行动、EMP屏障。只需一句话即可自由组合。',
     showcaseEyebrow: '看看你能创造什么',
-    showcaseTitle: '试玩机关演示关卡 →',
-    showcaseSub: '一个包含所有机关的关卡——碾压块、大炮、加速、重力设定、钥匙与门、弹射器。在自己设计之前，先感受每个机关的玩法。',
-    showcaseCta: '立即试玩 →',
+    showcaseTitle: '试玩已发布的竞技场 →',
+    showcaseSub: '一个完全通过向AI提示而建成的已发布关卡——多层防御、加特林阵地、独狼狙击手。在设计自己的任务之前，先感受实际玩法。',
+    showcaseCta: '立即出击 →',
     step1h: '第 1 步 — 连接 MCP 客户端',
     step1a: 'Prompt World 是一个 MCP 服务器。将此端点添加到任何支持 MCP 的 AI 客户端（Claude，或任何支持 MCP 的工具）:',
     step1b: '示例 — Claude Code:',
     step2h: '第 2 步 — 说出你想要的',
-    step2a: '只需描述一个关卡。例如:',
-    step2ex: '创建一个 Prompt World 关卡：在天花板上奔跑躲避尖刺，\n最后被大力弹射到终点。限时60秒。',
-    step2b: '你的助手会读取工具箱，设计关卡，并给你一个测试链接。',
+    step2a: '只需描述一个任务。例如:',
+    step2ex: '创建一个 Prompt World tac 关卡：夜晚的仓库区。士兵在集装箱\n间巡逻，塔上有狙击手，院子里有探照灯。潜行收集3份情报，\n然后抵达撤离区。',
+    step2b: '你的助手会读取工具箱，设计竞技场，并给你一个测试链接。',
     step3h: '第 3 步 — 游玩，然后发布',
     ruleLabel: '唯一的规则:',
     rule: '只有你在浏览器中通关后，关卡才能发布。你的通关过程会被服务器数学验证——不可能通关的关卡无法存在。',
     step3a: '通关你的测试链接，让你的助手发布，然后搜索名称找到你的关卡，或分享游玩网址。朋友打开即玩。无需安装、无需账号、免费。',
     step4h: '第 4 步 — 分享',
     step4a: '关卡只有被看到才会传播。把游玩网址发到 X（Twitter）和 Instagram — 一段简短的通关录屏效果最好。',
-    step4b: '发布后，你的助手会给你一段可直接发布的文案和一键分享到 X 的链接。游戏内，通关画面的 SHARE 按钮会打开手机的分享面板，可直接发到 Instagram、X 或消息。',
-    gimmicksh: '道具目录',
-    gimmicksa: '所有可放置的部件——地形、危险、重力、钥匙与门、风、传送、怪物。助手全都知道，只需描述你想要的。想感受它们？玩下面的 Sandbox——每种部件都有一个。',
-    gimmicksEyebrow: '所有部件·实机',
-    gimmicksTitle: '试玩道具 Sandbox →',
-    gimmicksCta: '全部查看 →',
+    step4b: '发布后，你的助手会给你一段可直接发布的文案和一键分享到 X 的链接。',
+    partsh: '可放置的内容',
+    partsa: '8种敌人（步枪兵、加特林火力点、狙击手、自爆无人机、无人机操作员、爆破兵、盾牌兵、装甲车）、地形（岩石、墙、平台、楼梯、战壕、河流）、装置（地雷、爆炸桶、医疗包、EMP开关、情报目标、撤离区），以及带路灯和探照灯的夜间行动。助手了解所有部件——只需描述任务即可。',
     limitsh: '限制',
-    limits: '限时 5秒–30分钟 · 每关最多300个部件 · 每天最多发布5次。3秒内可通关的关卡过于简单，无法发布。',
+    limits: '竞技场 10–200米 · 每关最多2000个部件、200个敌人 · 已发布关卡的通关限时统一为5分钟。通关由服务器重新模拟验证。',
     playnow: '立即游玩 →',
+    classicLink: '寻找经典2D平台跳跃指南？→ /create-classic',
+    supportLink: '支持',
     privacyLink: '隐私政策',
     termsLink: '服务条款',
   },
   es: {
     _name: 'Español',
-    tagline1: 'Mundos hechos de prompts. Describes un nivel — tu asistente de IA lo construye — cualquiera lo juega desde una URL.',
-    tagline2: 'Aplastadores, cintas, puertas temporizadas, gravedad invertida, llaves y puertas — todo combinable con una frase.',
+    tagline1: 'Arenas 3D de sigilo táctico hechas de prompts. Describes una misión — tu asistente de IA la construye — cualquiera la juega desde una URL.',
+    tagline2: 'Patrullas, francotiradores, drones kamikaze, nidos de gatling, portaescudos, APCs — trincheras, focos, operaciones nocturnas, velos EMP. Todo combinable con una frase.',
     showcaseEyebrow: 'MIRA LO QUE PUEDES CREAR',
-    showcaseTitle: 'Juega el Sandbox de mecánicas →',
-    showcaseSub: 'Un nivel con todas las mecánicas — aplastadores, cañones, impulsos, gravedad, llaves y puertas, catapultas. Siente cómo funciona cada una antes de diseñar el tuyo.',
-    showcaseCta: 'PRUÉBALO YA →',
+    showcaseTitle: 'Juega una arena publicada →',
+    showcaseSub: 'Un nivel publicado, creado solo con prompts a una IA: defensas por capas, nidos de gatling, un francotirador solitario. Siente el juego antes de diseñar tu propia misión.',
+    showcaseCta: 'DESPLIEGA YA →',
     step1h: 'PASO 1 — CONECTA UN CLIENTE MCP',
     step1a: 'Prompt World es un servidor MCP. Añade este endpoint a cualquier cliente de IA compatible con MCP (Claude, o cualquiera que hable MCP):',
     step1b: 'Ejemplo — Claude Code:',
     step2h: 'PASO 2 — DI LO QUE QUIERES',
-    step2a: 'Solo describe un nivel. Por ejemplo:',
-    step2ex: 'Crea un nivel de Prompt World: un pasillo con gravedad invertida\ndonde corro por el techo esquivando pinchos, y un gran impulso\nhacia la meta. Límite de 60 segundos.',
-    step2b: 'Tu asistente lee la caja de herramientas, diseña el nivel y te da un enlace de prueba.',
+    step2a: 'Solo describe una misión. Por ejemplo:',
+    step2ex: 'Crea un nivel tac de Prompt World: un distrito de almacenes de\nnoche. Patrullas entre contenedores, un francotirador en la torre,\nfocos en el patio. Me infiltro por 3 objetivos de inteligencia y\nllego a la salida.',
+    step2b: 'Tu asistente lee la caja de herramientas, diseña la arena y te da un enlace de prueba.',
     step3h: 'PASO 3 — JUÉGALO Y PUBLÍCALO',
     ruleLabel: 'La única regla:',
     rule: 'un nivel solo se publica después de que TÚ lo completes en el navegador. Tu partida se verifica matemáticamente en el servidor — aquí no existen niveles imposibles.',
     step3a: 'Completa tu enlace de prueba, pide a tu asistente que publique, y encuentra tu nivel buscando su nombre — o comparte la URL. Tus amigos lo abren y juegan al instante. Sin instalar, sin cuenta, gratis.',
     step4h: 'PASO 4 — COMPÁRTELO',
     step4a: 'Un nivel solo crece si la gente lo ve. Publica tu URL en X/Twitter e Instagram — una grabación corta de tu partida funciona mejor.',
-    step4b: 'Al publicar, tu asistente te da un texto listo para publicar y un enlace de X con un toque. En el juego, el botón SHARE de la pantalla de victoria abre el menú de compartir del móvil para enviarlo a Instagram, X o mensajes.',
-    gimmicksh: 'CATÁLOGO DE ELEMENTOS',
-    gimmicksa: 'Cada pieza que puedes colocar — terreno, peligros, gravedad, llaves y puertas, viento, teletransportes y monstruos. Tu asistente las conoce todas; solo describe lo que quieres. ¿Quieres probarlas? Juega el Sandbox de abajo: tiene una de cada.',
-    gimmicksEyebrow: 'TODO, EN VIVO',
-    gimmicksTitle: 'Juega el Sandbox →',
-    gimmicksCta: 'VER TODO →',
+    step4b: 'Al publicar, tu asistente te da un texto listo para publicar y un enlace de X con un toque.',
+    partsh: 'QUÉ PUEDES COLOCAR',
+    partsa: '8 tipos de enemigos (fusileros, nidos de gatling, francotiradores, drones kamikaze, operadores de dron, bombarderos, portaescudos, APCs), terreno (rocas, muros, plataformas, escaleras, trincheras, ríos), herramientas (minas, barriles explosivos, botiquines, interruptores EMP, objetivos de inteligencia, zonas de salida) y operaciones nocturnas con lámparas y focos. Tu asistente conoce cada pieza — solo describe la misión.',
     limitsh: 'LÍMITES',
-    limits: 'Límite de 5s–30min · hasta 300 piezas por nivel · 5 publicaciones al día. Niveles superables en menos de 3 segundos son demasiado triviales.',
+    limits: 'Arena 10–200 m · hasta 2000 piezas y 200 enemigos por nivel · los niveles publicados tienen un límite fijo de 5 minutos. Solo cuentan partidas verificadas: el servidor re-simula tu run.',
     playnow: 'JUGAR AHORA →',
+    classicLink: '¿Buscas la guía del plataformas 2D clásico? → /create-classic',
+    supportLink: 'Soporte',
     privacyLink: 'Política de privacidad',
     termsLink: 'Términos del servicio',
   },
   ko: {
     _name: '한국어',
-    tagline1: '프롬프트로 만든 세계. 스테이지를 말로 설명하면 당신의 AI 어시스턴트가 만들고, 누구나 URL로 플레이합니다.',
-    tagline2: '크러셔, 컨베이어, 타이머 게이트, 중력 반전, 열쇠와 문 — 모두 한 문장으로 조합하세요.',
+    tagline1: '프롬프트로 만든 3D 전술 스텔스 아레나. 미션을 말로 설명하면 당신의 AI 어시스턴트가 만들고, 누구나 URL로 플레이합니다.',
+    tagline2: '순찰병, 스나이퍼, 자폭 드론, 개틀링 진지, 방패병, 장갑차 — 참호, 서치라이트, 야간 작전, EMP 베일. 모두 한 문장으로 조합하세요.',
     showcaseEyebrow: '무엇을 만들 수 있는지 보기',
-    showcaseTitle: '기믹 샌드박스 플레이 →',
-    showcaseSub: '모든 기믹이 담긴 한 스테이지 — 크러셔, 대포, 부스트, 중력 설정, 열쇠와 문, 런처. 직접 만들기 전에 각 기믹의 감각을 체험하세요.',
-    showcaseCta: '지금 해보기 →',
+    showcaseTitle: '공개된 아레나 플레이 →',
+    showcaseSub: 'AI에게 프롬프트만으로 만들어진 공개 스테이지 — 다층 방어, 개틀링 진지, 외로운 스나이퍼. 직접 미션을 설계하기 전에 실제 감각을 체험하세요.',
+    showcaseCta: '지금 출격 →',
     step1h: 'STEP 1 — MCP 클라이언트 연결하기',
     step1a: 'Prompt World는 MCP 서버입니다. MCP를 지원하는 AI 클라이언트(Claude 등, MCP를 지원하면 무엇이든)에 이 엔드포인트를 추가하세요:',
     step1b: '예 — Claude Code:',
     step2h: 'STEP 2 — 원하는 것을 말하기',
-    step2a: '스테이지를 설명하기만 하면 됩니다. 예를 들어:',
-    step2ex: 'Prompt World 스테이지를 만들어줘: 천장을 달리며 가시를 피하고,\n마지막에 크게 발사되어 골인. 제한 시간 60초.',
-    step2b: '당신의 어시스턴트가 도구상자를 읽고 레벨을 설계해 테스트 링크를 줍니다.',
+    step2a: '미션을 설명하기만 하면 됩니다. 예를 들어:',
+    step2ex: 'Prompt World tac 스테이지를 만들어줘: 밤의 창고 지구.\n컨테이너 사이 순찰병, 타워 위 스나이퍼, 마당의 서치라이트.\n정보 3개를 몰래 회수하고 탈출 지점까지.',
+    step2b: '당신의 어시스턴트가 도구상자를 읽고 아레나를 설계해 테스트 링크를 줍니다.',
     step3h: 'STEP 3 — 플레이하고 게시하기',
     ruleLabel: '단 하나의 규칙:',
     rule: '스테이지는 당신이 브라우저에서 직접 클리어해야만 게시할 수 있습니다. 플레이 기록은 서버가 수학적으로 검증 — 클리어 불가능한 스테이지는 존재할 수 없습니다.',
     step3a: '테스트 링크를 클리어하고 어시스턴트에게 게시를 요청한 뒤, 이름으로 검색해 스테이지를 찾으세요. 플레이 URL을 공유하면 친구도 바로 플레이합니다. 설치 불필요, 계정 불필요, 무료.',
     step4h: 'STEP 4 — 공유하기',
     step4a: '스테이지는 사람들이 봐야 퍼집니다. 플레이 URL을 X(트위터)와 인스타그램에 올리세요. 짧은 플레이 화면 녹화가 가장 효과적입니다.',
-    step4b: '게시하면 어시스턴트가 바로 올릴 수 있는 캡션과 원탭 X 공유 링크를 줍니다. 게임 내에서는 클리어 화면의 SHARE 버튼이 휴대폰 공유 시트를 열어 인스타그램, X, 메시지로 바로 보낼 수 있습니다.',
-    gimmicksh: '기믹 카탈로그',
-    gimmicksa: '배치할 수 있는 모든 부품 — 지형·위험·중력·열쇠와 문·바람·워프·몬스터까지. 어시스턴트가 전부 알고 있으니 원하는 것을 설명만 하세요. 실제 움직임을 보고 싶다면 아래 Sandbox를 플레이하세요(모든 부품이 하나씩 들어 있습니다).',
-    gimmicksEyebrow: '모든 부품·실제',
-    gimmicksTitle: '기믹 Sandbox 플레이 →',
-    gimmicksCta: '전부 보기 →',
+    step4b: '게시하면 어시스턴트가 바로 올릴 수 있는 캡션과 원탭 X 공유 링크를 줍니다.',
+    partsh: '배치할 수 있는 것',
+    partsa: '8종의 적(소총병·개틀링 진지·스나이퍼·자폭 드론·드론 오퍼레이터·폭탄병·방패병·장갑차), 지형(바위·벽·발판·계단·참호·강), 장치(지뢰·폭발 배럴·메드킷·EMP 스위치·정보 목표·탈출 지점), 그리고 램프와 서치라이트의 야간 작전. 어시스턴트가 모든 부품을 알고 있으니 미션을 설명만 하세요.',
     limitsh: '제한',
-    limits: '제한 시간 5초–30분 · 스테이지당 최대 300개 부품 · 하루 5회 게시. 3초 안에 클리어되는 스테이지는 너무 단순해 게시할 수 없습니다.',
+    limits: '아레나 10–200m · 스테이지당 최대 2000개 부품·적 200体 · 공개 스테이지의 제한 시간은 일괄 5분. 클리어는 서버가 리플레이를 재시뮬레이션해 검증합니다.',
     playnow: '지금 플레이 →',
+    classicLink: '클래식 2D 플랫포머 가이드는 여기 → /create-classic',
+    supportLink: '지원',
     privacyLink: '개인정보 처리방침',
     termsLink: '이용약관',
   },
@@ -322,6 +320,8 @@ function apply(lang) {
 }
 
 function detectLang() {
+  const qs = new URLSearchParams(location.search).get('lang');
+  if (qs && I18N[qs]) return qs;
   try { const saved = localStorage.getItem('pw_lang'); if (saved && I18N[saved]) return saved; } catch (e) {}
   const nav = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
   const code = nav.toLowerCase().split('-')[0];

@@ -23,17 +23,22 @@ public static class Ads
     [DllImport("__Internal")] private static extern int PW_AdsReady();
 #endif
 
-    /// <summary>Show a full-screen ad if enough time has passed since the last one.</summary>
+    /// <summary>Show a full-screen ad if enough time has passed since the last one.
+    /// The cap is armed ONLY when an ad actually displays — a not-ready miss must
+    /// not consume the window, or rapid retries during no-fill would never see an
+    /// ad at all (that exact bug shipped in the first AdMob build).</summary>
     public static void ShowInterstitial()
     {
         if (Time.realtimeSinceStartup - lastShownTime < MinIntervalSeconds) return;
-        lastShownTime = Time.realtimeSinceStartup;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
+        // web overlay gives no success signal — arm the cap on the attempt
+        lastShownTime = Time.realtimeSinceStartup;
         try { PW_ShowInterstitial(); } catch { /* ad SDK absent — ignore */ }
 #elif (UNITY_IOS || UNITY_ANDROID) && !UNITY_EDITOR
-        AdMobBridge.ShowInterstitial();
+        if (AdMobBridge.TryShowInterstitial()) lastShownTime = Time.realtimeSinceStartup;
 #else
+        lastShownTime = Time.realtimeSinceStartup;
         Debug.Log("[Ads] (editor) interstitial would show here.");
 #endif
     }

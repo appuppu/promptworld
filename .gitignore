@@ -43,3 +43,4 @@ taccheck_*.txt
 simcheck_*.txt
 PromptWorld/simcheck_*.txt
 unity_tac_ios.log
+store-media/

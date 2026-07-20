@@ -1023,7 +1023,7 @@ async function opListPublished(env, query, sort, game, playerId) {
                  WHERE s.status = 'unverified' AND (c.banned IS NULL OR c.banned = 0)`;
     tbSql += game === 'tac' ? " AND s.game = 'tac'" : ' AND s.game IS NULL';
     const tbBinds = [];
-    if (q) { tbSql += ' AND s.name LIKE ?'; tbBinds.push(q); }
+    if (q) { tbSql += ' AND (s.name LIKE ? OR s.json LIKE ?)'; tbBinds.push(q, q); }
     if (hasPlayer) { tbSql += hideClause; tbBinds.push(playerId); }
     tbSql += ' ORDER BY s.published_at DESC LIMIT 100';
     const tbRows = await env.promptworld_stages.prepare(tbSql).bind(...tbBinds).all();
@@ -1071,8 +1071,10 @@ async function opListPublished(env, query, sort, game, playerId) {
   sql += game === 'tac' ? " AND s.game = 'tac'" : ' AND s.game IS NULL';
   const binds = [];
   if (q) {
-    sql += ' AND s.name LIKE ?';
-    binds.push(q);
+    // match the canonical name OR anywhere in the stage JSON — nameLoc holds
+    // the localized titles (ダストライン etc.), so search works in any language
+    sql += ' AND (s.name LIKE ? OR s.json LIKE ?)';
+    binds.push(q, q);
   }
   if (hasPlayer) {
     sql += hideClause;

@@ -107,6 +107,10 @@ public static class TacLoc
         { "voteThanks", new[] { "Thanks for rating!", "評価ありがとう!", "感谢评分!", "¡Gracias por puntuar!", "평가 감사합니다!" } },
         { "voteGood", new[] { "LIKE", "良かった", "赞", "ME GUSTA", "좋아요" } },
         { "voteBad", new[] { "MEH", "イマイチ", "一般", "MEH", "별로" } },
+        { "extTitle", new[] { "OPEN IN BROWSER?", "ブラウザで開きますか?", "在浏览器中打开?", "¿ABRIR EN EL NAVEGADOR?", "브라우저에서 열까요?" } },
+        { "extBody", new[] { "This will leave the app and open the page in your browser.", "アプリを離れて、外部ブラウザでページを開きます。", "将离开应用,在外部浏览器中打开页面。", "Saldrás de la app y la página se abrirá en tu navegador.", "앱을 벗어나 외부 브라우저에서 페이지를 엽니다." } },
+        { "extOpen", new[] { "OPEN", "開く", "打开", "ABRIR", "열기" } },
+        { "extCancel", new[] { "CANCEL", "キャンセル", "取消", "CANCELAR", "취소" } },
     };
 
     public static string T(string key)

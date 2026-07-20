@@ -151,6 +151,8 @@ var TAC = {
   DRONE_BOOM_AT: 1.1,       // 3D distance to the player that sets off the boom
   DRONE_BLAST_R: 1.6,
   DRONE_CRASH_SPEED: 3.5,   // fall rate after losing its operator
+  DRONE_ENGAGE_Y: 1.4,      // alerted-chase altitude above ground (the player's aim line)
+  DRONE_DESCEND: 3.5,       // descent rate to reach it once alerted
 
   OPERATOR_HP: 1,
   OPERATOR_R: 0.4,
@@ -2988,6 +2990,14 @@ TacWorld.prototype.stepDrone = function (en, range2) {
       }
     } else {
       w.moveEnemy(en, en.tx, en.tz, TAC.DRONE_CHASE_SPEED, true);
+      // alerted: drop to the player's eye line FIRST and chase there — the
+      // hover-then-vertical-drop was an unavoidable overhead kill on touch
+      // controls; at aim height the drone can be intercepted (2026-07-20)
+      var egy = w.groundY(en.x, en.z, en.y, en.r) + TAC.DRONE_ENGAGE_Y;
+      var drop = TAC.DRONE_DESCEND * TAC.TICK;
+      if (en.y > egy + drop) en.y = en.y - drop;
+      else if (en.y < egy - drop) en.y = en.y + drop;
+      else en.y = egy;
       if (!en.seesPlayer) {
         var ldx = en.tx - en.x;
         var ldz = en.tz - en.z;

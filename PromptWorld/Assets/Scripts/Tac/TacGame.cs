@@ -90,6 +90,27 @@ public class TacGame : MonoBehaviour
     RectTransform scopeCross;
     float dmgT, lastAlertT = -99f, briefCamT;
 
+    // ---- combat juice (render-only, sim untouched) ----
+    float shakeT, shakeDur, shakeAmp;            // camera-shake envelope
+    GameObject muzzleFlash; float muzzleT;       // flash at the player's gun tip
+    RectTransform hitMark; Image[] hitMarkBars;  // HUD hit-confirm ✕ at the impact point
+    float hitMarkT, hitMarkDur;
+    Image playVig, lowHpVig;                     // static cinematic vignette + low-HP pulse
+    RectTransform hpBarRoot;                     // segmented HP bar (replaces the heart glyphs)
+    readonly List<Image> hpSegs = new List<Image>();
+    int hpSegMax = -1;
+
+    // ---- attract mode: a SILENT training-ground firefight runs behind the home
+    // list as a live diorama (the home backdrop is the game itself). The scout
+    // wanders on autopilot and auto-fires like real play; all SFX/haptics/HUD
+    // reactions are suppressed; the run resets a beat after it ends.
+    bool attract;
+    float attractOrbitYaw, attractResetT;
+    float attractAimDeg, attractWantDeg;
+    bool attractPause;
+    int attractDirT;
+    readonly System.Random attractRng = new System.Random(1234567);
+
     // ui
     Canvas canvas;
     RectTransform hudRoot, listRoot, briefRoot, resultRoot, pauseRoot, settingsRoot, createRoot, listContent;
@@ -101,7 +122,7 @@ public class TacGame : MonoBehaviour
     class BriefEntry { public string sid, name, creator, embedded; public StageMeta meta; }
     readonly List<BriefEntry> briefList = new List<BriefEntry>();
     int briefIndex;
-    Text hpText, foesText, timeText, msgText;
+    Text foesText, timeText, msgText;
     Text toastText; float toastUntil; // canvas-level toast (visible on any screen)
     RawImage minimapImg;
     Texture2D minimapTex;
@@ -154,6 +175,13 @@ public class TacGame : MonoBehaviour
         for (int ai = 0; ai < args.Length; ai++)
         {
             if (args[ai] == "-tacshot" && ai + 1 < args.Length) StartCoroutine(ShotLoop(args[ai + 1]));
+            // supersample factor for -tacshot (store screenshots need exact
+            // device pixel sizes far larger than a Mac window)
+            if (args[ai] == "-tacshotscale" && ai + 1 < args.Length) shotScale = int.Parse(args[ai + 1]);
+            // App-Preview recorder: dump EVERY frame as PNG on a deterministic
+            // 30fps clock (Time.captureFramerate) — ffmpeg turns them into the
+            // store video. Wall-clock runs slower; game time stays correct.
+            if (args[ai] == "-tacrec" && ai + 1 < args.Length) StartCoroutine(RecLoop(args[ai + 1]));
             if (args[ai] == "-tacauto") StartCoroutine(AutoPilot());
             if (args[ai] == "-taccreate") StartCoroutine(AutoCreate());
             // desktop-only: fake a phone safe area "top,bottom[,left,right]" (px)
@@ -172,6 +200,9 @@ public class TacGame : MonoBehaviour
         cam.clearFlags = CameraClearFlags.SolidColor;
         var sunGo = GameObject.Find("Sun");
         if (sunGo != null) sunLight = sunGo.GetComponent<Light>();
+        // layer 31 belongs to the offscreen thumbnail rig (TacPreview3D), which
+        // brings its own light — keep the scene sun (day OR dusk) off of it
+        if (sunLight != null) sunLight.cullingMask &= ~(1 << 31);
         cam.nearClipPlane = 0.25f;
         cam.farClipPlane = 260f;
         audioKit = gameObject.AddComponent<TacAudioKit>();
@@ -257,6 +288,21 @@ public class TacGame : MonoBehaviour
         StartStage(full, sid, null);
     }
 
+    int shotScale = 1;
+
+    IEnumerator RecLoop(string dir)
+    {
+        System.IO.Directory.CreateDirectory(dir);
+        Time.captureFramerate = 30;
+        int n = 0;
+        while (true)
+        {
+            yield return null;
+            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "f" + n.ToString("00000") + ".png"), shotScale);
+            n++;
+        }
+    }
+
     IEnumerator ShotLoop(string dir)
     {
         System.IO.Directory.CreateDirectory(dir);
@@ -264,7 +310,7 @@ public class TacGame : MonoBehaviour
         while (true)
         {
             yield return new WaitForSeconds(2f);
-            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "shot-" + (n++).ToString("00") + ".png"));
+            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "shot-" + (n++).ToString("00") + ".png"), shotScale);
         }
     }
 
@@ -343,6 +389,23 @@ public class TacGame : MonoBehaviour
         return sa;
     }
 
+    // Child rect stretched PAST its safe-area panel to the PHYSICAL screen edges
+    // (same math as MakePanel's backdrop child). Full-screen overlays — vignette,
+    // damage flash — must bleed under the notch/home bar or play looks letterboxed.
+    RectTransform FullBleed(string name, RectTransform parent)
+    {
+        var rt = TacUi.Rect(name, parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var sa = SafeArea();
+        float cw = 420f, chh = cw * Screen.height / Mathf.Max(1, Screen.width);
+        float uxL = sa.xMin / Screen.width * cw;
+        float uxR = (Screen.width - sa.xMax) / Screen.width * cw;
+        float uyB = sa.yMin / Screen.height * chh;
+        float uyT = (Screen.height - sa.yMax) / Screen.height * chh;
+        rt.offsetMin = new Vector2(-uxL, -uyB);
+        rt.offsetMax = new Vector2(uxR, uyT);
+        return rt;
+    }
+
     RectTransform MakePanel(string name, Color c)
     {
         // content root hugs the SAFE AREA (text must never sit under the notch
@@ -394,7 +457,9 @@ public class TacGame : MonoBehaviour
         }
 
         // ---- stage list (mirrors tac-home.html, stacked for portrait) ----
-        listRoot = MakePanel("list", TacUi.Bg);
+        // Translucent backdrop: the attract-mode battle diorama (a live TRAINING
+        // firefight) plays behind the list, so the home screen IS the game.
+        listRoot = MakePanel("list", new Color(TacUi.Bg.r, TacUi.Bg.g, TacUi.Bg.b, 0.50f));
         // header sits snug against the safe-area top (user: trim the gap above PROMPT WORLD)
         var brand = TacUi.Label(listRoot, "", 22, TacUi.Fg, TextAnchor.MiddleLeft, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -40), new Vector2(-24, -4), true);
         brand.supportRichText = true;
@@ -408,7 +473,21 @@ public class TacGame : MonoBehaviour
         // ---- HUD ---- (hidden immediately; only Play mode shows it)
         hudRoot = MakePanel("hud", new Color(0, 0, 0, 0));
         hudRoot.gameObject.SetActive(false);
-        var dmgRt = TacUi.Rect("dmg", hudRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        // cinematic edge vignette (always on in play) + low-HP red pulse above it.
+        // FullBleed: these must reach the PHYSICAL screen edges, not stop at the
+        // safe area — a vignette ring ending at the notch line reads as a shrunken,
+        // letterboxed play view (user report 2026-07-20).
+        var vigRt = FullBleed("vig", hudRoot);
+        playVig = vigRt.gameObject.AddComponent<Image>();
+        playVig.sprite = TacUi.Vignette();
+        playVig.color = new Color(0f, 0f, 0f, 0.35f);
+        playVig.raycastTarget = false;
+        var lowRt = FullBleed("lowhp", hudRoot);
+        lowHpVig = lowRt.gameObject.AddComponent<Image>();
+        lowHpVig.sprite = TacUi.Vignette();
+        lowHpVig.color = new Color(0.9f, 0.08f, 0.06f, 0f);
+        lowHpVig.raycastTarget = false;
+        var dmgRt = FullBleed("dmg", hudRoot);
         dmgFlash = TacUi.Fill(dmgRt, new Color(1f, 0.15f, 0.1f, 0f));
         dmgFlash.raycastTarget = false;
 
@@ -432,7 +511,25 @@ public class TacGame : MonoBehaviour
         bar(new Vector2(-42, -1.2f), new Vector2(-8, 1.2f));  // left
         bar(new Vector2(-2, -2), new Vector2(2, 2));          // center dot
         scopeCross.gameObject.SetActive(false);
-        hpText = TacUi.Label(hudRoot, "", 22, TacUi.Alert, TextAnchor.UpperLeft, new Vector2(0, 1), new Vector2(0, 1), new Vector2(18, -46), new Vector2(320, -12), false);
+
+        // hit-confirm marker: 4 diagonal ticks that pop at the impact point.
+        // white = hit, red + bigger = kill. Repositioned per event (world→screen).
+        hitMark = TacUi.Rect("hitmark", hudRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-30, -30), new Vector2(30, 30));
+        hitMarkBars = new Image[4];
+        for (int hb = 0; hb < 4; hb++)
+        {
+            var pivotRt = TacUi.Rect("hmp" + hb, hitMark, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            pivotRt.localEulerAngles = new Vector3(0, 0, 45 + 90 * hb);
+            var barRt = TacUi.Rect("hmb", pivotRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-1.7f, 7), new Vector2(1.7f, 18));
+            hitMarkBars[hb] = barRt.gameObject.AddComponent<Image>();
+            hitMarkBars[hb].raycastTarget = false;
+        }
+        hitMark.gameObject.SetActive(false);
+
+        // segmented HP bar (top-left) — replaces the old heart glyph string
+        hpBarRoot = TacUi.Rect("hpbar", hudRoot, new Vector2(0, 1), new Vector2(0, 1), new Vector2(18, -38), new Vector2(196, -24));
+        hpSegMax = -1;
+        hpSegs.Clear();
         foesText = TacUi.Label(hudRoot, "", 13, TacUi.Dim, TextAnchor.UpperLeft, new Vector2(0, 1), new Vector2(0, 1), new Vector2(18, -74), new Vector2(420, -46));
         timeText = TacUi.Label(hudRoot, "", 14, TacUi.Fg, TextAnchor.UpperCenter, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-80, -38), new Vector2(80, -10));
         msgText = TacUi.Label(hudRoot, "", 17, TacUi.Warn, TextAnchor.MiddleCenter, new Vector2(0.2f, 0.62f), new Vector2(0.8f, 0.76f), Vector2.zero, Vector2.zero);
@@ -535,6 +632,33 @@ public class TacGame : MonoBehaviour
         uiScreenW = Screen.width; uiScreenH = Screen.height; uiSafe = SafeArea();
     }
 
+    // External-link gate: every jump out of the app asks first. Makes the app's
+    // web access explicitly user-confirmed (App Review clarity) and stops an
+    // accidental tap from yanking the player out to Safari mid-session.
+    void ConfirmOpenUrl(string url)
+    {
+        var ov = MakePanel("extlink", TacUi.Overlay);
+        ov.SetAsLastSibling();
+        var box = TacUi.Box(ov, TacUi.Panel, TacUi.Line, new Vector2(0.08f, 0.40f), new Vector2(0.92f, 0.62f), Vector2.zero, Vector2.zero);
+        TacUi.Label(box, TacUi.Track(TacLoc.T("extTitle")), 15, TacUi.Fg, TextAnchor.MiddleCenter,
+            new Vector2(0, 0.68f), new Vector2(1, 0.95f), Vector2.zero, Vector2.zero, true);
+        var body = TacUi.Label(box, TacLoc.T("extBody"), 12, TacUi.Dim, TextAnchor.UpperCenter,
+            new Vector2(0.06f, 0.38f), new Vector2(0.94f, 0.66f), Vector2.zero, Vector2.zero);
+        body.horizontalOverflow = HorizontalWrapMode.Wrap;
+        Text tmp;
+        TacUi.Btn(box, TacLoc.T("extCancel"), 12, TacUi.Line, new Vector2(0.06f, 0.07f), new Vector2(0.48f, 0.32f),
+            Vector2.zero, Vector2.zero, () => Destroy(ov.gameObject), out tmp);
+        tmp.color = TacUi.Dim;
+        TacUi.Btn(box, TacLoc.T("extOpen"), 12, TacUi.Teal, new Vector2(0.52f, 0.07f), new Vector2(0.94f, 0.32f),
+            Vector2.zero, Vector2.zero, () =>
+            {
+                Haptic.Tap();
+                Destroy(ov.gameObject);
+                Application.OpenURL(url);
+            }, out tmp);
+        StartCoroutine(StampIn(box, 0f));
+    }
+
     void Toast(string msg, float secs)
     {
         if (toastText == null) return;
@@ -601,7 +725,10 @@ public class TacGame : MonoBehaviour
         resultRoot.gameObject.SetActive(false);
         pauseRoot.gameObject.SetActive(false);
         settingsRoot.gameObject.SetActive(false);
-        TearDownWorld();
+        // Home diorama: keep a live attract battle running behind the list. A
+        // sort/search refresh must NOT restart the fight — only (re)build when
+        // arriving without one (first boot, back from a stage, etc).
+        if (!attract || world == null) StartAttract();
         ClearChildren(listRoot, 4); // panelbg + the 3 persistent header children
 
         // sort pills (one row of five, 68 wide each fits the 420 canvas)
@@ -637,10 +764,17 @@ public class TacGame : MonoBehaviour
             searchQuery = q; metas.Clear(); ShowList();
         });
 
-        // scroll shell — reaches the safe-area bottom (user: fill the screen with courses)
-        var scrollRt = TacUi.Rect("scroll", listRoot, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0), new Vector2(0, -192));
+        // scroll shell — the list must reach the PHYSICAL screen bottom (past the
+        // safe-area inset), or a strip below the last card stays empty even with a
+        // full list. listRoot hugs the safe area, so extend the scroll down by the
+        // bottom inset (in canvas units) to fill the home-indicator strip too.
+        var saB = SafeArea();
+        float chhB = 420f * Screen.height / Mathf.Max(1, Screen.width);
+        float bottomInsetUnits = saB.yMin / Screen.height * chhB;
+        var scrollRt = TacUi.Rect("scroll", listRoot, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, -bottomInsetUnits), new Vector2(0, -192));
         var scroll = scrollRt.gameObject.AddComponent<ScrollRect>();
         scroll.horizontal = false;
+        scroll.scrollSensitivity = 18f;
         scroll.movementType = ScrollRect.MovementType.Elastic;
         var viewport = TacUi.Rect("viewport", scrollRt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         viewport.gameObject.AddComponent<RectMask2D>();
@@ -797,11 +931,11 @@ public class TacGame : MonoBehaviour
         // footer: legal links (App Store / Play policy: reachable in-app) + back
         TacUi.Btn(settingsRoot, TacLoc.T("privacy"), 10, TacUi.Line,
             new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(24, 68), new Vector2(-6, 98),
-            () => Application.OpenURL(TacNet.Origin + "/privacy.html"), out tmp);
+            () => ConfirmOpenUrl(TacNet.Origin + "/privacy.html"), out tmp);
         tmp.color = TacUi.Dim;
         TacUi.Btn(settingsRoot, TacLoc.T("terms"), 10, TacUi.Line,
             new Vector2(0.5f, 0), new Vector2(1, 0), new Vector2(6, 68), new Vector2(-24, 98),
-            () => Application.OpenURL(TacNet.Origin + "/terms.html"), out tmp);
+            () => ConfirmOpenUrl(TacNet.Origin + "/terms.html"), out tmp);
         tmp.color = TacUi.Dim;
 
         TacUi.Btn(settingsRoot, TacLoc.T("back"), 12, new Color(1, 1, 1, 0.85f), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-90, 18), new Vector2(90, 56), () =>
@@ -865,7 +999,7 @@ public class TacGame : MonoBehaviour
         // footer pinned to the bottom edge
         TacUi.Btn(createRoot, TacLoc.T("openGuide"), 11, new Color(1, 1, 1, 0.85f), new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(24, 20), new Vector2(-6, 58), () =>
         {
-            Application.OpenURL("https://promptworldgame.org/create?lang=" + TacLoc.Lang);
+            ConfirmOpenUrl("https://promptworldgame.org/create?lang=" + TacLoc.Lang);
         }, out tmp);
         TacUi.Btn(createRoot, TacLoc.T("back"), 11, TacUi.Dim, new Vector2(0.5f, 0), new Vector2(1, 0), new Vector2(6, 20), new Vector2(-24, 58), () =>
         {
@@ -913,6 +1047,32 @@ public class TacGame : MonoBehaviour
         return TacThumb.Draw(st, w, h);
     }
 
+    // Thumbnail texture cache. A 3D preview render = geometry rebuild + offscreen
+    // render + GPU readback (~ms each); every ShowList used to re-render EVERY
+    // card in one frame. A published stage's layout never changes, so cache by id
+    // and reuse for the session.
+    readonly Dictionary<string, Texture2D> thumbCache = new Dictionary<string, Texture2D>();
+    int lastThumbFrame = -1;
+
+    Texture2D ThumbFor(string key, TacJson.JObj st, int w, int h)
+    {
+        if (key == null) return PreviewTex(st, w, h);
+        string k = key + ":" + w + "x" + h;
+        Texture2D t;
+        if (thumbCache.TryGetValue(k, out t) && t != null) return t;
+        t = PreviewTex(st, w, h);
+        if (t != null)
+        {
+            if (thumbCache.Count >= 100) // pressure valve; realistic use stays far below
+            {
+                foreach (var old in thumbCache.Values) if (old != null) Destroy(old);
+                thumbCache.Clear();
+            }
+            thumbCache[k] = t;
+        }
+        return t;
+    }
+
     // Fade a rect in (no movement) — for header title/buttons.
     IEnumerator FadeIn(RectTransform rt, float delay, float dur)
     {
@@ -931,11 +1091,36 @@ public class TacGame : MonoBehaviour
         cg.alpha = 1f;
     }
 
+    // Stamp-in: big → rest with an ease-out, for verdict/mission titles.
+    IEnumerator StampIn(RectTransform rt, float delay = 0f)
+    {
+        if (rt == null) yield break;
+        var cg = rt.GetComponent<CanvasGroup>() ?? rt.gameObject.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+        rt.localScale = Vector3.one * 2.1f;
+        while (delay > 0f) { delay -= Time.unscaledDeltaTime; yield return null; if (rt == null) yield break; }
+        float t = 0f;
+        const float dur = 0.22f;
+        while (t < dur)
+        {
+            if (rt == null) yield break;
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / dur);
+            k = 1f - (1f - k) * (1f - k); // ease-out
+            cg.alpha = k;
+            rt.localScale = Vector3.one * Mathf.Lerp(2.1f, 1f, k);
+            yield return null;
+        }
+        rt.localScale = Vector3.one;
+        cg.alpha = 1f;
+    }
+
     void AddStageCard(int idx, string sid, string nm, string creator, string embeddedJson, StageMeta meta)
     {
-        // single column: portrait width fits exactly one card
+        // single column: portrait width fits exactly one card. The card panel is
+        // slightly translucent so the attract diorama glints through the list.
         float y0 = -CardTop - idx * (CardH + CardGap);
-        var card = TacUi.Box(listContent, TacUi.Panel, TacUi.Line,
+        var card = TacUi.Box(listContent, new Color(TacUi.Panel.r, TacUi.Panel.g, TacUi.Panel.b, 0.90f), TacUi.Line,
             new Vector2(0.03f, 1), new Vector2(0.97f, 1),
             new Vector2(0, y0 - CardH), new Vector2(0, y0));
         // Staggered entrance: fade + rise, mirroring the web home's cardIn. Only
@@ -976,7 +1161,7 @@ public class TacGame : MonoBehaviour
         descLbl.verticalOverflow = VerticalWrapMode.Truncate;
         if (embeddedJson != null)
         {
-            raw.texture = PreviewTex(TacJson.Parse(embeddedJson), 120, 80);
+            raw.texture = ThumbFor("emb:" + nm, TacJson.Parse(embeddedJson), 120, 80);
             FillCardDetail(embeddedJson, nameLbl, descLbl);
         }
         else StartCoroutine(LoadThumb(sid, raw, nameLbl, descLbl));
@@ -1018,13 +1203,27 @@ public class TacGame : MonoBehaviour
 
     IEnumerator LoadThumb(string sid, RawImage raw, Text nameLbl = null, Text descLbl = null)
     {
-        string got = null;
-        yield return TacNet.GetJson("/api/stages/" + sid, (j) => got = j, null);
-        if (got == null || raw == null) yield break;
-        stageCache[sid] = got;
+        // stage JSON is immutable once published — reuse the session cache
+        // instead of refetching on every list rebuild (sort switch, back-nav)
+        string got;
+        if (!stageCache.TryGetValue(sid, out got))
+        {
+            got = null;
+            yield return TacNet.GetJson("/api/stages/" + sid, (j) => got = j, null);
+            if (got == null || raw == null) yield break;
+            stageCache[sid] = got;
+        }
+        // uncached 3D renders are spread one-per-frame: several fetches can land
+        // in the same frame, and each render carries a GPU-readback hitch
+        if (!thumbCache.ContainsKey(sid + ":120x80"))
+        {
+            while (lastThumbFrame == Time.frameCount) yield return null;
+            lastThumbFrame = Time.frameCount;
+        }
+        if (raw == null) yield break;
         try
         {
-            raw.texture = PreviewTex(TacJson.Parse(got), 120, 80);
+            raw.texture = ThumbFor(sid, TacJson.Parse(got), 120, 80);
             FillCardDetail(got, nameLbl, descLbl);
         }
         catch (System.Exception) { }
@@ -1083,6 +1282,7 @@ public class TacGame : MonoBehaviour
 
     void StartStageInner(string json, string sid, string nm)
     {
+        attract = false; // leaving the home diorama: sounds/HUD reactions resume
         stageJson = json;
         stageId = sid;
         stageDoc = TacJson.Parse(json);
@@ -1094,17 +1294,19 @@ public class TacGame : MonoBehaviour
         // actual arena from the start position behind a translucent overlay
         BuildWorldView();
         briefCamT = 0f;
-        TacUi.Label(briefRoot, TacUi.Track(previewDraft ? TacLoc.T("preview") : "MISSION"), 11,
+        var missionLbl = TacUi.Label(briefRoot, TacUi.Track(previewDraft ? TacLoc.T("preview") : "MISSION"), 11,
             previewDraft ? TacUi.Warn : TacUi.Teal, TextAnchor.MiddleCenter,
             new Vector2(0, 0.90f), new Vector2(1, 0.94f), Vector2.zero, Vector2.zero);
-        TacUi.Label(briefRoot, TacUi.Track(stageName), 22, TacUi.Fg, TextAnchor.MiddleCenter, new Vector2(0.04f, 0.83f), new Vector2(0.96f, 0.90f), Vector2.zero, Vector2.zero);
+        StartCoroutine(FadeIn((RectTransform)missionLbl.transform, 0.05f, 0.35f));
+        var stageLbl = TacUi.Label(briefRoot, TacUi.Track(stageName), 22, TacUi.Fg, TextAnchor.MiddleCenter, new Vector2(0.04f, 0.83f), new Vector2(0.96f, 0.90f), Vector2.zero, Vector2.zero, true);
+        StartCoroutine(StampIn((RectTransform)stageLbl.transform, 0.1f));
         TacUi.Divider(briefRoot, 0.82f);
         // map inset bottom-left, stats + desc to its right — the vertical
         // CENTER stays clear so the 3D vista of the arena (rendered behind
         // this translucent overlay) is the star of the briefing
         var mapBox = TacUi.Box(briefRoot, TacUi.Hex(0x07090C), TacUi.Line, new Vector2(0.05f, 0.26f), new Vector2(0.38f, 0.46f), Vector2.zero, Vector2.zero);
         var mraw = TacUi.Rect("map", mapBox, Vector2.zero, Vector2.one, new Vector2(4, 4), new Vector2(-4, -4)).gameObject.AddComponent<RawImage>();
-        try { mraw.texture = PreviewTex(stageDoc, 120, 150); } catch (System.Exception) { }
+        try { mraw.texture = ThumbFor(stageId ?? ("emb:" + stageName), stageDoc, 120, 150); } catch (System.Exception) { }
         string desc = TacLoc.Pick(stageDoc.Has("desc") ? stageDoc.Obj("desc") : null, "");
         var dt = TacUi.Label(briefRoot, desc, 11, TacUi.Promo, TextAnchor.UpperLeft, new Vector2(0.42f, 0.26f), new Vector2(0.95f, 0.395f), Vector2.zero, Vector2.zero);
         dt.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -1196,6 +1398,11 @@ public class TacGame : MonoBehaviour
         camPitch = -0.12f;
         heading = 255;
         fireHeld = false; sneakOn = false; bombAiming = false;
+        // Drop any touch ownership from the previous run. If a finger was down
+        // when the run ended, its id stays claimed forever (the end event fires
+        // while input reading is frozen) and the move stick "freezes" on retry.
+        stickTouch = -1; lookTouch = -1; pinchPrevDist = -1f;
+        if (stickBg != null) stickBg.gameObject.SetActive(false);
         autoLockT = 0; autoLockKey = -1;
         jumpLatch = grenLatch = droneLatch = scopeLatch = false;
         bool nightStage = stageDoc.Has("night") && stageDoc.Num("night") != 0.0;
@@ -1208,6 +1415,85 @@ public class TacGame : MonoBehaviour
         if (stageId != null && !previewDraft) StartCoroutine(TacNet.ReportPlay(stageId, false));
     }
 
+    // ------------------------------------------------------- attract diorama --
+    // (Re)build the silent TRAINING battle that plays behind the home list.
+    void StartAttract()
+    {
+        attract = true;
+        previewDraft = false;
+        stageJson = TRAINING;
+        stageId = null;
+        stageDoc = TacJson.Parse(TRAINING);
+        BuildWorldView();
+        // Dusk grade (render-only): the day-lit arena is too bright to sit
+        // behind the dark home UI, so the diorama gets a moody blue-hour look.
+        // nightLightingOn=true makes the next ApplyNightLighting(false) — any
+        // real stage build — fully restore the day values instead of skipping.
+        if (!world.night)
+        {
+            if (sunLight != null) { sunLight.intensity = 0.30f; sunLight.color = new Color(0.72f, 0.80f, 1f); }
+            RenderSettings.ambientLight = new Color(0.17f, 0.19f, 0.25f);
+            RenderSettings.fogColor = new Color(0.05f, 0.065f, 0.09f);
+            RenderSettings.fogStartDistance = 28f;
+            RenderSettings.fogEndDistance = 95f;
+            cam.backgroundColor = new Color(0.05f, 0.065f, 0.09f);
+            nightLightingOn = true;
+        }
+        acc = 0;
+        snapReady = false; snapPrevP = default(MoBody); snapCurP = default(MoBody);
+        snapPrevPilot = default(MoBody); snapCurPilot = default(MoBody);
+        snapCurE = new MoBody[0]; snapPrevE = new MoBody[0];
+        CaptureSnapshot();
+        autoLockT = 0; autoLockKey = -1;
+        attractResetT = 0f;
+        attractDirT = 0;
+        attractPause = false;
+        attractAimDeg = attractWantDeg = (float)(world.yawQ * 360.0 / 65536.0);
+        attractOrbitYaw = (float)(world.yawQ * System.Math.PI * 2.0 / 65536.0) + 2.6f;
+    }
+
+    // Autopilot for the diorama scout: wander toward the arena interior with a
+    // fresh waypoint every 1–3 s, and auto-fire with the same settled-lock rule
+    // real play uses — so genuine firefights break out behind the menu.
+    TacInput AttractInput()
+    {
+        if (attractDirT-- <= 0)
+        {
+            attractDirT = 60 + attractRng.Next(110);
+            attractPause = attractRng.Next(5) == 0;
+            double toC = System.Math.Atan2(world.arenaW / 2.0 - world.px, world.arenaD / 2.0 - world.pz);
+            attractWantDeg = (float)(toC * Mathf.Rad2Deg + (attractRng.NextDouble() - 0.5) * 200.0);
+        }
+        attractAimDeg = Mathf.MoveTowardsAngle(attractAimDeg, attractWantDeg, 170f * (float)TAC.TICK);
+        int b = 0;
+        long lk = world.lockTarget >= 0 ? (long)world.lockKind * 100000 + world.lockTarget : -1;
+        if (lk >= 0 && lk == autoLockKey) autoLockT++; else autoLockT = 0;
+        autoLockKey = lk;
+        if (lk >= 0 && autoLockT >= 10) b |= 2;
+        int yawQ = ((int)System.Math.Round(attractAimDeg / 360.0 * 65536.0) % 65536 + 65536) % 65536;
+        return new TacInput { b = b, m = attractPause ? 255 : 0, yawQ = yawQ, pitchQ = 0 };
+    }
+
+    // Slow cinematic orbit around the scout, framing whatever fight breaks out.
+    void AttractCamera()
+    {
+        attractOrbitYaw += Time.deltaTime * 0.11f;
+        float a = SnapAlpha();
+        Vector3 p = snapReady ? LerpPos(snapPrevP, snapCurP, a)
+                              : new Vector3((float)world.px, (float)world.py, (float)world.pz);
+        var pivot = p + Vector3.up * 1.2f;
+        var dir = new Vector3(Mathf.Sin(attractOrbitYaw), 0f, Mathf.Cos(attractOrbitYaw));
+        var eye = pivot - dir * 11.5f + Vector3.up * 4.6f;
+        float minY = (float)world.GroundY(eye.x, eye.z, 1000.0, 0.2) + 0.4f;
+        if (eye.y < minY) eye.y = minY;
+        cam.transform.position = Vector3.Lerp(cam.transform.position, eye, SmAlpha(0.45f));
+        // aim BELOW the scout so the action rides the upper third of the screen —
+        // that's the strip the (translucent) home list leaves fully open
+        var look = Quaternion.LookRotation(pivot - Vector3.up * 5f - cam.transform.position, Vector3.up);
+        cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, look, SmAlpha(0.35f));
+        cam.fieldOfView = Screen.height > Screen.width ? 66f : 50f;
+    }
+
     void BuildWorldView()
     {
         TearDownWorld();
@@ -1218,6 +1504,18 @@ public class TacGame : MonoBehaviour
         foreach (var wr in worldRoot.GetComponentsInChildren<Renderer>())
             if (wr.gameObject.name == "waterSurf") waterViews.Add(wr);
         playerView = TacRenderKit.BuildPlayerView(worldRoot);
+        // muzzle flash rides the gun tip (gun barrel: local (0.28, 1.05, 0.5..1.0))
+        // and blinks on for ~2 frames per shot with a random roll per flash
+        muzzleFlash = new GameObject("muzzle");
+        muzzleFlash.transform.SetParent(playerView.transform, false);
+        muzzleFlash.transform.localPosition = new Vector3(0.28f, 1.05f, 1.12f);
+        var mfCore = TacRenderKit.Sphere(muzzleFlash.transform, Vector3.zero, 0.30f, new Color(1f, 0.92f, 0.5f));
+        mfCore.GetComponent<Renderer>().sharedMaterial = TacRenderKit.UnlitMat(new Color(1f, 0.92f, 0.5f));
+        var mfSpikeH = TacRenderKit.Cube(muzzleFlash.transform, Vector3.zero, new Vector3(0.62f, 0.07f, 0.07f), Color.white);
+        mfSpikeH.GetComponent<Renderer>().sharedMaterial = TacRenderKit.UnlitMat(Color.white);
+        var mfSpikeV = TacRenderKit.Cube(muzzleFlash.transform, Vector3.zero, new Vector3(0.07f, 0.62f, 0.07f), Color.white);
+        mfSpikeV.GetComponent<Renderer>().sharedMaterial = TacRenderKit.UnlitMat(Color.white);
+        muzzleFlash.SetActive(false);
         foreach (var en in world.enemies) enemyViews.Add(TacRenderKit.BuildEnemyView(worldRoot, en));
 
         foreach (var sw in world.switches)
@@ -1382,6 +1680,8 @@ public class TacGame : MonoBehaviour
         foreach (var m in timed) if (m.go != null) Destroy(m.go);
         timed.Clear();
         pilotView = null; lockMarker = null; sniperLaser = null; bombArc = null; bombLandRing = null; bombAiming = false;
+        muzzleFlash = null; muzzleT = 0f;
+        shakeT = 0f; shakeDur = 0f; shakeAmp = 0f;
         audioKit.StopMusic();
         world = null;
     }
@@ -1419,6 +1719,22 @@ public class TacGame : MonoBehaviour
         }
 
         bool stickActive = false;
+        // Self-heal stale touch ownership: if a claimed finger id no longer
+        // exists in the touch list (its end event fired while input reading was
+        // frozen — pause, result, scope hand-off), release it, or that half of
+        // the controls stays dead ("stick frozen after retry").
+        if (stickTouch >= 0 || lookTouch >= 0)
+        {
+            bool stickSeen = false, lookSeen = false;
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                int fid = Input.GetTouch(i).fingerId;
+                if (fid == stickTouch) stickSeen = true;
+                if (fid == lookTouch) lookSeen = true;
+            }
+            if (stickTouch >= 0 && !stickSeen) { stickTouch = -1; stickBg.gameObject.SetActive(false); }
+            if (lookTouch >= 0 && !lookSeen) lookTouch = -1;
+        }
         // Split-screen controls: one half is the move stick (dynamic-origin
         // swipe), the other half drags the camera. Handedness ("tac_hand_l")
         // picks which half moves — right-handed = move LEFT / look RIGHT, so
@@ -1598,6 +1914,55 @@ public class TacGame : MonoBehaviour
             c.a = Mathf.Clamp01(dmgT) * 0.5f;
             dmgFlash.color = c;
         }
+        // hit-confirm marker: quick pop (1.45→1 scale) then fade out
+        if (hitMark != null && hitMark.gameObject.activeSelf)
+        {
+            hitMarkT -= Time.deltaTime;
+            if (hitMarkT <= 0f) hitMark.gameObject.SetActive(false);
+            else
+            {
+                float p = 1f - hitMarkT / hitMarkDur;
+                hitMark.localScale = Vector3.one * (1.45f - 0.45f * Mathf.Min(1f, p * 3f));
+                float al = p < 0.6f ? 1f : 1f - (p - 0.6f) / 0.4f;
+                foreach (var b in hitMarkBars)
+                {
+                    var bc = b.color; bc.a = al; b.color = bc;
+                }
+            }
+        }
+        // attract mode: silently advance the home-screen battle + orbit camera
+        if (mode == Mode.List && attract && world != null)
+        {
+            if (attractResetT > 0f)
+            {
+                attractResetT -= Time.deltaTime;
+                if (attractResetT <= 0f) { StartAttract(); }
+            }
+            else
+            {
+                acc += Time.deltaTime;
+                int asteps = 0;
+                while (acc >= TAC.TICK && asteps < 4)
+                {
+                    var ev = world.Step(AttractInput());
+                    HandleEvents(ev);
+                    CaptureSnapshot();
+                    acc -= TAC.TICK;
+                    asteps++;
+                    if (world.dead || world.clearedFlag || world.timedOutFlag)
+                    {
+                        attractResetT = 1.6f; // linger on the death burst, then next wave
+                        break;
+                    }
+                }
+            }
+            if (world != null)
+            {
+                UpdateViews();
+                AttractCamera();
+            }
+            return;
+        }
         if (mode == Mode.Brief && world != null)
         {
             ReadBriefSwipe();
@@ -1648,6 +2013,8 @@ public class TacGame : MonoBehaviour
     IEnumerator EndRunCo()
     {
         mode = Mode.Result; // freeze input immediately; views keep their last frame
+        audioKit.StopMusic(); // BGM cuts the moment the run ends (user request);
+                              // retry restarts it via BeginPlay → StartMusic
         UpdateViews();
         yield return new WaitForSeconds(world.dead ? 1.1f : 0.5f);
         EndRun();
@@ -1669,21 +2036,25 @@ public class TacGame : MonoBehaviour
         mode = Mode.Result;
         resultRoot.gameObject.SetActive(true);
         ClearChildren(resultRoot);
-        var title = TacUi.Label(resultRoot, TacUi.Track(TacLoc.T(kind)), 30, world.clearedFlag ? TacUi.Teal : TacUi.Alert, TextAnchor.MiddleCenter, new Vector2(0, 0.68f), new Vector2(1, 0.80f), Vector2.zero, Vector2.zero);
+        var title = TacUi.Label(resultRoot, TacUi.Track(TacLoc.T(kind)), 30, world.clearedFlag ? TacUi.Teal : TacUi.Alert, TextAnchor.MiddleCenter, new Vector2(0, 0.68f), new Vector2(1, 0.80f), Vector2.zero, Vector2.zero, true);
+        StartCoroutine(StampIn((RectTransform)title.transform, 0.05f));
         TacUi.Divider(resultRoot, 0.66f);
         if (world.clearedFlag)
         {
             int best = PlayerPrefs.GetInt(ClearKey(), 0);
             string bestNote = (best == world.tick) ? "   ★ BEST" : (best > 0 ? "   (BEST " + FmtTime(best) + ")" : "");
-            TacUi.Label(resultRoot, TacLoc.T("time") + "  " + FmtTime(world.tick) + bestNote, 16, TacUi.Fg, TextAnchor.MiddleCenter, new Vector2(0, 0.59f), new Vector2(1, 0.65f), Vector2.zero, Vector2.zero);
+            var timeLbl = TacUi.Label(resultRoot, TacLoc.T("time") + "  " + FmtTime(world.tick) + bestNote, 16, TacUi.Fg, TextAnchor.MiddleCenter, new Vector2(0, 0.59f), new Vector2(1, 0.65f), Vector2.zero, Vector2.zero);
+            StartCoroutine(FadeRiseIn((RectTransform)timeLbl.transform, 0.22f, 0.4f, 10f));
         }
         Text tmp;
-        TacUi.Btn(resultRoot, TacLoc.T("retry"), 14, new Color(1, 1, 1, 0.9f), new Vector2(0.08f, 0.14f), new Vector2(0.48f, 0.22f), Vector2.zero, Vector2.zero, () =>
+        var retryB = TacUi.Btn(resultRoot, TacLoc.T("retry"), 14, new Color(1, 1, 1, 0.9f), new Vector2(0.08f, 0.14f), new Vector2(0.48f, 0.22f), Vector2.zero, Vector2.zero, () =>
         {
             resultRoot.gameObject.SetActive(false);
             BeginPlay();
         }, out tmp);
-        TacUi.Btn(resultRoot, TacLoc.T("back"), 14, TacUi.Dim, new Vector2(0.52f, 0.14f), new Vector2(0.92f, 0.22f), Vector2.zero, Vector2.zero, ShowList, out tmp);
+        StartCoroutine(FadeRiseIn((RectTransform)retryB.transform, 0.3f, 0.4f, 12f));
+        var backB = TacUi.Btn(resultRoot, TacLoc.T("back"), 14, TacUi.Dim, new Vector2(0.52f, 0.14f), new Vector2(0.92f, 0.22f), Vector2.zero, Vector2.zero, ShowList, out tmp);
+        StartCoroutine(FadeRiseIn((RectTransform)backB.transform, 0.38f, 0.4f, 12f));
 
         // LIKE / MEH rating — only for real published stages (not training, not
         // a deep-link draft preview). Each button pairs a glyph with a text
@@ -1704,7 +2075,9 @@ public class TacGame : MonoBehaviour
                 goodT.text = vote == 1 ? "♥" : "♡";
                 goodT.color = vote == 1 ? TacUi.Teal : TacUi.Dim;
                 if (goodLbl != null) goodLbl.color = vote == 1 ? TacUi.Teal : TacUi.Dim;
-                badT.text = "✕";
+                // U+00D7 — the fancy ✕ (U+2715) is missing from iOS Helvetica
+                // and rendered as a blank button on device
+                badT.text = "×";
                 badT.color = vote == 2 ? TacUi.Alert : TacUi.Dim;
                 if (badLbl != null) badLbl.color = vote == 2 ? TacUi.Alert : TacUi.Dim;
             };
@@ -1885,6 +2258,15 @@ public class TacGame : MonoBehaviour
         StepGait(pRender, ref playerLegPrevPos, ref playerLegInit, ref playerLegPhase, ref playerLegAmp, pRender.y);
         SwingLegs(playerView, playerLegPhase, playerLegAmp);
 
+        // muzzle flash: a ~2-frame blink per shot, rolled randomly so bursts shimmer
+        if (muzzleFlash != null)
+        {
+            muzzleT -= Time.deltaTime;
+            bool mOn = muzzleT > 0f && playerView.activeSelf && !w.scoped;
+            if (muzzleFlash.activeSelf != mOn) muzzleFlash.SetActive(mOn);
+            if (mOn) muzzleFlash.transform.localRotation = Quaternion.Euler(0, 0, (Time.time * 991f) % 360f);
+        }
+
         // enemies
         for (int i = 0; i < w.enemies.Count; i++)
         {
@@ -2053,7 +2435,7 @@ public class TacGame : MonoBehaviour
         for (int i = 0; i < w.medkits.Count; i++)
         {
             var mk = w.medkits[i];
-            if (!mk.alive) { if (medkitViews[i].activeSelf) { medkitViews[i].SetActive(false); audioKit.Play("heard", 0.7f); } continue; }
+            if (!mk.alive) { if (medkitViews[i].activeSelf) { medkitViews[i].SetActive(false); Sfx("heard", 0.7f); } continue; }
             var mp = medkitViews[i].transform.position;
             mp.y = (float)mk.y + 0.35f + 0.1f * Mathf.Sin(Time.time * 3f + i);
             medkitViews[i].transform.position = mp;
@@ -2332,9 +2714,12 @@ public class TacGame : MonoBehaviour
         }
     }
 
+    // SFX gate: the attract diorama keeps every VISUAL effect but stays silent
+    void Sfx(string name, float vol = 1f) { if (!attract) audioKit.Play(name, vol); }
+
     void HandleEvents(TacEvents ev)
     {
-        if (ev.shot) audioKit.Play("shot");
+        if (ev.shot) { Sfx("shot"); muzzleT = 0.055f; }
         if (ev.rifleShot && ev.eshots != null)
         {
             // gatling fire is SILENT; only aimed rifle/sniper rounds make a
@@ -2350,38 +2735,54 @@ public class TacGame : MonoBehaviour
             if (nearest < 1e8)
             {
                 float dist = Mathf.Sqrt((float)nearest);
-                audioKit.Play("eshot", Mathf.Clamp01(1f - dist / 45f) * 0.8f);
+                Sfx("eshot", Mathf.Clamp01(1f - dist / 45f) * 0.8f);
             }
         }
         if (ev.kills != null)
         {
-            audioKit.Play("kill");
+            Sfx("kill");
+            bool first = true;
             foreach (var k in ev.kills)
             {
                 Color kc = k.type >= 0 && k.type < TypeCols.Length ? TypeCols[k.type] : TacRenderKit.SoldierCol;
-                Burst(new Vector3((float)k.x, (float)k.y + 0.8f, (float)k.z), kc, 14);
+                var kp = new Vector3((float)k.x, (float)k.y + 0.8f, (float)k.z);
+                Burst(kp, kc, 14);
+                if (!attract && first)
+                {
+                    ShowHitMark(kp, true); // red kill-confirm ✕ + a light haptic tick
+                    Haptic.Tap();
+                    Shake(0.10f, 0.18f);
+                    first = false;
+                }
             }
         }
         if (ev.enemyHit && ev.hits != null)
         {
-            audioKit.Play("kill", 0.35f);
-            foreach (var h in ev.hits) HitSpark(new Vector3((float)h.x, (float)h.y, (float)h.z));
+            Sfx("kill", 0.35f);
+            bool first = true;
+            foreach (var h in ev.hits)
+            {
+                var hp2 = new Vector3((float)h.x, (float)h.y, (float)h.z);
+                HitSpark(hp2);
+                if (!attract && first) { ShowHitMark(hp2, false); first = false; }
+            }
         }
         if (ev.playerHit)
         {
-            audioKit.Play("hurt");
-            dmgT = 0.55f;
+            Sfx("hurt");
+            if (!attract) { dmgT = 0.55f; Shake(0.22f, 0.3f); }
         }
         if (ev.playerDead)
         {
             Burst(new Vector3((float)world.px, (float)world.py + 0.9f, (float)world.pz), TacRenderKit.PlayerCol, 20);
+            if (!attract) Shake(0.35f, 0.5f);
         }
-        if (ev.spotted) { if (Time.time - lastAlertT > 3f) { audioKit.Play("alert", 0.6f); lastAlertT = Time.time; } }
-        if (ev.heard) audioKit.Play("heard");
-        if (ev.radio) audioKit.Play("heard", 0.35f);
-        if (ev.corpseFound) audioKit.Play("alert", 0.3f);
-        if (ev.shieldBlock) audioKit.Play("blip", 0.5f);
-        if (ev.mineArmed) audioKit.Play("beep");
+        if (ev.spotted) { if (!attract && Time.time - lastAlertT > 3f) { audioKit.Play("alert", 0.6f); lastAlertT = Time.time; } }
+        if (ev.heard) Sfx("heard");
+        if (ev.radio) Sfx("heard", 0.35f);
+        if (ev.corpseFound) Sfx("alert", 0.3f);
+        if (ev.shieldBlock) Sfx("blip", 0.5f);
+        if (ev.mineArmed) Sfx("beep");
         if (ev.scopeOn)
         {
             scopeFov = ScopeFovDefault;   // each aim-in starts at default zoom
@@ -2391,34 +2792,84 @@ public class TacGame : MonoBehaviour
             // the reticle follows input.yawQ/pitchQ 1:1)
             camYaw = (float)(world.faceQ * System.Math.PI * 2.0 / 65536.0);
         }
-        if (ev.scopeShot) audioKit.Play("shot");
-        if (ev.sniperShot) audioKit.Play("eshot");
-        if (ev.bomberThrow != null) audioKit.Play("whoosh");
+        if (ev.scopeShot) { Sfx("shot"); muzzleT = 0.055f; }
+        if (ev.sniperShot) Sfx("eshot");
+        if (ev.bomberThrow != null) Sfx("whoosh");
         if (ev.intelPick != null)
         {
-            audioKit.Play("clear", 0.5f);
-            msgText.text = ev.intelPick.left > 0
-                ? "INTEL " + (world.intels.Count - ev.intelPick.left) + "/" + world.intels.Count
-                : "ALL INTEL — GO TO EXIT!";
-            msgUntil = Time.time + 2.5f;
+            Sfx("clear", 0.5f);
+            if (!attract)
+            {
+                msgText.text = ev.intelPick.left > 0
+                    ? "INTEL " + (world.intels.Count - ev.intelPick.left) + "/" + world.intels.Count
+                    : "ALL INTEL — GO TO EXIT!";
+                msgUntil = Time.time + 2.5f;
+            }
         }
-        if (ev.switchDown) audioKit.Play("zap");
+        if (ev.switchDown) Sfx("zap");
         if (ev.jamZap != null)
         {
-            audioKit.Play("zap");
+            Sfx("zap");
             var z = TacRenderKit.Sphere(worldRoot, new Vector3((float)ev.jamZap.x, (float)ev.jamZap.y, (float)ev.jamZap.z), 1.2f, new Color(0.7f, 0.55f, 1f, 0.6f), true);
             z.GetComponent<Renderer>().material = new Material(TacRenderKit.TransMat(new Color(0.7f, 0.55f, 1f, 0.6f)));
             fxs.Add(new Fx { go = z, t = 0, dur = 0.35f });
         }
         if (ev.explosions != null)
         {
-            audioKit.Play("boom");
+            Sfx("boom");
             foreach (var ex in ev.explosions) Boom(new Vector3((float)ex.x, (float)ex.y, (float)ex.z), (float)ex.r);
+            if (!attract) Shake(0.5f, 0.55f);
         }
-        if (ev.wallBreaks != null) audioKit.Play("crash");
+        if (ev.wallBreaks != null)
+        {
+            Sfx("crash");
+            if (!attract) Shake(0.28f, 0.4f);
+        }
         bool anyAlert = false;
         foreach (var en in world.enemies) if (en.alive && en.state == 2) { anyAlert = true; break; }
-        audioKit.SetCombat(anyAlert);
+        if (!attract) audioKit.SetCombat(anyAlert);
+    }
+
+    // ---------------------------------------------------------- juice helpers --
+    // Camera shake: envelopes stack by taking the max, decay is quadratic.
+    void Shake(float amp, float dur)
+    {
+        shakeAmp = Mathf.Max(shakeAmp, amp);
+        shakeDur = Mathf.Max(shakeDur, dur);
+        shakeT = shakeDur;
+    }
+
+    // Applied AFTER the camera settles each frame; Perlin-driven so it wobbles
+    // instead of jittering. Scoped view keeps a much smaller kick.
+    void ApplyShake()
+    {
+        if (shakeT <= 0f) return;
+        shakeT -= Time.deltaTime;
+        float k = Mathf.Clamp01(shakeT / Mathf.Max(shakeDur, 1e-4f));
+        float amp = shakeAmp * k * k * (world != null && world.scoped ? 0.25f : 1f);
+        float t = Time.time * 34f;
+        var off = new Vector3(Mathf.PerlinNoise(t, 0.3f) - 0.5f, Mathf.PerlinNoise(0.6f, t) - 0.5f, 0f) * 2f * amp;
+        cam.transform.position += cam.transform.rotation * off;
+        cam.transform.rotation *= Quaternion.Euler(0, 0, (Mathf.PerlinNoise(t, 7.7f) - 0.5f) * amp * 5f);
+        if (shakeT <= 0f) { shakeAmp = 0f; shakeDur = 0f; }
+    }
+
+    // Pop the hit-confirm ✕ at the impact point (world→HUD projection).
+    void ShowHitMark(Vector3 worldPos, bool kill)
+    {
+        if (hitMark == null || cam == null || hudRoot == null) return;
+        var sp = cam.WorldToScreenPoint(worldPos);
+        if (sp.z <= 0f) return; // behind the camera — nothing meaningful to mark
+        Vector2 local;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(hudRoot, sp, null, out local)) return;
+        hitMark.anchoredPosition = local;
+        hitMarkDur = kill ? 0.42f : 0.22f;
+        hitMarkT = hitMarkDur;
+        var c = kill ? TacUi.Alert : Color.white;
+        foreach (var b in hitMarkBars) b.color = c;
+        hitMark.localScale = Vector3.one * (kill ? 1.75f : 1.45f);
+        hitMark.gameObject.SetActive(true);
+        hitMark.SetAsLastSibling();
     }
 
     // ------------------------------------------------------------------ camera --
@@ -2439,6 +2890,7 @@ public class TacGame : MonoBehaviour
             cam.transform.position = new Vector3(pInterp.x, pivY, pInterp.z);
             cam.transform.rotation = Quaternion.LookRotation(fwd, Vector3.up);
             cam.fieldOfView = scopeFov;
+            ApplyShake();
             return;
         }
         // Portrait's narrow horizontal FOV would blind the flanks — widen the
@@ -2466,15 +2918,64 @@ public class TacGame : MonoBehaviour
         if (eye.y < minY) eye.y = minY;
         cam.transform.position = Vector3.Lerp(cam.transform.position, eye, SmAlpha(0.05f));
         cam.transform.rotation = Quaternion.LookRotation(pivot + new Vector3(0, 0.0f, 0) - cam.transform.position, Vector3.up);
+        ApplyShake();
     }
 
     // ------------------------------------------------------------------ HUD --
+    // build/rebuild the segmented HP bar for a given max (segment count changes
+    // only between stages, so this runs rarely)
+    void BuildHpBar(int max)
+    {
+        hpSegMax = max;
+        for (int i = hpBarRoot.childCount - 1; i >= 0; i--) Destroy(hpBarRoot.GetChild(i).gameObject);
+        hpSegs.Clear();
+        if (max <= 0) return;
+        float wAll = 178f, gap = 4f;
+        float sw = (wAll - gap * (max - 1)) / max;
+        for (int i = 0; i < max; i++)
+        {
+            float x = i * (sw + gap);
+            var bgR = TacUi.Rect("seg" + i, hpBarRoot, new Vector2(0, 0), new Vector2(0, 1), new Vector2(x, 0), new Vector2(x + sw, 0));
+            var bg = bgR.gameObject.AddComponent<Image>();
+            bg.sprite = TacUi.RoundFill();
+            bg.type = Image.Type.Sliced;
+            bg.color = new Color(1f, 1f, 1f, 0.13f);
+            bg.raycastTarget = false;
+            var fR = TacUi.Rect("fill", bgR, Vector2.zero, Vector2.one, new Vector2(1.5f, 1.5f), new Vector2(-1.5f, -1.5f));
+            var f = fR.gameObject.AddComponent<Image>();
+            f.sprite = TacUi.RoundFill();
+            f.type = Image.Type.Sliced;
+            f.raycastTarget = false;
+            hpSegs.Add(f);
+        }
+    }
+
     void UpdateHud()
     {
         var w = world;
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < w.maxHp; i++) sb.Append(i < w.hp ? "♥" : "♡");
-        hpText.text = sb.ToString();
+        // HP: segmented bar, teal → amber → red as it drains; low HP pulses the
+        // red vignette (a modern-shooter "hurt" frame instead of heart glyphs)
+        if (hpSegMax != w.maxHp) BuildHpBar(w.maxHp);
+        float hpFrac = w.maxHp > 0 ? (float)w.hp / w.maxHp : 1f;
+        var hpc = hpFrac <= 0.34f ? TacUi.Alert : (hpFrac <= 0.6f ? TacUi.Warn : TacUi.Teal);
+        if (hpFrac <= 0.34f && w.hp > 0)
+        {
+            float pulse = 0.75f + 0.25f * Mathf.Sin(Time.time * 6f);
+            hpc = new Color(hpc.r * pulse + (1f - pulse), hpc.g * pulse, hpc.b * pulse);
+        }
+        for (int i = 0; i < hpSegs.Count; i++)
+        {
+            bool on = i < w.hp;
+            hpSegs[i].enabled = on;
+            if (on) hpSegs[i].color = hpc;
+        }
+        if (lowHpVig != null)
+        {
+            float want = (w.hp > 0 && hpFrac <= 0.34f) ? 0.28f + 0.12f * Mathf.Sin(Time.time * 5.2f) : 0f;
+            var lc = lowHpVig.color;
+            lc.a = Mathf.MoveTowards(lc.a, want, Time.deltaTime * 1.6f);
+            lowHpVig.color = lc;
+        }
         string objLine = TacLoc.T("hostiles") + " " + w.enemiesLeft;
         if (w.goalType == 1)
         {

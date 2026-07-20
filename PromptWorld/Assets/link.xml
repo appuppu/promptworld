@@ -1,0 +1,11 @@
+<linker>
+  <!-- The TAC world is built entirely from GameObject.CreatePrimitive, which
+       attaches Sphere/Capsule/Box colliders (we destroy them immediately, but
+       the classes must exist for the call to succeed). The code-only scene
+       references no collider assets except the ShaderRef cube's BoxCollider,
+       so iOS IL2CPP stripping removed the physics module — every Sphere()/Cyl()
+       on device logged "Can't add component because class 'SphereCollider'
+       doesn't exist!". Preserve the whole physics module (same class of fix as
+       the ShaderRef shader pinning). -->
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
+</linker>

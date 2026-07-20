@@ -1532,9 +1532,15 @@ function onStageLoaded() {
     descHtml = '<p class="promo">' + descEsc.innerHTML + '</p>';
   }
   // mission briefing: title, promo blurb, and a framed map of the arena
-  var pvW = Math.min(430, window.innerWidth - 90);
-  var pvH = Math.max(140, Math.min(300, Math.round(pvW * world.arenaD / world.arenaW)));
+  // size the inset to the ARENA's aspect so the canvas has no dead gutters,
+  // and never let it exceed the phone's width or a third of its height
+  var pvMaxW = Math.min(430, window.innerWidth - 72);
+  var pvMaxH = Math.max(140, Math.min(300, Math.round(window.innerHeight * 0.34)));
+  var pvSc = Math.min(pvMaxW / world.arenaW, pvMaxH / world.arenaD);
+  var pvW = Math.max(120, Math.round(world.arenaW * pvSc));
+  var pvH = Math.max(100, Math.round(world.arenaD * pvSc));
   showOverlay(
+    '<div class="eyebrow">M I S S I O N</div>' +
     '<h1>' + locName + '</h1>' +
     descHtml +
     '<div class="mapwrap"><canvas id="briefMap" style="width:' + pvW + 'px;height:' + pvH + 'px"></canvas></div>' +
@@ -2004,7 +2010,9 @@ function handleEvents(ev) {
       }
       fx.push({ kind: 'embers', pieces: ep, t: 0, dur: 55 });
     });
-    if (shakeT !== undefined) { } // (screen shake intentionally disabled)
+    // (screen shake intentionally disabled — NOTE: the old guard here read an
+    // UNDECLARED shakeT, which is a ReferenceError: every explosion killed the
+    // frame's event handling and could freeze the run mid-mission)
     sfx.boom();
   }
   if (ev.kills) {
@@ -2730,6 +2738,16 @@ function drawEnemy(en, x, y, z, yaw, sc, phase, amp) {
       // open / staggered: plate dropped low and tilted aside
       draw(mCube, x + s * 0.45 + Math.cos(yaw) * 0.5, y + (stag ? 0.3 : 0.5) * sc, z + c * 0.45 - Math.sin(yaw) * 0.5, yaw + 0.5, 2.0 * sc, 0.9 * sc, 0.1 * sc, 0.5, 0.53, 0.58, 1);
     }
+  } else if (en.type === 7) { // APC: low armored hull + turret + wheels
+    draw(mCube, x, y + 0.55 * sc, z, yaw, 1.6 * sc, 1.1 * sc, 2.6 * sc, 0.56, 0.23, 0.21, 1);
+    draw(mCube, x + s * 1.25, y + 0.5 * sc, z + c * 1.25, yaw, 1.4 * sc, 0.7 * sc, 0.5 * sc, 0.45, 0.18, 0.17, 1);
+    draw(mCube, x, y + 1.3 * sc, z, yaw, 1.0 * sc, 0.5 * sc, 1.0 * sc, 0.66, 0.3, 0.27, 1);
+    draw(mCube, x + s * 0.95, y + 1.35 * sc, z + c * 0.95, yaw, 0.14 * sc, 0.14 * sc, 1.5 * sc, 0.14, 0.15, 0.18, 1);
+    for (var wi = -1; wi <= 1; wi++) {
+      var wfx = x + s * wi * 0.85, wfz = z + c * wi * 0.85;
+      draw(mCube, wfx + c * 0.85, y + 0.26 * sc, wfz - s * 0.85, yaw, 0.5 * sc, 0.52 * sc, 0.5 * sc, 0.1, 0.1, 0.12, 1);
+      draw(mCube, wfx - c * 0.85, y + 0.26 * sc, wfz + s * 0.85, yaw, 0.5 * sc, 0.52 * sc, 0.5 * sc, 0.1, 0.1, 0.12, 1);
+    }
   } else { // sniper: slim tall + long barrel
     drawLegs(x, y, z, yaw, sc, phase, 0.2, 0.6, 0.16, 0.12,
       COL.sniper[0] * 0.7, COL.sniper[1] * 0.7, COL.sniper[2] * 0.7);
@@ -3013,8 +3031,9 @@ function setupMinimap() {
     document.body.appendChild(gearEl);
   }
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var cssW = 250;
-  var cssH = Math.max(140, Math.min(340, Math.round(cssW * world.arenaD / world.arenaW)));
+  // fit phones: the fixed 250px panel covered most of a 390px-wide screen
+  var cssW = Math.min(250, Math.round(window.innerWidth * 0.40));
+  var cssH = Math.max(110, Math.min(Math.round(window.innerHeight * 0.30), Math.round(cssW * world.arenaD / world.arenaW)));
   miniCanvas.style.width = cssW + 'px';
   miniCanvas.style.height = cssH + 'px';
   miniCanvas.width = cssW * dpr;

@@ -33,6 +33,10 @@ public static class AttPrompt
 #endif
     }
 
+    /// <summary>Timeout fallback: initialize ads even if the ATT completion
+    /// never fired. Safe to call repeatedly (AdMobBridge.Initialize self-guards).</summary>
+    public static void ForceInitAds() { InitAds(); }
+
     private static void InitAds()
     {
 #if (UNITY_IOS || UNITY_ANDROID) && !UNITY_EDITOR

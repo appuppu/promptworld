@@ -170,6 +170,34 @@ public static class TacUi
         return Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f));
     }
 
+    // radial vignette: transparent center, alpha ramping toward edges/corners.
+    // Tinted per-use (black = cinematic play framing, red = low-HP pulse).
+    static Sprite _vignette;
+    public static Sprite Vignette()
+    {
+        if (_vignette != null) return _vignette;
+        int S = 128;
+        float cx = (S - 1) / 2f;
+        var tex = new Texture2D(S, S, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Clamp;
+        var px = new Color32[S * S];
+        for (int y = 0; y < S; y++)
+        {
+            for (int x = 0; x < S; x++)
+            {
+                float r = Mathf.Sqrt((x - cx) * (x - cx) + (y - cx) * (y - cx)) / (S * 0.5f);
+                float a = Mathf.Clamp01((r - 0.55f) / 0.62f);
+                a *= a; // ease-in so the center stays perfectly clean
+                px[y * S + x] = new Color32(255, 255, 255, (byte)(a * 255));
+            }
+        }
+        tex.SetPixels32(px);
+        tex.Apply(false);
+        _vignette = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f));
+        return _vignette;
+    }
+
     public static RectTransform Rect(string name, RectTransform parent, Vector2 aMin, Vector2 aMax, Vector2 offMin, Vector2 offMax)
     {
         var go = new GameObject(name, typeof(RectTransform));

@@ -15,8 +15,8 @@
     text-transform:uppercase; letter-spacing:0.14em; font-size:12px; }
   #topbar { top:calc(10px + env(safe-area-inset-top)); left:14px; right:14px;
     display:flex; justify-content:space-between; align-items:flex-start; }
-  #stats { text-align:left; line-height:1.9; text-shadow:0 1px 2px rgba(0,0,0,.7); }
-  #stats b { font-weight:normal; color:#9aa3ad; margin-right:6px; }
+  #stats { text-align:left; line-height:1.75; font-size:11px; text-shadow:0 1px 2px rgba(0,0,0,.7); }
+  #stats b { font-weight:normal; color:#4dd2c3; margin-right:6px; }
   #alertbox { text-align:right; line-height:1.9; text-shadow:0 1px 2px rgba(0,0,0,.7); }
   #alerttxt { color:#ff5a48; display:none; }
   #warntxt { color:#ffd23e; display:none; }
@@ -41,17 +41,20 @@
   #crosshair:after { left:2px; top:10px; width:18px; height:2px; }
   #hitmark { top:50%; left:50%; width:26px; height:26px; margin:-13px 0 0 -13px;
     border:2px solid #ffd23e; transform:rotate(45deg); opacity:0; transition:opacity .25s; }
-  #overlay { inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  #overlay { inset:0; box-sizing:border-box; max-width:100vw; display:flex; flex-direction:column; align-items:center; justify-content:center;
     background:rgba(6,8,10,.72); pointer-events:auto; text-align:center; padding:20px; overflow-y:auto; }
-  #overlay h1 { font-size:clamp(22px,4.5vw,30px); font-weight:normal; letter-spacing:.28em; margin:0 0 10px; }
-  #overlay .promo { color:#cfd6de; font-size:14px; line-height:2; max-width:560px; margin:2px 0 4px;
-    text-transform:none; letter-spacing:.04em; }
+  #overlay h1 { font-size:clamp(20px,4.5vw,30px); font-weight:normal; letter-spacing:.22em; margin:0 0 10px;
+    width:min(720px, calc(100vw - 48px)); overflow-wrap:anywhere; }
+  #overlay .eyebrow { color:#4dd2c3; font-size:11px; letter-spacing:.3em; margin-bottom:10px; }
+  #overlay .promo { color:#cfd6de; font-size:14px; line-height:2; width:min(560px, calc(100vw - 48px)); margin:2px 0 4px;
+    text-transform:none; letter-spacing:.04em; overflow-wrap:anywhere; }
   #overlay .mapwrap { border:1px solid #2a2f38; background:#07090c; padding:8px; margin:16px 0 4px;
-    box-shadow:0 0 40px rgba(77,210,195,.06); }
+    box-shadow:0 0 40px rgba(77,210,195,.06); max-width:calc(100% - 2px); box-sizing:border-box; }
+  #overlay .mapwrap canvas { max-width:100%; }
   #overlay .mapwrap canvas { display:block; }
   #overlay .divider { width:56px; height:1px; background:#4dd2c3; opacity:.6; margin:14px auto; }
-  #overlay p { color:#9aa3ad; letter-spacing:.1em; line-height:1.9; margin:6px 0; max-width:640px;
-    text-transform:none; }
+  #overlay p { color:#9aa3ad; letter-spacing:.1em; line-height:1.9; margin:6px 0; width:min(640px, calc(100vw - 48px));
+    text-transform:none; overflow-wrap:anywhere; }
   .btnrow { display:flex; gap:12px; margin-top:22px; flex-wrap:wrap; justify-content:center; }
   .btn { border:1px solid #fff; color:#fff; background:transparent; padding:12px 30px;
     font-size:13px; letter-spacing:.22em; text-transform:uppercase; cursor:pointer;

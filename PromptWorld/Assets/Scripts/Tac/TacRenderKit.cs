@@ -314,6 +314,21 @@ public static class TacRenderKit
             eye.name = "eye";
             eye.GetComponent<Renderer>().sharedMaterial = UnlitMat(Color.red);
         }
+        else if (en.type == 7)
+        {
+            // APC: low armored hull + nose plate + turret + wheels (the sim's
+            // newest enemy — without this branch it rendered as a foot soldier)
+            var hull = new Color(0.56f, 0.23f, 0.21f);
+            Cube(root.transform, new Vector3(0, 0.55f, 0), new Vector3(1.6f, 1.1f, 2.6f), hull);
+            Cube(root.transform, new Vector3(0, 0.5f, 1.25f), new Vector3(1.4f, 0.7f, 0.5f), hull * 0.8f);
+            Cube(root.transform, new Vector3(0, 1.3f, 0), new Vector3(1.0f, 0.5f, 1.0f), hull * 1.18f);
+            Cube(root.transform, new Vector3(0, 1.35f, 0.95f), new Vector3(0.14f, 0.14f, 1.5f), new Color(0.14f, 0.15f, 0.18f));
+            for (int wi = -1; wi <= 1; wi++)
+            {
+                Cube(root.transform, new Vector3(-0.85f, 0.26f, wi * 0.85f), new Vector3(0.5f, 0.52f, 0.5f), new Color(0.1f, 0.1f, 0.12f));
+                Cube(root.transform, new Vector3(0.85f, 0.26f, wi * 0.85f), new Vector3(0.5f, 0.52f, 0.5f), new Color(0.1f, 0.1f, 0.12f));
+            }
+        }
         else if (en.type == 6)
         {
             AddLegs(root.transform, 0.5f, 0.24f, 0.16f, new Color(0.24f, 0.26f, 0.3f));

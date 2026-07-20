@@ -29,6 +29,11 @@ public static class AppIconSetup
 
         Apply(NamedBuildTarget.iOS, tex);
         Apply(NamedBuildTarget.Android, tex);
+        // Launch screen: plain default (user decision 2026-07-20 — no image).
+        // Reset explicitly: older builds set ImageAndBackgroundConstant, which
+        // would break once the launch image asset was deleted.
+        PlayerSettings.iOS.SetiPhoneLaunchScreenType(iOSLaunchScreenType.Default);
+        PlayerSettings.iOS.SetiPadLaunchScreenType(iOSLaunchScreenType.Default);
         AssetDatabase.SaveAssets();
         Debug.Log("[AppIconSetup] app icon assigned to iOS + Android slots.");
     }

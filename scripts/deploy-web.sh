@@ -89,6 +89,9 @@ fi
 # (privacy + terms are required for Google AdSense approval).
 cp "$ROOT/server/og-card.png" "$OUT/og-card.png"
 cp "$ROOT/server/create.html" "$OUT/create.html"
+# creator guide is tac-first now; the classic 2D guide lives on at /create-classic
+cp "$ROOT/server/create-classic.html" "$OUT/create-classic.html"
+cp "$ROOT/server/support.html" "$OUT/support.html"
 cp "$ROOT/server/privacy.html" "$OUT/privacy.html"
 cp "$ROOT/server/terms.html" "$OUT/terms.html"
 cp "$ROOT/server/mcp-spec.html" "$OUT/mcp-spec.html"

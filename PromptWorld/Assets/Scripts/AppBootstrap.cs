@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -15,12 +16,32 @@ public static class AppBootstrap
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = 60;
 
-        // Ask for App Tracking Transparency (iOS 14+) THEN warm up mobile ads so
-        // the first interstitial is preloaded. On Android/editor this skips
-        // straight to ad init. No-op unless the AdMob plugin + PROMPTWORLD_ADMOB
-        // define are present.
 #if UNITY_IOS || UNITY_ANDROID
-        AttPrompt.RequestThenInitAds();
+        // Ads/ATT boot moved to a runner: iOS SILENTLY IGNORES an ATT request
+        // made before the app is active (the prompt never appears AND the
+        // completion callback never fires), which left AdMob uninitialized for
+        // the whole session — the "ads never show" bug. The runner waits for
+        // focus + a beat, then asks; a timeout net initializes ads regardless.
+        var go = new GameObject("AdsBootstrap");
+        Object.DontDestroyOnLoad(go);
+        go.hideFlags = HideFlags.HideAndDontSave;
+        go.AddComponent<AdsBootstrapRunner>();
 #endif
+    }
+}
+
+public class AdsBootstrapRunner : MonoBehaviour
+{
+    IEnumerator Start()
+    {
+        yield return new WaitForSeconds(0.8f);
+        while (!Application.isFocused) yield return null;
+        AttPrompt.RequestThenInitAds();
+        // Safety net: if the ATT completion never arrives (OS quirk, restricted
+        // devices), initialize ads anyway — AdMob serves non-personalized ads
+        // without consent, and Initialize() self-guards against double calls.
+        yield return new WaitForSeconds(6f);
+        AttPrompt.ForceInitAds();
+        Destroy(gameObject);
     }
 }

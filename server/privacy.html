@@ -7,7 +7,7 @@
 <meta name="robots" content="index,follow">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #000; color: #fff; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+  body { background: #000; color: #fff; font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", "Noto Sans CJK", Arial, sans-serif;
          line-height: 1.75; padding: 24px 24px 96px; }
   main { max-width: 680px; margin: 0 auto; }
   h1 { font-size: 34px; letter-spacing: 2px; margin-bottom: 6px; }
@@ -17,59 +17,279 @@
   ul { margin: 0 0 10px 22px; }
   a { color: #fff; }
   .back { display: inline-block; margin-top: 40px; opacity: .6; font-size: 13px; letter-spacing: 2px; }
+  .note { font-size: 12px; opacity: .5; margin-top: 28px; }
+  .langbar { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+  .langbar button { background: none; border: 1px solid #333; color: #888; padding: 5px 11px;
+                    font-size: 12px; letter-spacing: 1px; cursor: pointer; font-family: inherit; }
+  .langbar button.active { color: #000; background: #fff; border-color: #fff; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Privacy Policy</h1>
-  <p class="tagline">Prompt World — last updated 2026-07-20</p>
+  <div class="langbar" id="langbar"></div>
 
-  <p>Prompt World ("we", "the game") is a free game available as a browser game and as mobile apps for iOS and Android. This policy explains what data we handle and why. We keep it minimal on purpose, and it applies to both the web and app versions.</p>
+  <h1 data-i="title"></h1>
+  <p class="tagline" data-i="tagline"></p>
 
-  <h2>Information we collect</h2>
+  <p data-i="intro"></p>
+
+  <h2 data-i="collectH"></h2>
   <ul>
-    <li><strong>Anonymous device ID</strong>: a random identifier stored in your browser's local storage. It lets us count plays, deduplicate votes and leaderboard entries, and remember which stages you have played. It is not linked to your name, email, or any account — there are no accounts.</li>
-    <li><strong>Gameplay data</strong>: when you play a published stage, we record anonymous, aggregated statistics (play count, clear count, clear times, up/down votes). Creators submit stage designs (level layouts) and, when they clear a stage, a replay of their inputs used to verify the clear.</li>
-    <li><strong>A display name</strong>: optional, only if you type one for the leaderboard. Choose any nickname; do not enter real personal information.</li>
+    <li data-i="collect1"></li>
+    <li data-i="collect2"></li>
+    <li data-i="collect3"></li>
   </ul>
 
-  <h2>Information we do NOT collect</h2>
+  <h2 data-i="notH"></h2>
   <ul>
-    <li>No sign-up, no email, no password, no real name.</li>
-    <li>No precise location, no contacts, no microphone or camera.</li>
+    <li data-i="not1"></li>
+    <li data-i="not2"></li>
   </ul>
 
-  <h2>Advertising</h2>
-  <p><strong>Web:</strong> we may show ads served by Google, including Google AdSense. Third-party vendors, including Google, use cookies and similar technologies to serve ads based on your prior visits to this and other websites. Google's use of advertising cookies enables it and its partners to serve ads to you based on your visit to our site and/or other sites on the Internet.</p>
-  <p><strong>Mobile apps (iOS / Android):</strong> we show ads through Google AdMob. To serve and measure ads, AdMob and its partners may collect and process a mobile advertising identifier (on iOS the IDFA; on Android the Advertising ID), coarse device and app information, and general usage/interaction data. This data is used for ad delivery, frequency capping, measurement, and fraud prevention.</p>
-  <p><strong>iOS App Tracking Transparency:</strong> on iOS 14 and later, the app asks for your permission before it accesses the IDFA for tracking. If you decline, we still show ads, but they are non-personalized. You can change this any time in iOS Settings → Privacy &amp; Security → Tracking. On Android you can reset or delete your Advertising ID in the device settings.</p>
-  <p>You may opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Google Ads Settings</a>. For more information about how Google uses data, see <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">How Google uses information from sites that use its services</a>. Where required by law, we will ask for your consent before serving personalized ads.</p>
+  <h2 data-i="adsH"></h2>
+  <p data-i="adsWeb"></p>
+  <p data-i="adsApp"></p>
+  <p data-i="adsAtt"></p>
+  <p><span data-i="adsOpt"></span>
+    <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Google Ads Settings</a> /
+    <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener" data-i="adsGoogleLink"></a></p>
 
-  <h2>Cookies &amp; local storage</h2>
-  <p>We use your browser's local storage for the anonymous device ID and your display name. Advertising partners may set cookies as described above. You can clear this data at any time through your browser settings.</p>
+  <h2 data-i="cookiesH"></h2>
+  <p data-i="cookies"></p>
 
-  <h2>How we use the data</h2>
+  <h2 data-i="useH"></h2>
   <ul>
-    <li>To run the game: show stages, count plays, rank leaderboards, verify clears, and prevent abuse (e.g. rate limiting).</li>
-    <li>To show ads and keep the game free.</li>
+    <li data-i="use1"></li>
+    <li data-i="use2"></li>
   </ul>
 
-  <h2>Data sharing</h2>
-  <p>We do not sell your data. Aggregated, anonymous stats (like a stage's play count and clear rate) are shown publicly in the game. Ad partners process data as described in the Advertising section.</p>
+  <h2 data-i="shareH"></h2>
+  <p data-i="share"></p>
 
-  <h2>Children</h2>
-  <p>Prompt World is a general-audience game and is not directed to children under 13. We do not knowingly collect personal information from children.</p>
+  <h2 data-i="childrenH"></h2>
+  <p data-i="children"></p>
 
-  <h2>Your choices</h2>
+  <h2 data-i="choicesH"></h2>
   <ul>
-    <li>Clear your browser's local storage / cookies to reset your anonymous ID and remove your display name.</li>
-    <li>Opt out of personalized ads via the Google link above.</li>
+    <li data-i="choice1"></li>
+    <li data-i="choice2"></li>
   </ul>
 
-  <h2>Contact</h2>
-  <p>Questions about this policy: <a href="mailto:kukutaku23@gmail.com">kukutaku23@gmail.com</a>.</p>
+  <h2 data-i="contactH"></h2>
+  <p><span data-i="contact"></span> <a href="mailto:kukutaku23@gmail.com">kukutaku23@gmail.com</a>
+    &nbsp;/&nbsp; <a href="/support" data-i="supportLink"></a></p>
 
-  <a class="back" href="/">&larr; BACK TO GAME</a>
+  <p class="note" data-i="authoritative"></p>
+
+  <a class="back" href="/" data-i="back"></a>
 </main>
+
+<script>
+const I18N = {
+  en: { _name: 'English',
+    title: 'Privacy Policy',
+    tagline: 'Prompt World — last updated 2026-07-20',
+    intro: 'Prompt World ("we", "the game") is a free game available as a browser game and as mobile apps for iOS and Android. This policy explains what data we handle and why. We keep it minimal on purpose, and it applies to both the web and app versions.',
+    collectH: 'Information we collect',
+    collect1: 'Anonymous device ID: a random identifier stored on your device. It lets us count plays, deduplicate votes and leaderboard entries, and remember which stages you have played. It is not linked to your name, email, or any account — there are no accounts.',
+    collect2: 'Gameplay data: when you play a published stage, we record anonymous, aggregated statistics (play count, clear count, clear times, up/down votes). Creators submit stage designs (level layouts) and, when they clear a stage, a replay of their inputs used to verify the clear.',
+    collect3: 'A display name: optional, only if you type one for the leaderboard. Choose any nickname; do not enter real personal information.',
+    notH: 'Information we do NOT collect',
+    not1: 'No sign-up, no email, no password, no real name.',
+    not2: 'No precise location, no contacts, no microphone or camera.',
+    adsH: 'Advertising',
+    adsWeb: 'Web: we may show ads served by Google, including Google AdSense. Third-party vendors, including Google, use cookies and similar technologies to serve ads based on your prior visits to this and other websites.',
+    adsApp: 'Mobile apps (iOS / Android): we show ads through Google AdMob. To serve and measure ads, AdMob and its partners may collect and process a mobile advertising identifier (on iOS the IDFA; on Android the Advertising ID), coarse device and app information, and general usage/interaction data. This data is used for ad delivery, frequency capping, measurement, and fraud prevention.',
+    adsAtt: 'iOS App Tracking Transparency: on iOS 14 and later, the app asks for your permission before it accesses the IDFA for tracking. If you decline, we still show ads, but they are non-personalized. You can change this any time in iOS Settings → Privacy & Security → Tracking. On Android you can reset or delete your Advertising ID in the device settings.',
+    adsOpt: 'You may opt out of personalized advertising, and read more about how Google uses data, here:',
+    adsGoogleLink: 'How Google uses information',
+    cookiesH: 'Cookies & local storage',
+    cookies: 'We use local storage for the anonymous device ID and your display name. Advertising partners may set cookies as described above. You can clear this data at any time through your browser or device settings.',
+    useH: 'How we use the data',
+    use1: 'To run the game: show stages, count plays, rank leaderboards, verify clears, and prevent abuse (e.g. rate limiting).',
+    use2: 'To show ads and keep the game free.',
+    shareH: 'Data sharing',
+    share: 'We do not sell your data. Aggregated, anonymous stats (like a stage’s play count and clear rate) are shown publicly in the game. Ad partners process data as described in the Advertising section.',
+    childrenH: 'Children',
+    children: 'Prompt World is a general-audience game and is not directed to children under 13. We do not knowingly collect personal information from children.',
+    choicesH: 'Your choices',
+    choice1: 'Clear your browser’s local storage / cookies (or reinstall the app) to reset your anonymous ID and remove your display name.',
+    choice2: 'Opt out of personalized ads via the Google link above.',
+    contactH: 'Contact',
+    contact: 'Questions about this policy:',
+    supportLink: 'Support',
+    authoritative: 'This policy is provided in several languages for convenience. If any translation conflicts with the English version, the English version prevails.',
+    back: '← BACK TO GAME' },
+
+  ja: { _name: '日本語',
+    title: 'プライバシーポリシー',
+    tagline: 'Prompt World — 最終更新 2026-07-20',
+    intro: 'Prompt World(以下「当ゲーム」)は、ブラウザおよびiOS/Androidアプリで遊べる無料ゲームです。本ポリシーでは、当ゲームが扱うデータとその目的を説明します。扱うデータは意図的に最小限にしており、本ポリシーはWeb版・アプリ版の両方に適用されます。',
+    collectH: '収集する情報',
+    collect1: '匿名のデバイスID: 端末に保存されるランダムな識別子です。プレイ数のカウント、評価やランキングの重複排除、プレイ済みステージの記録に使います。氏名・メールアドレス・アカウントには一切ひも付きません(そもそもアカウント制度がありません)。',
+    collect2: 'ゲームプレイデータ: 公開ステージをプレイすると、匿名の集計統計(プレイ数・クリア数・クリアタイム・評価)を記録します。ステージ作者はステージデータ(レベル構成)を投稿し、クリア時にはクリア検証用の入力リプレイが送信されます。',
+    collect3: '表示名: ランキング用に入力した場合のみ保存される任意項目です。ニックネームは自由に設定できますが、実際の個人情報は入力しないでください。',
+    notH: '収集しない情報',
+    not1: '会員登録なし。メールアドレス・パスワード・氏名は収集しません。',
+    not2: '正確な位置情報・連絡先・マイク・カメラにはアクセスしません。',
+    adsH: '広告について',
+    adsWeb: 'Web版: Google AdSenseを含むGoogle配信の広告を表示することがあります。Googleを含む第三者配信事業者は、当サイトや他サイトへの過去のアクセス情報に基づいて広告を配信するため、Cookieなどの技術を使用します。',
+    adsApp: 'モバイルアプリ(iOS / Android): Google AdMobを通じて広告を表示します。広告の配信・計測のため、AdMobとそのパートナーは、モバイル広告識別子(iOSではIDFA、AndroidではAdvertising ID)、おおまかな端末・アプリ情報、一般的な利用状況データを収集・処理することがあります。これらは広告配信、表示頻度の制御、効果測定、不正防止に使用されます。',
+    adsAtt: 'iOSのApp Tracking Transparency: iOS 14以降では、トラッキング目的でIDFAへアクセスする前に、アプリが許可を求めます。拒否しても広告は表示されますが、パーソナライズされない広告になります。設定はいつでも「設定 → プライバシーとセキュリティ → トラッキング」から変更できます。Androidでは端末設定から広告IDのリセット・削除ができます。',
+    adsOpt: 'パーソナライズ広告のオプトアウトや、Googleのデータ利用の詳細はこちら:',
+    adsGoogleLink: 'Googleによる情報の使用について',
+    cookiesH: 'Cookieとローカルストレージ',
+    cookies: '匿名デバイスIDと表示名の保存にローカルストレージを使用します。広告パートナーは上記の通りCookieを設定することがあります。これらのデータはブラウザや端末の設定からいつでも削除できます。',
+    useH: 'データの利用目的',
+    use1: 'ゲームの運営のため: ステージの表示、プレイ数の集計、ランキングの作成、クリアの検証、不正対策(レート制限など)。',
+    use2: '広告を表示し、ゲームを無料で提供し続けるため。',
+    shareH: 'データの共有',
+    share: 'データを販売することはありません。匿名の集計統計(ステージのプレイ数やクリア率など)はゲーム内で公開されます。広告パートナーによるデータの取り扱いは「広告について」の記載の通りです。',
+    childrenH: 'お子様について',
+    children: 'Prompt Worldは一般向けのゲームであり、13歳未満の子供を対象としていません。子供の個人情報を故意に収集することはありません。',
+    choicesH: 'ユーザーの選択肢',
+    choice1: 'ブラウザのローカルストレージ/Cookieを削除する(またはアプリを再インストールする)ことで、匿名IDのリセットと表示名の削除ができます。',
+    choice2: '上記のGoogleのリンクからパーソナライズ広告をオプトアウトできます。',
+    contactH: 'お問い合わせ',
+    contact: '本ポリシーに関するご質問:',
+    supportLink: 'サポート',
+    authoritative: '本ポリシーは利便性のため複数言語で提供しています。翻訳と英語版の間に相違がある場合は、英語版が優先されます。',
+    back: '← ゲームに戻る' },
+
+  zh: { _name: '中文',
+    title: '隐私政策',
+    tagline: 'Prompt World — 最后更新 2026-07-20',
+    intro: 'Prompt World(以下称"本游戏")是一款可在浏览器以及iOS/Android应用中游玩的免费游戏。本政策说明我们处理哪些数据及其原因。我们有意将数据保持在最低限度,本政策同时适用于网页版和应用版。',
+    collectH: '我们收集的信息',
+    collect1: '匿名设备ID: 保存在您设备上的随机标识符,用于统计游玩次数、去重评价与排行榜记录、记住您玩过的关卡。它不会关联您的姓名、邮箱或任何账号——本游戏没有账号系统。',
+    collect2: '游戏数据: 当您游玩已发布的关卡时,我们会记录匿名的汇总统计(游玩数、通关数、通关时间、评价)。创作者会提交关卡设计(布局数据),并在通关时提交用于验证的操作回放。',
+    collect3: '显示名称: 仅在您为排行榜输入昵称时保存,为可选项。请自由取名,不要填写真实个人信息。',
+    notH: '我们不收集的信息',
+    not1: '无需注册。不收集邮箱、密码、真实姓名。',
+    not2: '不访问精确位置、通讯录、麦克风或摄像头。',
+    adsH: '广告',
+    adsWeb: '网页版: 我们可能展示由Google(包括Google AdSense)投放的广告。包括Google在内的第三方供应商会使用Cookie等技术,根据您对本网站及其他网站的访问记录投放广告。',
+    adsApp: '移动应用(iOS / Android): 我们通过Google AdMob展示广告。为投放和衡量广告,AdMob及其合作伙伴可能收集和处理移动广告标识符(iOS为IDFA,Android为广告ID)、粗略的设备与应用信息,以及一般使用数据。这些数据用于广告投放、频次控制、效果衡量和防欺诈。',
+    adsAtt: 'iOS应用跟踪透明度(ATT): 在iOS 14及以上版本,应用会在出于跟踪目的访问IDFA前征求您的许可。若您拒绝,广告仍会展示,但不再个性化。您可随时在"设置 → 隐私与安全 → 跟踪"中更改。Android用户可在设备设置中重置或删除广告ID。',
+    adsOpt: '您可以在此退出个性化广告,并了解Google如何使用数据:',
+    adsGoogleLink: 'Google如何使用信息',
+    cookiesH: 'Cookie与本地存储',
+    cookies: '我们使用本地存储保存匿名设备ID和显示名称。广告合作伙伴可能按上文所述设置Cookie。您可以随时通过浏览器或设备设置清除这些数据。',
+    useH: '数据的用途',
+    use1: '运营游戏: 展示关卡、统计游玩数、生成排行榜、验证通关、防止滥用(如频率限制)。',
+    use2: '展示广告,让游戏保持免费。',
+    shareH: '数据共享',
+    share: '我们不出售您的数据。匿名汇总统计(如关卡的游玩数和通关率)会在游戏内公开展示。广告合作伙伴按"广告"一节所述处理数据。',
+    childrenH: '儿童',
+    children: 'Prompt World面向一般用户,不以13岁以下儿童为对象。我们不会有意收集儿童的个人信息。',
+    choicesH: '您的选择',
+    choice1: '清除浏览器的本地存储/Cookie(或重新安装应用)即可重置匿名ID并删除显示名称。',
+    choice2: '通过上方Google链接退出个性化广告。',
+    contactH: '联系我们',
+    contact: '关于本政策的问题:',
+    supportLink: '支持',
+    authoritative: '本政策为方便起见提供多语言版本。如翻译与英文版有出入,以英文版为准。',
+    back: '← 返回游戏' },
+
+  es: { _name: 'Español',
+    title: 'Política de Privacidad',
+    tagline: 'Prompt World — última actualización: 2026-07-20',
+    intro: 'Prompt World ("nosotros", "el juego") es un juego gratuito disponible como juego de navegador y como apps para iOS y Android. Esta política explica qué datos manejamos y por qué. Los mantenemos al mínimo a propósito, y se aplica tanto a la versión web como a las apps.',
+    collectH: 'Información que recopilamos',
+    collect1: 'ID anónimo de dispositivo: un identificador aleatorio guardado en tu dispositivo. Nos permite contar partidas, evitar votos y entradas duplicadas en la clasificación, y recordar qué niveles has jugado. No está vinculado a tu nombre, correo ni a ninguna cuenta — no existen cuentas.',
+    collect2: 'Datos de juego: al jugar un nivel publicado registramos estadísticas anónimas y agregadas (partidas, veces superado, tiempos, votos). Los creadores envían sus diseños de nivel y, al superarlos, una repetición de sus acciones que sirve para verificar el logro.',
+    collect3: 'Nombre visible: opcional, solo si escribes uno para la clasificación. Elige cualquier apodo; no introduzcas información personal real.',
+    notH: 'Información que NO recopilamos',
+    not1: 'Sin registro, sin correo, sin contraseña, sin nombre real.',
+    not2: 'Sin ubicación precisa, sin contactos, sin micrófono ni cámara.',
+    adsH: 'Publicidad',
+    adsWeb: 'Web: podemos mostrar anuncios servidos por Google, incluido Google AdSense. Proveedores externos, incluido Google, usan cookies y tecnologías similares para mostrar anuncios según tus visitas previas a este y otros sitios.',
+    adsApp: 'Apps móviles (iOS / Android): mostramos anuncios mediante Google AdMob. Para servir y medir anuncios, AdMob y sus socios pueden recopilar y procesar un identificador publicitario móvil (IDFA en iOS; Advertising ID en Android), información aproximada del dispositivo y de la app, y datos generales de uso. Estos datos se usan para la entrega de anuncios, el control de frecuencia, la medición y la prevención de fraude.',
+    adsAtt: 'App Tracking Transparency en iOS: en iOS 14 y posteriores, la app pide tu permiso antes de acceder al IDFA con fines de seguimiento. Si lo rechazas, seguirás viendo anuncios, pero no personalizados. Puedes cambiarlo en Ajustes → Privacidad y seguridad → Rastreo. En Android puedes restablecer o eliminar tu Advertising ID en los ajustes del dispositivo.',
+    adsOpt: 'Puedes desactivar la publicidad personalizada y leer cómo usa Google los datos aquí:',
+    adsGoogleLink: 'Cómo usa Google la información',
+    cookiesH: 'Cookies y almacenamiento local',
+    cookies: 'Usamos el almacenamiento local para el ID anónimo y tu nombre visible. Los socios publicitarios pueden establecer cookies como se describe arriba. Puedes borrar estos datos en cualquier momento desde los ajustes de tu navegador o dispositivo.',
+    useH: 'Cómo usamos los datos',
+    use1: 'Para operar el juego: mostrar niveles, contar partidas, ordenar clasificaciones, verificar logros y prevenir abusos (p. ej., límites de frecuencia).',
+    use2: 'Para mostrar anuncios y mantener el juego gratuito.',
+    shareH: 'Compartición de datos',
+    share: 'No vendemos tus datos. Las estadísticas anónimas y agregadas (como las partidas y la tasa de éxito de un nivel) se muestran públicamente en el juego. Los socios publicitarios procesan datos según la sección de Publicidad.',
+    childrenH: 'Menores',
+    children: 'Prompt World es un juego para público general y no está dirigido a menores de 13 años. No recopilamos conscientemente información personal de menores.',
+    choicesH: 'Tus opciones',
+    choice1: 'Borra el almacenamiento local / las cookies de tu navegador (o reinstala la app) para restablecer tu ID anónimo y eliminar tu nombre visible.',
+    choice2: 'Desactiva los anuncios personalizados mediante el enlace de Google de arriba.',
+    contactH: 'Contacto',
+    contact: 'Preguntas sobre esta política:',
+    supportLink: 'Soporte',
+    authoritative: 'Esta política se ofrece en varios idiomas por comodidad. Si alguna traducción difiere de la versión en inglés, prevalece la versión en inglés.',
+    back: '← VOLVER AL JUEGO' },
+
+  ko: { _name: '한국어',
+    title: '개인정보 처리방침',
+    tagline: 'Prompt World — 최종 업데이트 2026-07-20',
+    intro: 'Prompt World(이하 "본 게임")는 브라우저와 iOS/Android 앱에서 즐길 수 있는 무료 게임입니다. 본 방침은 우리가 다루는 데이터와 그 목적을 설명합니다. 데이터는 의도적으로 최소한으로 유지하며, 웹 버전과 앱 버전 모두에 적용됩니다.',
+    collectH: '수집하는 정보',
+    collect1: '익명 기기 ID: 기기에 저장되는 무작위 식별자입니다. 플레이 수 집계, 평가·랭킹의 중복 방지, 플레이한 스테이지 기억에 사용됩니다. 이름·이메일·계정과는 일절 연결되지 않습니다(애초에 계정 제도가 없습니다).',
+    collect2: '게임 플레이 데이터: 공개 스테이지를 플레이하면 익명의 집계 통계(플레이 수, 클리어 수, 클리어 타임, 평가)를 기록합니다. 제작자는 스테이지 데이터(레벨 구성)를 제출하며, 클리어 시 검증용 입력 리플레이가 전송됩니다.',
+    collect3: '표시 이름: 랭킹용으로 입력한 경우에만 저장되는 선택 항목입니다. 닉네임은 자유롭게 정하되, 실제 개인정보는 입력하지 마세요.',
+    notH: '수집하지 않는 정보',
+    not1: '회원가입 없음. 이메일·비밀번호·실명을 수집하지 않습니다.',
+    not2: '정확한 위치정보·연락처·마이크·카메라에 접근하지 않습니다.',
+    adsH: '광고',
+    adsWeb: '웹 버전: Google AdSense를 포함한 Google 광고를 표시할 수 있습니다. Google을 포함한 제3자 공급업체는 본 사이트 및 다른 사이트 방문 기록을 바탕으로 광고를 게재하기 위해 쿠키 등의 기술을 사용합니다.',
+    adsApp: '모바일 앱(iOS / Android): Google AdMob을 통해 광고를 표시합니다. 광고 게재와 측정을 위해 AdMob과 그 파트너는 모바일 광고 식별자(iOS는 IDFA, Android는 광고 ID), 대략적인 기기·앱 정보, 일반적인 사용 데이터를 수집·처리할 수 있습니다. 이 데이터는 광고 게재, 노출 빈도 제어, 성과 측정, 부정 방지에 사용됩니다.',
+    adsAtt: 'iOS 앱 추적 투명성(ATT): iOS 14 이상에서는 추적 목적으로 IDFA에 접근하기 전에 앱이 허가를 요청합니다. 거부해도 광고는 표시되지만 맞춤형이 아닌 광고가 됩니다. 설정은 언제든 "설정 → 개인정보 보호 및 보안 → 추적"에서 변경할 수 있습니다. Android에서는 기기 설정에서 광고 ID를 재설정하거나 삭제할 수 있습니다.',
+    adsOpt: '맞춤형 광고 수신 거부 및 Google의 데이터 사용에 대한 자세한 내용은 다음에서 확인할 수 있습니다:',
+    adsGoogleLink: 'Google의 정보 사용 방식',
+    cookiesH: '쿠키와 로컬 스토리지',
+    cookies: '익명 기기 ID와 표시 이름 저장에 로컬 스토리지를 사용합니다. 광고 파트너는 위에 설명한 대로 쿠키를 설정할 수 있습니다. 이 데이터는 브라우저나 기기 설정에서 언제든 삭제할 수 있습니다.',
+    useH: '데이터 이용 목적',
+    use1: '게임 운영: 스테이지 표시, 플레이 수 집계, 랭킹 산정, 클리어 검증, 부정 방지(속도 제한 등).',
+    use2: '광고를 표시하여 게임을 무료로 제공하기 위해.',
+    shareH: '데이터 공유',
+    share: '데이터를 판매하지 않습니다. 익명 집계 통계(스테이지의 플레이 수나 클리어율 등)는 게임 내에 공개됩니다. 광고 파트너의 데이터 처리는 "광고" 항목의 설명을 따릅니다.',
+    childrenH: '아동에 대하여',
+    children: 'Prompt World는 일반 이용자 대상 게임으로, 13세 미만 아동을 대상으로 하지 않습니다. 아동의 개인정보를 고의로 수집하지 않습니다.',
+    choicesH: '이용자의 선택',
+    choice1: '브라우저의 로컬 스토리지/쿠키를 삭제하면(또는 앱을 재설치하면) 익명 ID가 재설정되고 표시 이름이 삭제됩니다.',
+    choice2: '위 Google 링크에서 맞춤형 광고를 수신 거부할 수 있습니다.',
+    contactH: '문의',
+    contact: '본 방침에 대한 문의:',
+    supportLink: '지원',
+    authoritative: '본 방침은 편의를 위해 여러 언어로 제공됩니다. 번역본과 영어판이 다를 경우 영어판이 우선합니다.',
+    back: '← 게임으로 돌아가기' },
+};
+const LANGS = ['en','ja','zh','es','ko'];
+function apply(lang) {
+  const dict = I18N[lang] || I18N.en;
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i]').forEach(el => {
+    const key = el.getAttribute('data-i');
+    if (dict[key] != null) el.textContent = dict[key];
+  });
+  document.querySelectorAll('#langbar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === lang));
+  try { localStorage.setItem('pw_lang', lang); } catch (e) {}
+}
+function detectLang() {
+  const qs = new URLSearchParams(location.search).get('lang');
+  if (qs && I18N[qs]) return qs;
+  try { const saved = localStorage.getItem('pw_lang'); if (saved && I18N[saved]) return saved; } catch (e) {}
+  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+  const code = nav.toLowerCase().split('-')[0];
+  return I18N[code] ? code : 'en';
+}
+const bar = document.getElementById('langbar');
+for (const l of LANGS) {
+  const b = document.createElement('button');
+  b.textContent = I18N[l]._name;
+  b.dataset.lang = l;
+  b.onclick = () => apply(l);
+  bar.appendChild(b);
+}
+apply(detectLang());
+</script>
 </body>
 </html>

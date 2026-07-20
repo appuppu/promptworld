@@ -36,6 +36,35 @@ public static class TacPostProcess
         // the app still launches on iOS < 14 where the framework is absent.
         proj.AddFrameworkToProject(fw, "AppTrackingTransparency.framework", true);
         proj.AddFrameworkToProject(fw, "AdSupport.framework", true);
+
+        // ---- ATT dialog copy, localized (5 languages) ----
+        // iOS reads <bundle>/xx.lproj/InfoPlist.strings for the tracking dialog.
+        // Ship each language as an xx.lproj FOLDER REFERENCE so the folder is
+        // copied verbatim into the bundle root. Append-mode safe: files are only
+        // rewritten when their bytes differ, folder refs added exactly once.
+        var attCopy = new System.Collections.Generic.Dictionary<string, string>
+        {
+            { "en", "This lets us show ads relevant to you. Your choice never affects gameplay." },
+            { "ja", "あなたに合った広告を表示するために使用します。どちらを選んでもゲームプレイには一切影響しません。" },
+            { "zh-Hans", "用于向您展示更相关的广告。您的选择不会影响游戏体验。" },
+            { "es", "Esto nos permite mostrarte anuncios relevantes. Tu elección nunca afecta al juego." },
+            { "ko", "회원님에게 맞는 광고를 표시하는 데 사용됩니다. 어떤 선택을 해도 게임 플레이에는 영향이 없습니다." },
+        };
+        foreach (var kv in attCopy)
+        {
+            string lproj = kv.Key + ".lproj";
+            string lprojDir = System.IO.Path.Combine(path, lproj);
+            System.IO.Directory.CreateDirectory(lprojDir);
+            string strings = "NSUserTrackingUsageDescription = \"" + kv.Value + "\";\n";
+            string fp = System.IO.Path.Combine(lprojDir, "InfoPlist.strings");
+            if (!System.IO.File.Exists(fp) || System.IO.File.ReadAllText(fp) != strings)
+                System.IO.File.WriteAllText(fp, strings);
+            if (!proj.ContainsFileByProjectPath(lproj))
+            {
+                string lguid = proj.AddFolderReference(lproj, lproj, PBXSourceTree.Source);
+                proj.AddFileToBuild(app, lguid);
+            }
+        }
         proj.WriteToFile(projPath);
 
         // App Tracking Transparency: AdMob asks for the IDFA, so App Review
@@ -47,6 +76,11 @@ public static class TacPostProcess
         plist.ReadFromFile(plistPath);
         plist.root.SetString("NSUserTrackingUsageDescription",
             "This lets us show ads relevant to you. Your choice never affects gameplay.");
+        // declare the languages the bundle localizes (the xx.lproj folders above)
+        plist.root.SetString("CFBundleDevelopmentRegion", "en");
+        var blocs = plist.root.CreateArray("CFBundleLocalizations");
+        blocs.AddString("en"); blocs.AddString("ja"); blocs.AddString("zh-Hans");
+        blocs.AddString("es"); blocs.AddString("ko");
 
         // SKAdNetwork: ad-attribution IDs so installs are still measured when the
         // user denies tracking. Google's own network plus the common partners

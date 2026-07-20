@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support — Prompt World</title>
+<meta name="robots" content="noindex">
+<style>
+  /* Support page — same design tokens as the rest of the site (tac.html). */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --bg:#0b0d10; --panel:#12151b; --line:#2a2f38; --fg:#f2f4f6; --dim:#9aa3ad; --teal:#4dd2c3; }
+  body { background: var(--bg); color: var(--fg);
+         font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", "Noto Sans CJK", Arial, sans-serif;
+         line-height: 1.8; padding: 24px 24px 96px; }
+  main { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: clamp(24px, 6vw, 34px); letter-spacing: .18em; margin: 28px 0 8px; font-weight: 800; }
+  h1 b { color: var(--teal); font-weight: 800; }
+  .tagline { color: var(--dim); margin-bottom: 36px; }
+  p { color: #cfd6de; margin-bottom: 14px; }
+  .cta { display: block; text-align: center; border: 1px solid var(--teal); color: var(--teal);
+         padding: 16px 20px; margin: 28px 0 10px; text-decoration: none; letter-spacing: .18em;
+         font-weight: 700; }
+  .cta:hover { background: var(--teal); color: #04110f; }
+  .note { font-size: 12px; color: var(--dim); }
+  .links { margin-top: 48px; font-size: 13px; letter-spacing: 1px; opacity: .6; }
+  .links a { color: var(--fg); }
+  .langbar { display: flex; justify-content: flex-end; gap: 4px; flex-wrap: wrap; }
+  .langbar button { background: none; border: 1px solid var(--line); color: #888; padding: 5px 11px;
+                    font-size: 12px; letter-spacing: 1px; cursor: pointer; font-family: inherit; }
+  .langbar button.active { color: #04110f; background: var(--teal); border-color: var(--teal); }
+</style>
+</head>
+<body>
+<main>
+  <div class="langbar" id="langbar"></div>
+  <h1>PROMPT <b>WORLD</b></h1>
+  <p class="tagline" data-i="sub"></p>
+
+  <p data-i="lead"></p>
+  <p data-i="detail"></p>
+
+  <a class="cta" href="https://docs.google.com/forms/d/e/1FAIpQLSdM8hELZyfwwPYHZdmJEParA0MIKBqcPK1-w0xOC80RylO7hg/viewform"
+     target="_blank" rel="noopener" data-i="cta"></a>
+  <p class="note" data-i="note"></p>
+
+  <p class="links">
+    <a href="/" data-i="backHome"></a>
+    &nbsp;·&nbsp;
+    <a href="/privacy.html" data-i="privacy"></a>
+    &nbsp;·&nbsp;
+    <a href="/terms.html" data-i="terms"></a>
+  </p>
+</main>
+
+<script>
+const I18N = {
+  en: { _name: 'English',
+    sub: 'Support',
+    lead: 'Found a bug? Have a question, a feature idea, or trouble with a stage or your account?',
+    detail: 'Send us a message through the form below. We read everything, and fixes ship fast.',
+    cta: 'OPEN THE CONTACT FORM →',
+    note: 'The form opens on Google Forms. No sign-in required.',
+    backHome: 'HOME', privacy: 'PRIVACY', terms: 'TERMS' },
+  ja: { _name: '日本語',
+    sub: 'サポート',
+    lead: '不具合を見つけた?質問・機能の要望・ステージやアカウントのトラブルなど、なんでもどうぞ。',
+    detail: '下のフォームからご連絡ください。すべて目を通し、修正は迅速に反映します。',
+    cta: 'お問い合わせフォームを開く →',
+    note: 'フォームはGoogleフォームで開きます。ログイン不要です。',
+    backHome: 'ホーム', privacy: 'プライバシー', terms: '利用規約' },
+  zh: { _name: '中文',
+    sub: '支持',
+    lead: '发现了Bug?有问题、功能建议,或关卡/账号方面的困扰?',
+    detail: '请通过下方表单联系我们。我们会阅读每一条反馈,修复也会很快上线。',
+    cta: '打开联系表单 →',
+    note: '表单将在 Google 表单中打开,无需登录。',
+    backHome: '首页', privacy: '隐私政策', terms: '服务条款' },
+  es: { _name: 'Español',
+    sub: 'Soporte',
+    lead: '¿Encontraste un bug? ¿Tienes una pregunta, una idea o problemas con un nivel o tu cuenta?',
+    detail: 'Escríbenos a través del formulario. Leemos todo, y las correcciones llegan rápido.',
+    cta: 'ABRIR EL FORMULARIO DE CONTACTO →',
+    note: 'El formulario se abre en Google Forms. No requiere iniciar sesión.',
+    backHome: 'INICIO', privacy: 'PRIVACIDAD', terms: 'TÉRMINOS' },
+  ko: { _name: '한국어',
+    sub: '지원',
+    lead: '버그를 발견하셨나요? 질문, 기능 제안, 스테이지나 계정 문제 등 무엇이든 좋습니다.',
+    detail: '아래 양식으로 연락해 주세요. 모든 내용을 읽고, 수정 사항은 빠르게 반영합니다.',
+    cta: '문의 양식 열기 →',
+    note: '양식은 Google Forms에서 열립니다. 로그인이 필요 없습니다.',
+    backHome: '홈', privacy: '개인정보', terms: '이용약관' },
+};
+const LANGS = ['en','ja','zh','es','ko'];
+function apply(lang) {
+  const dict = I18N[lang] || I18N.en;
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i]').forEach(el => {
+    const key = el.getAttribute('data-i');
+    if (dict[key] != null) el.textContent = dict[key];
+  });
+  document.querySelectorAll('#langbar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === lang));
+  try { localStorage.setItem('pw_lang', lang); } catch (e) {}
+}
+function detectLang() {
+  const qs = new URLSearchParams(location.search).get('lang');
+  if (qs && I18N[qs]) return qs;
+  try { const saved = localStorage.getItem('pw_lang'); if (saved && I18N[saved]) return saved; } catch (e) {}
+  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+  const code = nav.toLowerCase().split('-')[0];
+  return I18N[code] ? code : 'en';
+}
+const bar = document.getElementById('langbar');
+for (const l of LANGS) {
+  const b = document.createElement('button');
+  b.textContent = I18N[l]._name;
+  b.dataset.lang = l;
+  b.onclick = () => apply(l);
+  bar.appendChild(b);
+}
+apply(detectLang());
+</script>
+</body>
+</html>
