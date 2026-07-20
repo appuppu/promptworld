@@ -1,4 +1,4 @@
-// Prompt World — TACTICAL web client (game:"tac").
+// Prompt World — TACTICAL web client (game:"tac"). rev 2026-07-20b (stepUp)
 // Renders and drives the deterministic sim in /tacsim.js. The sim is the game;
 // this file only reads input, records the per-tick trace (the future replay
 // certificate), steps the world at a fixed 50 Hz, and draws interpolated state.
@@ -11,8 +11,9 @@ var LANGS = {
     start: 'START MISSION', retry: 'RETRY', menu: 'ALL STAGES', resume: 'RESUME', paused: 'PAUSED',
     cleared: 'AREA CLEARED', dead: 'MISSION FAILED', timeout: 'TIME OVER', loading: 'LOADING',
     enemies: 'HOSTILES', ammo: 'AMMO', time: 'TIME', hp: 'ARMOR',
-    spotted: '! SPOTTED', hunting: '? SEARCHING', lock: 'SNIPER LOCK',
+    spotted: '! SPOTTED', hunting: '? SEARCHING', lock: 'SNIPER LOCK', dronewarn: 'DRONE',
     verifying: 'VERIFYING CLEAR…', verified: 'CLEAR VERIFIED — READY TO PUBLISH', verifyfail: 'CLEAR VERIFY FAILED',
+    firstClear: '🏆 WORLD FIRST CLEAR', firstClearSub: 'You published this stage for everyone!', newRecord: '⚡ NEW RECORD', worldBest: 'WORLD BEST',
     hintpc: 'WASD/arrows: move & turn (auto-aim where you face) · click shoot · SPACE jump · SHIFT sneak · G: grenade · T: scope · M: map',
     hintmobile: 'Swipe anywhere: move & turn (light = sneak) · aim locks on and FIRES AUTOMATICALLY · BOMB / SCOPE / DRONE buttons · switch hand side in PAUSE',
     handR: 'CONTROLS: RIGHT HAND', handL: 'CONTROLS: LEFT HAND', rotate: 'ROTATE TO PORTRAIT',
@@ -20,14 +21,15 @@ var LANGS = {
     err: 'STAGE NOT FOUND',
     droneGet: 'DRONE ACQUIRED — press E / DRONE button',
     kMove: 'MOVE', kSneak: 'SNEAK', kJump: 'JUMP', kFire: 'FIRE', kScope: 'SCOPE', kBomb: 'BOMB (hold)', kDrone: 'DRONE', kMap: 'MAP',
-    stagelist: 'PUBLISHED STAGES', good: 'GOOD', bad: 'BAD', thanks: 'Thanks for the feedback!', scopeGet: 'SCOPE ACQUIRED — T to aim, 3 shots', jammerDown: 'JAMMER DOWN'
+    stagelist: 'PUBLISHED STAGES', rateThis: 'RATE THIS STAGE', good: 'GOOD', bad: 'BAD', thanks: 'Thanks for the feedback!', scopeGet: 'SCOPE ACQUIRED — T to aim, 3 shots', jammerDown: 'JAMMER DOWN'
   },
   ja: {
     start: 'ミッション開始', retry: 'リトライ', menu: 'ステージ一覧', resume: '再開', paused: '一時停止',
     cleared: 'エリア制圧完了', dead: 'ミッション失敗', timeout: 'タイムオーバー', loading: '読み込み中',
     enemies: '敵', ammo: '弾薬', time: '時間', hp: 'アーマー',
-    spotted: '! 発見された', hunting: '? 捜索中', lock: 'スナイパー照準',
+    spotted: '! 発見された', hunting: '? 捜索中', lock: 'スナイパー照準', dronewarn: 'ドローン',
     verifying: 'クリア検証中…', verified: 'クリア証明 完了 — 公開できます', verifyfail: 'クリア検証に失敗',
+    firstClear: '🏆 世界初クリア', firstClearSub: 'このステージを全員に公開しました!', newRecord: '⚡ 新記録', worldBest: '世界最速',
     hintpc: 'WASD/矢印: 移動&向き変更(向いた敵に自動照準) · クリックで射撃 · SPACEジャンプ · SHIFT忍び歩き · G:グレネード · T:スコープ · M:マップ',
     hintmobile: 'スワイプで移動&向き(浅め=忍び足) · 照準が定まると自動射撃 · BOMB / SCOPE / DRONE ボタン · 利き手はポーズ画面で切替',
     handR: '操作: 右手配置', handL: '操作: 左手配置', rotate: 'タテ画面にしてください',
@@ -35,14 +37,15 @@ var LANGS = {
     err: 'ステージが見つかりません',
     droneGet: 'ドローン入手! Eキー / DRONEボタンで射出',
     kMove: '移動', kSneak: 'スニーク', kJump: 'ジャンプ', kFire: '射撃', kScope: 'スコープ', kBomb: '爆弾(長押し)', kDrone: 'ドローン', kMap: 'マップ',
-    stagelist: '公開ステージ', good: 'GOOD', bad: 'BAD', thanks: '評価ありがとう!', scopeGet: 'スコープ入手! Tキーで照準・3発', jammerDown: 'ジャマー停止!'
+    stagelist: '公開ステージ', rateThis: 'このステージを評価', good: 'よかった', bad: 'イマイチ', thanks: '評価ありがとう!', scopeGet: 'スコープ入手! Tキーで照準・3発', jammerDown: 'ジャマー停止!'
   },
   zh: {
     start: '开始任务', retry: '重试', menu: '全部关卡', resume: '继续', paused: '暂停',
     cleared: '区域已肃清', dead: '任务失败', timeout: '时间到', loading: '加载中',
     enemies: '敌人', ammo: '弹药', time: '时间', hp: '护甲',
-    spotted: '! 被发现', hunting: '? 搜索中', lock: '狙击锁定',
+    spotted: '! 被发现', hunting: '? 搜索中', lock: '狙击锁定', dronewarn: '无人机',
     verifying: '正在验证通关…', verified: '通关验证完成 — 可以发布', verifyfail: '通关验证失败',
+    firstClear: '🏆 世界首次通关', firstClearSub: '你已将此关卡向所有人发布!', newRecord: '⚡ 新纪录', worldBest: '世界最快',
     hintpc: 'WASD/方向键: 移动&转向(自动瞄准面向的敌人) · 点击射击 · SPACE跳跃 · SHIFT潜行 · G:手雷 · T:狙击镜 · M:地图',
     hintmobile: '滑动屏幕移动&转向(轻滑=潜行) · 瞄准锁定后自动射击 · BOMB / SCOPE / DRONE 按钮 · 暂停菜单可切换左右手',
     handR: '操作: 右手布局', handL: '操作: 左手布局', rotate: '请竖持设备',
@@ -50,14 +53,15 @@ var LANGS = {
     err: '找不到关卡',
     droneGet: '获得无人机!按E或DRONE键发射',
     kMove: '移动', kSneak: '潜行', kJump: '跳跃', kFire: '射击', kScope: '瞄准镜', kBomb: '炸弹(长按)', kDrone: '无人机', kMap: '地图',
-    stagelist: '已发布关卡', good: '好评', bad: '差评', thanks: '感谢评价!', scopeGet: '获得瞄准镜!按T瞄准·3发', jammerDown: '干扰器已瘫痪!'
+    stagelist: '已发布关卡', rateThis: '评价这个关卡', good: '好评', bad: '差评', thanks: '感谢评价!', scopeGet: '获得瞄准镜!按T瞄准·3发', jammerDown: '干扰器已瘫痪!'
   },
   es: {
     start: 'INICIAR MISIÓN', retry: 'REINTENTAR', menu: 'NIVELES', resume: 'CONTINUAR', paused: 'PAUSA',
     cleared: 'ZONA DESPEJADA', dead: 'MISIÓN FALLIDA', timeout: 'TIEMPO AGOTADO', loading: 'CARGANDO',
     enemies: 'ENEMIGOS', ammo: 'MUNICIÓN', time: 'TIEMPO', hp: 'BLINDAJE',
-    spotted: '! DETECTADO', hunting: '? BUSCANDO', lock: 'FRANCOTIRADOR',
+    spotted: '! DETECTADO', hunting: '? BUSCANDO', lock: 'FRANCOTIRADOR', dronewarn: 'DRON',
     verifying: 'VERIFICANDO…', verified: 'VERIFICADO — LISTO PARA PUBLICAR', verifyfail: 'FALLÓ LA VERIFICACIÓN',
+    firstClear: '🏆 PRIMER PASE MUNDIAL', firstClearSub: '¡Publicaste este nivel para todos!', newRecord: '⚡ NUEVO RÉCORD', worldBest: 'MEJOR MUNDIAL',
     hintpc: 'WASD/flechas: mover y girar (auto-apuntado al frente) · clic disparar · SPACE saltar · SHIFT sigilo · G: granada · T: mira · M: mapa',
     hintmobile: 'Desliza: mover y girar (suave = sigilo) · la mira fija y DISPARA SOLA · botones BOMB / SCOPE / DRONE · cambia de mano en PAUSA',
     handR: 'CONTROLES: DIESTRO', handL: 'CONTROLES: ZURDO', rotate: 'GIRA A VERTICAL',
@@ -65,14 +69,15 @@ var LANGS = {
     err: 'NIVEL NO ENCONTRADO',
     droneGet: 'DRON ADQUIRIDO — pulsa E / botón DRONE',
     kMove: 'MOVER', kSneak: 'SIGILO', kJump: 'SALTO', kFire: 'DISPARO', kScope: 'MIRA', kBomb: 'BOMBA (mantén)', kDrone: 'DRON', kMap: 'MAPA',
-    stagelist: 'NIVELES PUBLICADOS', good: 'BIEN', bad: 'MAL', thanks: '¡Gracias!', scopeGet: 'MIRA ADQUIRIDA — T para apuntar, 3 tiros', jammerDown: '¡JAMMER CAÍDO!'
+    stagelist: 'NIVELES PUBLICADOS', rateThis: 'VALORA ESTE NIVEL', good: 'BIEN', bad: 'MAL', thanks: '¡Gracias!', scopeGet: 'MIRA ADQUIRIDA — T para apuntar, 3 tiros', jammerDown: '¡JAMMER CAÍDO!'
   },
   ko: {
     start: '임무 시작', retry: '재시도', menu: '스테이지 목록', resume: '계속', paused: '일시정지',
     cleared: '구역 소탕 완료', dead: '임무 실패', timeout: '시간 초과', loading: '로딩 중',
     enemies: '적', ammo: '탄약', time: '시간', hp: '아머',
-    spotted: '! 발각됨', hunting: '? 수색 중', lock: '저격 조준',
+    spotted: '! 발각됨', hunting: '? 수색 중', lock: '저격 조준', dronewarn: '드론',
     verifying: '클리어 검증 중…', verified: '클리어 검증 완료 — 게시 가능', verifyfail: '클리어 검증 실패',
+    firstClear: '🏆 세계 최초 클리어', firstClearSub: '이 스테이지를 모두에게 공개했습니다!', newRecord: '⚡ 신기록', worldBest: '세계 최고 기록',
     hintpc: 'WASD/방향키: 이동&방향 전환(향한 적 자동 조준) · 클릭 사격 · SPACE 점프 · SHIFT 은신 · G: 수류탄 · T: 스코프 · M: 지도',
     hintmobile: '스와이프로 이동&방향(살짝=은신) · 조준이 고정되면 자동 사격 · BOMB / SCOPE / DRONE 버튼 · 일시정지에서 손잡이 전환',
     handR: '조작: 오른손 배치', handL: '조작: 왼손 배치', rotate: '세로 화면으로 돌려주세요',
@@ -80,7 +85,7 @@ var LANGS = {
     err: '스테이지를 찾을 수 없습니다',
     droneGet: '드론 획득! E 키 / DRONE 버튼으로 발진',
     kMove: '이동', kSneak: '은신', kJump: '점프', kFire: '사격', kScope: '스코프', kBomb: '폭탄(길게)', kDrone: '드론', kMap: '맵',
-    stagelist: '공개된 스테이지', good: '좋아요', bad: '별로', thanks: '평가 감사합니다!', scopeGet: '스코프 획득! T로 조준·3발', jammerDown: '재머 정지!'
+    stagelist: '공개된 스테이지', rateThis: '이 스테이지 평가', good: '좋아요', bad: '별로', thanks: '평가 감사합니다!', scopeGet: '스코프 획득! T로 조준·3발', jammerDown: '재머 정지!'
   }
 };
 var lang = 'en';
@@ -101,6 +106,10 @@ var elAlert = document.getElementById('alerttxt');
 var elWarn = document.getElementById('warntxt');
 var elOverlay = document.getElementById('overlay');
 var elCross = document.getElementById('crosshair');
+var elDroneWarn = document.getElementById('dronewarn');
+var elDroneArrow = elDroneWarn ? elDroneWarn.querySelector('.arrow') : null;
+var elDroneLbl = elDroneWarn ? elDroneWarn.querySelector('.lbl') : null;
+if (elDroneLbl) elDroneLbl.textContent = T('dronewarn');
 var elHit = document.getElementById('hitmark');
 var elToast = document.getElementById('toast');
 var touchUi = document.getElementById('touchui');
@@ -611,6 +620,9 @@ var camSmoothY = -1e9;
 var snap = { px: 0, py: 0, pz: 0 }, prev = { px: 0, py: 0, pz: 0 };
 var ePrev = [], eCur = [];
 var eYawP = [], eYawC = []; // unwrapped enemy yaws (radians) for smooth turning
+var eLegPhase = [];         // per-enemy walk-cycle phase (radians), render-only
+var eLegAmp = [];           // per-enemy smoothed swing amplitude (0 = standing)
+var playerLegPhase = 0, playerLegAmp = 0; // hero walk cycle, render-only
 var pilotPrev = null, pilotCur = null; // piloted-drone interpolation
 
 // fx
@@ -714,20 +726,35 @@ var MSCALES = {
   phrygian: [0, 1, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10],
   pentatonic: [0, 3, 5, 7, 10, 12, 15]
 };
+// "bright" scales get the up-tempo, melodic combat treatment; "dark" ones get
+// a tighter, moodier groove. This is the ハイブリッド switch — each stage's own
+// scale picks its feel, so the world stops sounding uniformly grim.
+var BRIGHT_SCALES = { major: 1, dorian: 1, pentatonic: 1 };
 function setupMusicCfg(stage) {
   var mu = stage && stage.music;
-  var bpm = mu && mu.bpm ? mu.bpm : 112;
+  var bpm = mu && mu.bpm ? mu.bpm : 116;
   var rootHz = (mu && MKEY_HZ[mu.key] !== undefined) ? MKEY_HZ[mu.key] : 55.0;
-  var scale = (mu && MSCALES[mu.scale]) ? MSCALES[mu.scale] : MSCALES.minor;
+  var scaleName = (mu && MSCALES[mu.scale]) ? mu.scale : 'minor';
+  var scale = MSCALES[scaleName];
   var prog = (mu && Array.isArray(mu.prog) && mu.prog.length) ? mu.prog : [0, 0, 2, -1];
-  var roots = [];
+  // roots for the bass/bar (low octave) AND a mid-octave scale table the lead
+  // draws from, so the combat layer can carry an actual melodic hook.
+  var roots = [], scaleHz = [];
   for (var i = 0; i < 4; i++) {
     var deg = Math.round(prog[i % prog.length]);
     var oct = Math.floor(deg / 7);
     var idx = ((deg % 7) + 7) % 7;
     roots.push(rootHz * Math.pow(2, (scale[idx] + 12 * oct) / 12));
   }
-  MUSIC_CFG = { spb: 60 / bpm / 4, roots: roots };
+  for (var j = 0; j < 7; j++) scaleHz.push(scale[j]);
+  MUSIC_CFG = {
+    spb: 60 / bpm / 4,
+    roots: roots,
+    scale: scaleHz,
+    rootHz: rootHz,
+    bright: !!BRIGHT_SCALES[scaleName],
+    night: !!(stage && stage.night)
+  };
 }
 
 function mtone(bus, t, freq0, freq1, dur, type, vol) {
@@ -752,6 +779,31 @@ function mnoise(bus, t, dur, cutoff, vol) {
   src.connect(f); f.connect(g); g.connect(bus);
   src.start(t);
 }
+// --- punchy drum voices (the rhythm the user wants up front) ---
+function mkick(bus, t, vol) {
+  // short pitch-drop sine = tight kick with body but no boom
+  var o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(48, t + 0.08);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  o.connect(g); g.connect(bus);
+  o.start(t); o.stop(t + 0.2);
+}
+function msnare(bus, t, vol) {
+  // noise crack + a short tonal tick so it reads as a snare, not a hiss
+  mnoise(bus, t, 0.12, 2000, vol);
+  var o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'triangle'; o.frequency.setValueAtTime(190, t);
+  g.gain.setValueAtTime(vol * 0.5, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+  o.connect(g); g.connect(bus);
+  o.start(t); o.stop(t + 0.1);
+}
+function mhat(bus, t, vol, open) {
+  mnoise(bus, t, open ? 0.08 : 0.022, 9000, vol);
+}
 function mpad(bus, t, root, dur) {
   var f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 340;
   var g = AC.createGain();
@@ -772,7 +824,7 @@ function musicStart() {
   if (!audio()) return;
   try { if (localStorage.getItem('pw_music') === '0') return; } catch (e) { }
   if (music.timer) return;
-  music.master = AC.createGain(); music.master.gain.value = 0.13; music.master.connect(AC.destination);
+  music.master = AC.createGain(); music.master.gain.value = 0.15; music.master.connect(AC.destination);
   music.stealthG = AC.createGain(); music.stealthG.gain.value = 1; music.stealthG.connect(music.master);
   music.combatG = AC.createGain(); music.combatG.gain.value = 0; music.combatG.connect(music.master);
   music.nextT = AC.currentTime + 0.15;
@@ -793,36 +845,68 @@ function musicTick() {
   if (!AC || !music.timer) return;
   // crossfade toward the combat layer while anyone is alerted
   var target = music.combat ? 1 : 0;
-  music.combatG.gain.setTargetAtTime(target, AC.currentTime, 0.5);
-  music.stealthG.gain.setTargetAtTime(1 - 0.72 * target, AC.currentTime, 0.8);
+  music.combatG.gain.setTargetAtTime(target, AC.currentTime, 0.4);
+  // fade the (now light) stealth pulse almost out during combat so the drums
+  // own the mix — the combat groove should hit, not sit under a pad.
+  music.stealthG.gain.setTargetAtTime(1 - 0.85 * target, AC.currentTime, 0.7);
   while (music.nextT < AC.currentTime + 0.35) {
     musicStep(music.step, music.nextT);
     music.step = (music.step + 1) % 64;
     music.nextT += MUSIC_CFG.spb;
   }
 }
+// 16th-note grid, 64 steps = 4 bars. s&15 = position in bar, (s>>4)&3 = bar.
 function musicStep(s, t) {
   var bar = (s >> 4) & 3;
+  var pos = s & 15;
   var root = MUSIC_CFG.roots[bar];
   var st = music.stealthG, cb = music.combatG;
-  // stealth layer: drone pad, heartbeat, faint tick
-  if ((s & 15) === 0) mpad(st, t, root, MUSIC_CFG.spb * 16);
-  if ((s & 15) === 0) mtone(st, t, 68, 34, 0.14, 'sine', 0.55);
-  if ((s & 15) === 7) mtone(st, t, 62, 32, 0.10, 'sine', 0.35);
-  if ((s & 7) === 4) mnoise(st, t, 0.03, 7000, 0.05);
-  // combat layer: four-on-the-floor + snare + hats + 8th bass + stab
-  if ((s & 3) === 0) mtone(cb, t, 130, 38, 0.13, 'sine', 0.95);
-  if ((s & 7) === 4) mnoise(cb, t, 0.09, 1600, 0.5);
-  if ((s & 1) === 0) mnoise(cb, t, 0.025, 8000, 0.16);
+  var cfg = MUSIC_CFG, bright = cfg.bright, night = cfg.night;
+
+  // ---- stealth layer: light and forward, NOT a heavy drone ----
+  // a soft pulse on the bar + an airy tick — enough to feel alive without gloom.
+  if (pos === 0) mtone(st, t, root * 2, root * 2, 0.09, 'triangle', 0.22);
+  if (pos === 8) mtone(st, t, root * 3, root * 3, 0.07, 'triangle', 0.14);
+  if ((s & 3) === 2) mnoise(st, t, 0.02, 8000, 0.035); // faint hat shimmer
+  // night stages keep a thin shadow pad so the mood still lands — but quiet.
+  if (night && pos === 0) mpad(st, t, root, cfg.spb * 12);
+
+  // ---- combat layer: drums UP FRONT, with a melodic hook ----
+  // kick pattern: bright = driving (1, &of2, 3, &of4) syncopation; dark = a
+  // steadier, heavier four-on-the-floor with a tighter feel.
+  var kickHit = bright ? (pos === 0 || pos === 6 || pos === 8 || pos === 14)
+                       : (pos === 0 || pos === 4 || pos === 8 || pos === 12);
+  if (kickHit) mkick(cb, t, 0.9);
+  // snare on the backbeat (beats 2 & 4) — the spine of the groove.
+  if (pos === 4 || pos === 12) msnare(cb, t, 0.5);
+  // hats: bright rides straight 8ths + open off-beats; dark plays sparser 8ths.
+  if ((s & 1) === 0) mhat(cb, t, bright ? 0.14 : 0.10, false);
+  if (bright && (pos === 2 || pos === 10)) mhat(cb, t, 0.11, true);
+  // bass: 8th-note root pulse, walking up on the turnaround.
   if ((s & 1) === 0) {
     var b = root * 2;
-    if ((s & 7) === 6) b = b * 1.335; // walk up a fourth on the off-accent
-    mtone(cb, t, b, b, 0.11, 'square', 0.3);
+    if (pos === 14) b = b * 1.335; // walk a fourth into the next bar
+    mtone(cb, t, b, b, bright ? 0.10 : 0.13, bright ? 'square' : 'sawtooth', bright ? 0.26 : 0.32);
   }
-  if ((s & 31) === 0) {
-    mtone(cb, t, root * 4, root * 4, 0.3, 'sawtooth', 0.16);
-    mtone(cb, t, root * 4 * 1.189, root * 4 * 1.189, 0.3, 'sawtooth', 0.13);
-    mtone(cb, t, root * 4 * 1.498, root * 4 * 1.498, 0.3, 'sawtooth', 0.13);
+  // lead hook: a short melodic riff from the stage's scale, so the combat music
+  // has a TUNE, not just chords. Bright = brisker, higher; dark = sparser, lower.
+  var scl = cfg.scale, rt = cfg.rootHz;
+  function note(deg) {
+    var oct = Math.floor(deg / 7), idx = ((deg % 7) + 7) % 7;
+    return rt * Math.pow(2, (scl[idx] + 12 * oct) / 12);
+  }
+  if (bright) {
+    // 2 hits per bar with a rising motif over 4 bars — catchy and light
+    var motif = [ [7, 9], [7, 11], [9, 12], [7, 10] ][bar];
+    if (pos === 0) mtone(cb, t, note(motif[0]), note(motif[0]), 0.16, 'square', 0.16);
+    if (pos === 8) mtone(cb, t, note(motif[1]), note(motif[1]), 0.16, 'square', 0.16);
+  } else {
+    // one darker stab per bar, held a touch longer
+    var stab = [7, 8, 10, 7][bar];
+    if (pos === 0) {
+      mtone(cb, t, note(stab), note(stab), 0.28, 'sawtooth', 0.15);
+      mtone(cb, t, note(stab + 2), note(stab + 2), 0.28, 'sawtooth', 0.11);
+    }
   }
 }
 
@@ -883,12 +967,26 @@ function hudUpdate() {
     btnScope.style.display = !world.pilot && mode === 'playing' ? 'flex' : 'none';
   }
   var alerted = false, sus = false, lock = false;
+  // nearest approaching enemy drone (type 3), for the proximity warning
+  var droneNear = -1, droneNear2 = 1e30, droneDiving = false;
+  var DRONE_WARN_R = 12.0, DRONE_WARN_R2 = DRONE_WARN_R * DRONE_WARN_R;
+  var DRONE_CLOSE_R2 = 6.0 * 6.0;
   for (var e = 0; e < world.enemies.length; e++) {
     var en = world.enemies[e];
     if (!en.alive) continue;
     if (en.state === 2) alerted = true;
     else if (en.state === 1) sus = true;
     if (en.type === 2 && en.warnT > 0) lock = true;
+    if (en.type === 3) {
+      var ddx = en.x - world.px, ddz = en.z - world.pz;
+      var dd2 = ddx * ddx + ddz * ddz;
+      // warn only for drones that have noticed you (diving, or alerted/hunting)
+      // and are within range — a far idle patrol drone shouldn't nag.
+      var active = en.diving || en.state >= 1;
+      if (active && dd2 < DRONE_WARN_R2 && dd2 < droneNear2) {
+        droneNear2 = dd2; droneNear = e; droneDiving = en.diving;
+      }
+    }
   }
   music.combat = alerted;
   elAlert.style.display = alerted ? 'block' : 'none';
@@ -896,6 +994,29 @@ function hudUpdate() {
   elWarn.style.display = (lock || sus) ? 'block' : 'none';
   elWarn.textContent = lock ? T('lock') : T('hunting');
   elWarn.style.color = lock ? '#ff5a48' : '#ffd23e';
+
+  // drone proximity arrow: point from screen centre toward the drone's on-screen
+  // bearing (relative to where the camera looks). Hidden while scoped/piloting
+  // (that view has its own framing) or on the pause/end overlays.
+  if (elDroneWarn) {
+    var showDrone = droneNear >= 0 && !world.scoped && !world.pilot && mode === 'playing';
+    if (showDrone) {
+      var dn = world.enemies[droneNear];
+      var rvx = dn.x - world.px, rvz = dn.z - world.pz;
+      // world bearing of the drone, then subtract the camera yaw so 0 = ahead.
+      // camYaw follows the same convention as the render (see player draw).
+      var worldAng = Math.atan2(rvx, rvz);
+      var screenAng = worldAng - camYaw;
+      // CSS: 0deg points up (-Y). Ahead should point up, so rotate by screenAng.
+      var deg = screenAng * 180 / Math.PI;
+      if (elDroneArrow) elDroneArrow.style.transform = 'rotate(' + deg.toFixed(1) + 'deg)';
+      elDroneWarn.style.display = 'block';
+      var fast = droneDiving || droneNear2 < DRONE_CLOSE_R2;
+      elDroneWarn.className = 'hud ' + (fast ? 'pulse-fast' : 'pulse');
+    } else {
+      elDroneWarn.style.display = 'none';
+    }
+  }
 }
 
 // ---------------------------------------------------------------- net
@@ -1466,6 +1587,17 @@ function resetWorld() {
   setupMinimap();
   setupKeyGuide();
   acc = 0;
+  // Clear any held/queued input so a finger or key still down from the RETRY tap
+  // doesn't bleed into the fresh run (a lingering FIRE/SCOPE would misfire and,
+  // for scope, root the body — "can't move right after retry"). The sim also
+  // starts prevB fully pressed, so this is belt-and-suspenders.
+  keys = {};
+  mouseFire = false;
+  touchFire = false;
+  jumpQueued = droneQueued = grenQueued = scopeQueued = false;
+  autoLockT = 0;
+  autoLockKey = -1;
+  stick.active = false; stick.id = -1; stick.dx = 0; stick.dy = 0;
 }
 
 function startPlay() {
@@ -1498,6 +1630,8 @@ function finish(kind) {
   mode = 'done';
   doneKind = kind;
   touchUi.style.display = 'none';
+  var celeb = document.getElementById('celebrate');
+  if (celeb) { celeb.style.display = 'none'; celeb.innerHTML = ''; } // clear any prior burst
   if (mapOpen) toggleMap();
   musicStop();
   if (kind === 'cleared') sfx.clear(); else sfx.dead();
@@ -1505,8 +1639,12 @@ function finish(kind) {
   var title = kind === 'cleared' ? T('cleared') : (kind === 'timeout' ? T('timeout') : T('dead'));
   var timeStr = kind === 'cleared' ? '<p>' + T('time') + ' ' + fmtTime(world.tick) + ' · ' + (world.tick * 20) + 'ms</p>' : '';
   setTimeout(function () {
+    var vbtn = function (id, ico, label) {
+      return '<button class="btn vbtn" id="' + id + '"><span class="ico">' + ico + '</span>' + label + '</button>';
+    };
     var voteRow = (stageId && !editKey)
-      ? '<div class="btnrow" id="voteRow">' + btn('bGood', '👍 ' + T('good')) + btn('bBad', '👎 ' + T('bad')) + '</div>'
+      ? '<p id="voteLabel">' + T('rateThis') + '</p>' +
+        '<div class="btnrow" id="voteRow">' + vbtn('bGood', '👍', T('good')) + vbtn('bBad', '👎', T('bad')) + '</div>'
       : '';
     showOverlay(
       '<h1>' + title + '</h1>' + timeStr +
@@ -1528,7 +1666,10 @@ function finish(kind) {
       document.getElementById('bBad').onclick = function () { vote(false); };
     }
     if (kind === 'cleared' && stageId && editKey) submitClear();
-    if (kind === 'cleared' && stageId && !editKey) reportPlay(true);
+    // A NON-author clear submits a verified score/replay too — this is what
+    // promotes an unverified stage to published ("anyone's clear publishes it")
+    // and seeds the leaderboard/ghost. reportPlay only bumps the play counters.
+    if (kind === 'cleared' && stageId && !editKey) { submitScore(); reportPlay(true); }
     if (kind !== 'cleared' && stageId && !editKey) reportPlay(false);
   }, 600);
 }
@@ -1569,6 +1710,54 @@ function reportPlay(cleared) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ playerId: playerId(), cleared: !!cleared, surviveMs: surviveMs })
   }).catch(function () { });
+}
+
+// A non-author clear: submit the verified replay to /score. The server
+// re-simulates it, records the leaderboard time + ghost, and — if this is the
+// FIRST clear of an unverified stage — promotes it to published. A first clear
+// (firstClear) triggers the celebration banner + confetti on the result screen.
+function submitScore() {
+  var replay = { v: 't1', ticks: world.tick, data: tacEncodeTrace(recs) };
+  fetch('/api/stages/' + encodeURIComponent(stageId) + '/score', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerId: playerId(), name: 'anonymous', replay: replay })
+  }).then(function (r) { return r.json(); }).then(function (b) {
+    if (!b) return;
+    if (b.firstClear || b.promoted) celebrateFirstClear();
+    else if (b.top && b.top.length && b.top[0] && (world.tick * 20) <= b.top[0].time_ms) celebrateRecord();
+  }).catch(function () { });
+}
+
+function celebrateFirstClear() {
+  var box = document.getElementById('celebrate');
+  if (!box) return;
+  box.innerHTML = '<div class="celebo"><div class="celebt">' + T('firstClear') + '</div>' +
+    '<div class="celebs">' + T('firstClearSub') + '</div></div>';
+  box.style.display = 'flex';
+  spawnConfetti();
+}
+function celebrateRecord() {
+  var box = document.getElementById('celebrate');
+  if (!box) return;
+  box.innerHTML = '<div class="celebo"><div class="celebt">' + T('newRecord') + '</div>' +
+    '<div class="celebs">' + T('worldBest') + '</div></div>';
+  box.style.display = 'flex';
+  spawnConfetti();
+}
+// Lightweight CSS confetti — a burst of falling colored squares, no library.
+function spawnConfetti() {
+  var box = document.getElementById('celebrate');
+  if (!box) return;
+  var cols = ['#4dd2c3', '#ffd23e', '#ff6b6b', '#3ddc84', '#59d9f0', '#ffffff'];
+  for (var i = 0; i < 40; i++) {
+    var p = document.createElement('span');
+    p.className = 'confetti';
+    p.style.left = (Math.random() * 100) + '%';
+    p.style.background = cols[i % cols.length];
+    p.style.animationDelay = (Math.random() * 0.5) + 's';
+    p.style.animationDuration = (1.6 + Math.random() * 1.2) + 's';
+    box.appendChild(p);
+  }
 }
 
 // ---------------------------------------------------------------- input
@@ -1882,6 +2071,14 @@ function render(alpha) {
   var py = prev.py + (snap.py - prev.py) * alpha;
   var pz = prev.pz + (snap.pz - prev.pz) * alpha;
 
+  // hero walk cycle (render-only): advance from ground speed, ease amplitude
+  var pdx = snap.px - prev.px, pdz = snap.pz - prev.pz;
+  var pspd = Math.sqrt(pdx * pdx + pdz * pdz) / TAC.TICK;
+  var pWalking = pspd > 0.4 && py < 0.2;
+  playerLegPhase += pspd * 2.2 * frameDt;
+  playerLegAmp += ((pWalking ? 1 : 0) - playerLegAmp) * Math.min(1, frameDt * 12);
+  if (!pWalking && playerLegAmp < 0.02) playerLegPhase = 0;
+
   // while piloting a captured drone, the camera rides with the drone
   var plx = 0, ply = 0, plz = 0;
   var camX = px, camY = py, camZ = pz;
@@ -2039,7 +2236,15 @@ function render(alpha) {
     var eyy = ePrev[i].y + (eCur[i].y - ePrev[i].y) * alpha;
     var ez = ePrev[i].z + (eCur[i].z - ePrev[i].z) * alpha;
     var eyaw = eYawP[i] + (eYawC[i] - eYawP[i]) * alpha;
-    drawEnemy(en, ex, eyy, ez, eyaw, en.crouched ? 0.62 : 1);
+    // advance this enemy's walk cycle from its ground speed (render-only)
+    var edx = eCur[i].x - ePrev[i].x, edz = eCur[i].z - ePrev[i].z;
+    var espd = Math.sqrt(edx * edx + edz * edz) / TAC.TICK; // m/s over the last tick
+    if (eLegPhase[i] === undefined) { eLegPhase[i] = 0; eLegAmp[i] = 0; }
+    var eMoving = espd > 0.4 && eyy < 0.2; // grounded and actually walking
+    eLegPhase[i] += espd * 2.2 * frameDt;
+    eLegAmp[i] += ((eMoving ? 1 : 0) - eLegAmp[i]) * Math.min(1, frameDt * 12);
+    if (!eMoving && eLegAmp[i] < 0.02) eLegPhase[i] = 0; // settle feet together
+    drawEnemy(en, ex, eyy, ez, eyaw, en.crouched ? 0.62 : 1, eLegPhase[i], eLegAmp[i]);
     // blob shadow
     if (eyy > 0.05) draw(mDisc, ex, 0.05, ez, 0, en.r * 2.2, 1, en.r * 2.2, COL.shadow[0], COL.shadow[1], COL.shadow[2], 0.35);
   }
@@ -2152,7 +2357,11 @@ function render(alpha) {
   if (!world.dead && !world.scoped) {
     var pyaw = playerYawR;
     var pScale = world.crouched ? 0.62 : 1;
-    draw(mCyl, px, py, pz, pyaw, 0.66, 1.15 * pScale, 0.66, COL.playerDark[0], COL.playerDark[1], COL.playerDark[2], 1);
+    // stiff Minecraft-style legs; torso (cylinder) shortened by the leg length
+    var pLegLen = 0.42 * pScale;
+    drawLegs(px, py, pz, pyaw, 1, playerLegPhase, 0.22 * pScale, pLegLen / 1, 0.24, 0.15,
+      COL.playerDark[0] * 0.8, COL.playerDark[1] * 0.8, COL.playerDark[2] * 0.8);
+    draw(mCyl, px, py + pLegLen, pz, pyaw, 0.66, (1.15 * pScale - pLegLen), 0.66, COL.playerDark[0], COL.playerDark[1], COL.playerDark[2], 1);
     draw(mCube, px, py + 1.15 * pScale, pz, pyaw, 0.5, 0.42, 0.5, COL.player[0], COL.player[1], COL.player[2], 1);
     drawFace(px, py + 1.4 * pScale, pz, pyaw, 0.5, 0.36); // hero's eyes sit wider apart
     // gun: small box forward-right
@@ -2436,10 +2645,33 @@ function drawFace(x, y, z, yaw, w, spread) {
   draw(mCube, x + s * fo, y - w * 0.34, z + c * fo, yaw, w * 0.4, w * 0.1, 0.03, 0.08, 0.08, 0.1, 1, true);
 }
 
-function drawEnemy(en, x, y, z, yaw, sc) {
+// Minecraft-style stiff legs: two vertical leg blocks under the torso whose
+// FEET slide fore/aft in counter-phase (draw() only rotates about yaw, so we
+// swing the contact point instead of tilting the limb). legLen is how much of
+// the body's base is legs; the caller shortens its torso by the same amount so
+// total height is unchanged. phase is a free-running walk cycle (radians);
+// amp 0 = standing (feet level). Purely cosmetic — never touches the sim.
+function drawLegs(x, y, z, yaw, sc, phase, amp, legLen, legW, spread, r, g, b) {
+  var fx = Math.sin(yaw), fz = Math.cos(yaw);          // forward (facing) axis
+  var rx = Math.cos(yaw), rz = -Math.sin(yaw);         // right (side) axis
+  var swing = Math.sin(phase) * amp;                   // fore/aft foot offset
+  var sp = spread * sc;
+  var lw = legW * sc, ll = legLen * sc;
+  // left leg leads while right trails, then they cross — classic biped gait
+  draw(mCube, x - rx * sp + fx * swing, y, z - rz * sp + fz * swing,
+    yaw, lw, ll, lw, r, g, b, 1);
+  draw(mCube, x + rx * sp - fx * swing, y, z + rz * sp - fz * swing,
+    yaw, lw, ll, lw, r, g, b, 1);
+}
+
+function drawEnemy(en, x, y, z, yaw, sc, phase, amp) {
   var s = Math.sin(yaw), c = Math.cos(yaw);
+  phase = phase || 0; amp = amp || 0;
   if (en.type === 0) { // rifle soldier: slim olive body + head + rifle forward
-    draw(mCube, x, y, z, yaw, 0.55 * sc, 1.5 * sc, 0.42 * sc, COL.soldier[0], COL.soldier[1], COL.soldier[2], 1);
+    // legs take the bottom 0.5 of the body; torso starts at 0.5 and is 0.5 shorter
+    drawLegs(x, y, z, yaw, sc, phase, 0.22, 0.5, 0.2, 0.13,
+      COL.soldierDark[0], COL.soldierDark[1], COL.soldierDark[2]);
+    draw(mCube, x, y + 0.5 * sc, z, yaw, 0.55 * sc, 1.0 * sc, 0.42 * sc, COL.soldier[0], COL.soldier[1], COL.soldier[2], 1);
     draw(mCube, x, y + 1.5 * sc, z, yaw, 0.34 * sc, 0.3 * sc, 0.34 * sc, COL.soldier[0] * 1.35, COL.soldier[1] * 1.35, COL.soldier[2] * 1.35, 1);
     drawFace(x, y + 1.69 * sc, z, yaw, 0.34 * sc);
     draw(mCube, x, y + 1.78 * sc, z, yaw, 0.42 * sc, 0.14 * sc, 0.42 * sc, COL.soldier[0] * 0.75, COL.soldier[1] * 0.75, COL.soldier[2] * 0.75, 1);
@@ -2461,20 +2693,24 @@ function drawEnemy(en, x, y, z, yaw, sc) {
     draw(mDisc, x, y + 0.26 * sc, z, rot, 1.2 * sc, 1, 1.2 * sc, 0.62, 0.65, 0.70, 1);
     draw(mCube, x + s * 0.34, y + 0.04 * sc, z + c * 0.34, yaw, 0.12 * sc, 0.12 * sc, 0.12 * sc, 1, 0.25, 0.2, 1, true);
   } else if (en.type === 5) { // satchel bomber: stocky rust body + bulky bomb pack
-    draw(mCube, x, y, z, yaw, 0.62 * sc, 1.45 * sc, 0.5 * sc, COL.bomber[0], COL.bomber[1], COL.bomber[2], 1);
+    drawLegs(x, y, z, yaw, sc, phase, 0.2, 0.48, 0.24, 0.15,
+      COL.bomber[0] * 0.7, COL.bomber[1] * 0.7, COL.bomber[2] * 0.7);
+    draw(mCube, x, y + 0.48 * sc, z, yaw, 0.62 * sc, 0.97 * sc, 0.5 * sc, COL.bomber[0], COL.bomber[1], COL.bomber[2], 1);
     draw(mCube, x, y + 1.45 * sc, z, yaw, 0.34 * sc, 0.3 * sc, 0.34 * sc, COL.bomber[0] * 1.35, COL.bomber[1] * 1.35, COL.bomber[2] * 1.35, 1);
     var bs = Math.sin(yaw), bc = Math.cos(yaw);
     draw(mCube, x - bs * 0.42, y + 0.55 * sc, z - bc * 0.42, yaw, 0.5 * sc, 0.6 * sc, 0.3 * sc, 0.15, 0.12, 0.1, 1);
     draw(mOcta, x - bs * 0.42, y + 1.05 * sc, z - bc * 0.42, 0, 0.1, 0.1, 0.1, 1.0, 0.3, 0.15, 1);
-  } else if (en.type === 4) { // drone operator: kneeling figure + antenna pack + glowing pad
-    draw(mCube, x, y, z, yaw, 0.55 * sc, 1.1 * sc, 0.45 * sc, 0.55, 0.48, 0.34, 1);
+  } else if (en.type === 4) { // drone operator: crouched figure + antenna pack + glowing pad
+    drawLegs(x, y, z, yaw, sc, phase, 0.16, 0.34, 0.2, 0.14, 0.42, 0.37, 0.26);
+    draw(mCube, x, y + 0.34 * sc, z, yaw, 0.55 * sc, 0.76 * sc, 0.45 * sc, 0.55, 0.48, 0.34, 1);
     draw(mCube, x, y + 1.1 * sc, z, yaw, 0.32 * sc, 0.28 * sc, 0.32 * sc, 0.62, 0.55, 0.4, 1);
     drawFace(x, y + 1.27 * sc, z, yaw, 0.32 * sc);
     draw(mCube, x - s * 0.32, y + 0.55 * sc, z - c * 0.32, yaw, 0.4 * sc, 0.55 * sc, 0.18 * sc, 0.3, 0.28, 0.22, 1);
     draw(mCube, x - s * 0.32, y + 1.5 * sc, z - c * 0.32, yaw, 0.04 * sc, 0.85 * sc, 0.04 * sc, 0.75, 0.78, 0.82, 1);
     draw(mCube, x + s * 0.35, y + 0.85 * sc, z + c * 0.35, yaw, 0.3 * sc, 0.05 * sc, 0.22 * sc, 0.3, 0.95, 0.85, 1, true);
   } else if (en.type === 6) { // shield bearer: heavy frame behind a tower shield
-    draw(mCube, x, y, z, yaw, 0.6 * sc, 1.55 * sc, 0.5 * sc, 0.34, 0.36, 0.4, 1);
+    drawLegs(x, y, z, yaw, sc, phase, 0.16, 0.5, 0.24, 0.16, 0.24, 0.26, 0.3);
+    draw(mCube, x, y + 0.5 * sc, z, yaw, 0.6 * sc, 1.05 * sc, 0.5 * sc, 0.34, 0.36, 0.4, 1);
     draw(mCube, x, y + 1.55 * sc, z, yaw, 0.36 * sc, 0.3 * sc, 0.36 * sc, 0.4, 0.42, 0.47, 1);
     var up = world.shieldUp(en);
     var stag = en.shieldStagT > 0;
@@ -2487,7 +2723,9 @@ function drawEnemy(en, x, y, z, yaw, sc) {
       draw(mCube, x + s * 0.45 + Math.cos(yaw) * 0.5, y + (stag ? 0.3 : 0.5) * sc, z + c * 0.45 - Math.sin(yaw) * 0.5, yaw + 0.5, 2.0 * sc, 0.9 * sc, 0.1 * sc, 0.5, 0.53, 0.58, 1);
     }
   } else { // sniper: slim tall + long barrel
-    draw(mCube, x, y, z, yaw, 0.42 * sc, 1.85 * sc, 0.42 * sc, COL.sniper[0], COL.sniper[1], COL.sniper[2], 1);
+    drawLegs(x, y, z, yaw, sc, phase, 0.2, 0.6, 0.16, 0.12,
+      COL.sniper[0] * 0.7, COL.sniper[1] * 0.7, COL.sniper[2] * 0.7);
+    draw(mCube, x, y + 0.6 * sc, z, yaw, 0.42 * sc, 1.25 * sc, 0.42 * sc, COL.sniper[0], COL.sniper[1], COL.sniper[2], 1);
     draw(mCube, x + s * 0.8, y + 1.55 * sc, z + c * 0.8, yaw, 0.1 * sc, 0.1 * sc, 1.5 * sc, 0.16, 0.17, 0.2, 1);
     draw(mCube, x, y + 1.85 * sc, z, yaw, 0.3 * sc, 0.22 * sc, 0.3 * sc, COL.sniper[0] * 1.3, COL.sniper[1] * 1.3, COL.sniper[2] * 1.3, 1);
     drawFace(x, y + 1.96 * sc, z, yaw, 0.3 * sc);

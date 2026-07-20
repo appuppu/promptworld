@@ -22,17 +22,26 @@
   nav a { font-size:11px; color:var(--dim); margin-left:18px; letter-spacing:.18em; text-transform:uppercase; }
   nav a:hover { color:var(--fg); }
 
-  .hero { padding:72px 0 56px; text-align:center;
+  .hero { padding:72px 0 56px; text-align:center; position:relative; overflow:hidden;
     background:
-      radial-gradient(ellipse 90% 60% at 50% -10%, rgba(77,210,195,.13), transparent),
       repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.025) 39px 40px),
       repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,.025) 39px 40px); }
-  h1 { font-size:clamp(34px, 7vw, 60px); font-weight:normal; letter-spacing:.24em; margin:0 0 14px; }
+  /* slow-pulsing teal glow behind the title — motion without noise */
+  .hero::before { content:''; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse 90% 60% at 50% -10%, rgba(77,210,195,.16), transparent);
+    animation:heroglow 6s ease-in-out infinite; }
+  @keyframes heroglow { 0%,100%{opacity:.6} 50%{opacity:1} }
+  .hero > * { position:relative; z-index:1; }
+  h1 { font-size:clamp(34px, 7vw, 60px); font-weight:normal; letter-spacing:.24em; margin:0 0 14px;
+    animation:riseIn .7s ease both; }
   h1 b { color:var(--teal); font-weight:normal; }
-  .tag { color:var(--dim); font-size:clamp(13px,2.4vw,16px); line-height:1.9; margin:0 auto 34px; max-width:640px; }
+  .tag { color:var(--dim); font-size:clamp(13px,2.4vw,16px); line-height:1.9; margin:0 auto 34px; max-width:640px;
+    animation:riseIn .7s ease .08s both; }
+  @keyframes riseIn { from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }
   .cta { display:inline-block; border:1px solid var(--teal); color:var(--teal); padding:15px 44px;
-    font-size:13px; letter-spacing:.26em; text-transform:uppercase; margin:6px 8px; }
-  .cta:hover { background:var(--teal); color:#04110f; }
+    font-size:13px; letter-spacing:.26em; text-transform:uppercase; margin:6px 8px;
+    transition:background .15s, color .15s, transform .15s, box-shadow .15s; animation:riseIn .7s ease .16s both; }
+  .cta:hover { background:var(--teal); color:#04110f; transform:translateY(-2px); box-shadow:0 6px 22px rgba(77,210,195,.3); }
   .cta.ghost { border-color:var(--line); color:var(--dim); }
   .cta.ghost:hover { background:var(--panel); color:var(--fg); }
   .keys { margin-top:26px; color:#5f6873; font-size:11px; letter-spacing:.12em; }
@@ -40,7 +49,17 @@
   section { padding:54px 0; border-top:1px solid var(--line); }
   h2 { font-size:14px; font-weight:normal; letter-spacing:.3em; text-transform:uppercase; color:var(--teal); margin:0 0 26px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:14px; }
-  .card { border:1px solid var(--line); background:var(--panel); padding:14px; display:block; }
+  .card { border:1px solid var(--line); background:var(--panel); padding:14px; display:block; position:relative;
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    animation:cardIn .5s ease both; }
+  @keyframes cardIn { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none} }
+  .card:hover { transform:translateY(-4px); border-color:var(--teal);
+    box-shadow:0 10px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(77,210,195,.25); }
+  @media (prefers-reduced-motion:reduce){ .hero::before,h1,.tag,.cta,.card{animation:none} }
+  .hidebtn { position:absolute; top:8px; right:8px; z-index:2; width:26px; height:26px; line-height:1;
+    background:rgba(10,12,14,.7); border:1px solid #2a2f38; color:#9aa3ad; border-radius:50%;
+    font-size:15px; cursor:pointer; padding:0; letter-spacing:0; }
+  .hidebtn:hover { color:#ff6b6b; border-color:#ff6b6b; }
   .card canvas.thumb { width:100%; height:150px; display:block; background:#0b0d10;
     border:1px solid var(--line); margin-bottom:12px; }
   .card .comp { color:var(--dim); font-size:10px; letter-spacing:.12em; margin-top:6px;
@@ -81,7 +100,6 @@
     <nav>
       <a href="#stages" data-t="navStages"></a>
       <a href="#create" data-t="navCreate"></a>
-      <a href="/classic" data-t="navClassic"></a>
       <select id="langSel" style="background:#12151b;color:#9aa3ad;border:1px solid #2a2f38;font-size:11px;padding:4px 6px;margin-left:18px;letter-spacing:.1em">
         <option value="en">EN</option><option value="ja">日本語</option><option value="zh">中文</option><option value="es">ES</option><option value="ko">한국어</option>
       </select>
@@ -142,8 +160,7 @@
   <div class="wrap">
     <span>© PROMPT WORLD</span>
     <span>
-      <a href="/classic" data-t="navClassic"></a> ·
-      <a href="/create.html">MCP GUIDE</a> ·
+      <a href="/mcp-spec.html">MCP GUIDE</a> ·
       <a href="/privacy.html">PRIVACY</a> ·
       <a href="/terms.html">TERMS</a>
     </span>
@@ -261,7 +278,33 @@
   L.en.tbNone = 'CLEARED BY: NONE'; L.ja.tbNone = 'クリア者: なし'; L.zh.tbNone = '通关者: 无'; L.es.tbNone = 'SUPERADO POR: NADIE'; L.ko.tbNone = '클리어: 없음';
   L.en.tbLife = 'avg life'; L.ja.tbLife = '平均生存'; L.zh.tbLife = '平均存活'; L.es.tbLife = 'vida media'; L.ko.tbLife = '평균 생존';
   L.en.tbHint = 'Be the FIRST in the world to clear one — your run becomes its ghost.'; L.ja.tbHint = '世界初クリアを奪え — 君のプレイがゴーストになる。'; L.zh.tbHint = '成为世界首位通关者——你的操作将成为幽灵。'; L.es.tbHint = 'Sé el PRIMERO del mundo en superarlo.'; L.ko.tbHint = '세계 최초 클리어에 도전하라.';
+  L.en.hide = 'Report / Hide'; L.ja.hide = '通報・非表示'; L.zh.hide = '举报・隐藏'; L.es.hide = 'Reportar / Ocultar'; L.ko.hide = '신고・숨기기';
+  L.en.hidden = 'Hidden'; L.ja.hidden = '非表示にしました'; L.zh.hidden = '已隐藏'; L.es.hidden = 'Oculto'; L.ko.hidden = '숨김';
+  L.en.hideConfirm = 'Report and hide this stage from your lists? It stays visible to others; our team reviews reports.';
+  L.ja.hideConfirm = 'このステージを通報して、あなたの一覧から非表示にしますか?他の人には表示されたままで、運営が通報を確認します。';
+  L.zh.hideConfirm = '举报并从你的列表中隐藏此关卡?其他人仍可看到,我们会审核举报。';
+  L.es.hideConfirm = '¿Reportar y ocultar este nivel de tus listas? Sigue visible para otros; nuestro equipo revisa los reportes.';
+  L.ko.hideConfirm = '이 스테이지를 신고하고 목록에서 숨기시겠습니까? 다른 사람에게는 계속 표시되며, 운영팀이 신고를 검토합니다.';
   var T = function (k) { return L[lang][k] || L.en[k] || k; };
+  // Anonymous per-device id (same key the play screen uses), so hides made here
+  // and in-game share one identity.
+  function playerId() {
+    try {
+      var id = localStorage.getItem('pw_pid_web');
+      if (!id) { id = 'w-' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('pw_pid_web', id); }
+      return id;
+    } catch (e) { return 'w-anon'; }
+  }
+  // Hide a stage for this device only (server filters it out of future lists).
+  function hideStage(id, cardEl) {
+    if (!confirm(T('hideConfirm'))) return;
+    fetch('/api/stages/' + encodeURIComponent(id) + '/hide', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ playerId: playerId() })
+    }).then(function () {
+      if (cardEl) { cardEl.style.opacity = '0.35'; cardEl.style.pointerEvents = 'none'; }
+    }).catch(function () { });
+  }
   document.querySelectorAll('[data-t]').forEach(function (el) { el.textContent = T(el.getAttribute('data-t')); });
   document.querySelectorAll('[data-p]').forEach(function (el) { el.placeholder = T(el.getAttribute('data-p')); });
   var sel = document.getElementById('langSel');
@@ -273,15 +316,33 @@
   var tabTb = document.getElementById('tabTb');
   tabMain.textContent = T('tabMain');
   tabTb.textContent = T('tabTb');
-  tabTb.onclick = function () {
+  var esc0 = function (t) { var e = document.createElement('span'); e.textContent = t || ''; return e.innerHTML; };
+  // Small hide/report button overlaid on a card (stops the card's link nav).
+  function hideBtn(id) {
+    return '<button class="hidebtn" data-hide="' + esc0(id) + '" title="' + T('hide') + '">⋯</button>';
+  }
+  // Wire up every hide button currently in the grid.
+  function wireHides(grid) {
+    grid.querySelectorAll('[data-hide]').forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        hideStage(b.getAttribute('data-hide'), b.closest('.card'));
+      };
+    });
+  }
+  // Filter the testbench shelf by the current search box, server-side.
+  function loadTestbench() {
     tabTb.classList.add('on'); tabMain.classList.remove('on');
     var grid = document.getElementById('stageGrid');
     grid.innerHTML = '<span style="color:#9aa3ad;font-size:13px">…</span>';
-    fetch('/api/stages?game=tac&sort=testbench').then(function (r) { return r.json(); }).then(function (d) {
+    var qv = (document.getElementById('q').value || '').trim();
+    var qs = '/api/stages?game=tac&sort=testbench&playerId=' + encodeURIComponent(playerId()) +
+      (qv ? '&q=' + encodeURIComponent(qv) : '');
+    fetch(qs).then(function (r) { return r.json(); }).then(function (d) {
       var esc = function (t) { var e = document.createElement('span'); e.textContent = t || ''; return e.innerHTML; };
       var rows = (d.stages || []).map(function (s) {
         var life = s.avg_survive_ms ? (s.avg_survive_ms / 1000).toFixed(1) + 's' : '—';
-        return '<a class="card" href="/?stage=' + encodeURIComponent(s.id) + '">' +
+        return '<a class="card" href="/?stage=' + encodeURIComponent(s.id) + '">' + hideBtn(s.id) +
           '<div class="nm">⚠ ' + esc(s.name) + '</div>' +
           '<div class="meta tbmeta">' + T('tbNone') + '</div>' +
           '<div class="meta">' + (s.attempts || 0) + ' tries · ' + T('tbLife') + ' ' + life +
@@ -290,22 +351,28 @@
       }).join('');
       grid.innerHTML = '<div style="grid-column:1/-1;color:#ffd23e;font-size:12px;letter-spacing:.08em;margin-bottom:6px">' + T('tbHint') + '</div>' +
         (rows || '<span style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>');
+      wireHides(grid);
     }).catch(function () { grid.innerHTML = '<span style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>'; });
-  };
+  }
+  var tbActive = false;
+  tabTb.onclick = function () { tbActive = true; loadTestbench(); };
   tabMain.onclick = function () { location.reload(); };
 
-  fetch('/api/stages?game=tac').then(function (r) { return r.json(); }).then(function (d) {
+  fetch('/api/stages?game=tac&playerId=' + encodeURIComponent(playerId())).then(function (r) { return r.json(); }).then(function (d) {
     var grid = document.getElementById('stageGrid');
     if (!d.stages || !d.stages.length) { document.getElementById('stageEmpty').textContent = T('empty'); return; }
     var esc = function (t) { var e = document.createElement('span'); e.textContent = t || ''; return e.innerHTML; };
-    var TCOL = { soldier: '#7c9a6e', gatling: '#c0564e', sniper: '#a06ec2', drone: '#a6adba', operator: '#c2a05e' };
-    var TCODE = { soldier: 'SOL', gatling: 'GAT', sniper: 'SNP', drone: 'DRN', operator: 'OPR' };
+    var TCOL = { soldier: '#7c9a6e', gatling: '#c0564e', sniper: '#a06ec2', drone: '#a6adba', operator: '#c2a05e', shield: '#5e8ac2', bomber: '#d98a3a', apc: '#8f3a36' };
+    var TCODE = { soldier: 'SOL', gatling: 'GAT', sniper: 'SNP', drone: 'DRN', operator: 'OPR', shield: 'SHD', bomber: 'BMB', apc: 'APC' };
     function drawThumb(cv, st) {
       var dpr2 = Math.min(window.devicePixelRatio || 1, 2);
       var W = cv.clientWidth * dpr2, H = 150 * dpr2;
       cv.width = W; cv.height = H;
       var c = cv.getContext('2d');
-      c.fillStyle = '#0b0d10'; c.fillRect(0, 0, W, H);
+      // subtle vertical sky gradient instead of flat black — reads less "diagram"
+      var bg = c.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#141922'); bg.addColorStop(1, '#0b0d10');
+      c.fillStyle = bg; c.fillRect(0, 0, W, H);
       var aw = st.arena.w, ad = st.arena.d;
       var m2 = 6 * dpr2;
       var sc2 = Math.min((W - 2 * m2) / aw, (H - 2 * m2) / ad);
@@ -313,20 +380,38 @@
       var X2 = function (x) { return ox2 + x * sc2; };
       var Z2 = function (z) { return oy2 + (ad - z) * sc2; };
       c.strokeStyle = '#2a2f38'; c.strokeRect(X2(0), Z2(ad), aw * sc2, ad * sc2);
+      // Fake-3D extrusion: draw a solid part as a top face plus a shaded
+      // "wall" pushed down-right, so structures read as raised blocks, not a map.
+      var EX = 3.2 * dpr2; // extrusion depth in px
+      function block3d(px, pz, w2, d2, top, side) {
+        var x0 = X2(px - w2 / 2), z0 = Z2(pz + d2 / 2), ww = w2 * sc2, hh = d2 * sc2;
+        // side wall (extruded down-right)
+        c.fillStyle = side;
+        c.beginPath();
+        c.moveTo(x0, z0 + hh); c.lineTo(x0 + EX, z0 + hh + EX);
+        c.lineTo(x0 + ww + EX, z0 + hh + EX); c.lineTo(x0 + ww, z0 + hh);
+        c.closePath(); c.fill();
+        c.beginPath();
+        c.moveTo(x0 + ww, z0); c.lineTo(x0 + ww + EX, z0 + EX);
+        c.lineTo(x0 + ww + EX, z0 + hh + EX); c.lineTo(x0 + ww, z0 + hh);
+        c.closePath(); c.fill();
+        // top face
+        c.fillStyle = top;
+        c.fillRect(x0, z0, ww, hh);
+      }
       (st.parts || []).forEach(function (pt) {
         var w2 = pt.w || 1, d2 = pt.d || 1;
         if (pt.type === 'block') {
-          c.fillStyle = /^#[0-9a-f]{6}$/i.test(pt.tint || '') ? pt.tint : '#5a6270';
-          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+          var tp = /^#[0-9a-f]{6}$/i.test(pt.tint || '') ? pt.tint : '#5a6270';
+          block3d(pt.x, pt.z, w2, d2, tp, '#3a4150');
         } else if (pt.type === 'pit') {
           c.fillStyle = 'rgba(10,12,15,0.95)';
           c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
         } else if (pt.type === 'rock' || pt.type === 'wall' || pt.type === 'platform') {
-          c.fillStyle = pt.type === 'wall' ? '#454c58' : (pt.type === 'platform' ? '#6f7683' : '#575e6a');
-          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+          var tp2 = pt.type === 'wall' ? '#454c58' : (pt.type === 'platform' ? '#6f7683' : '#575e6a');
+          block3d(pt.x, pt.z, w2, d2, tp2, '#2f353f');
         } else if (pt.type === 'slope') {
-          c.fillStyle = '#636a76';
-          c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
+          block3d(pt.x, pt.z, w2, d2, '#636a76', '#3a4048');
         } else if (pt.type === 'river') {
           c.fillStyle = 'rgba(70,130,200,0.55)';
           c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
@@ -347,8 +432,15 @@
         }
       });
       (st.enemies || []).forEach(function (e) {
+        var ex = X2(e.x), ez = Z2(e.z), er = 2.8 * dpr2;
+        // drop shadow (down-right) for a raised, 3D feel
+        c.fillStyle = 'rgba(0,0,0,0.5)';
+        c.beginPath(); c.arc(ex + 1.4 * dpr2, ez + 1.4 * dpr2, er, 0, Math.PI * 2); c.fill();
         c.fillStyle = TCOL[e.type] || '#999';
-        c.beginPath(); c.arc(X2(e.x), Z2(e.z), 2.4 * dpr2, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.arc(ex, ez, er, 0, Math.PI * 2); c.fill();
+        // top-left highlight
+        c.fillStyle = 'rgba(255,255,255,0.35)';
+        c.beginPath(); c.arc(ex - 0.8 * dpr2, ez - 0.8 * dpr2, er * 0.4, 0, Math.PI * 2); c.fill();
       });
       if (st.playerStart) {
         c.fillStyle = '#4dd2c3';
@@ -367,10 +459,11 @@
       return comp + '<br>' + st.arena.w + '×' + st.arena.d + 'm · ' + mins + 'min · ♥' + (st.lives || 1) +
         ' · ' + (st.ammo ? st.ammo + ' ammo' : '∞ ammo');
     }
-    var render = function (list) { grid.innerHTML = list.map(function (s) {
+    var render = function (list) { grid.innerHTML = list.map(function (s, idx) {
       var meta = (s.attempts || 0) + ' ' + T('plays') + ' · ' + (s.clears || 0) + ' ' + T('clears') +
         (s.creator ? ' · by ' + esc(s.creator) : '');
-      return '<a class="card" href="/?stage=' + encodeURIComponent(s.id) + '">' +
+      var delay = idx < 12 ? (idx * 0.045).toFixed(3) + 's' : '0s'; // staggered entrance for the first row-fills
+      return '<a class="card" style="animation-delay:' + delay + '" href="/?stage=' + encodeURIComponent(s.id) + '">' + hideBtn(s.id) +
         '<canvas class="thumb" data-sid="' + esc(s.id) + '"></canvas>' +
         '<div class="nm" data-nid="' + esc(s.id) + '">' + esc(s.name) + '</div>' +
         '<div class="meta">' + meta + '</div>' +
@@ -378,6 +471,7 @@
         '<div class="comp" data-cid="' + esc(s.id) + '">…</div>' +
         '<div class="play up">▶ ' + T('playCard') + '</div></a>';
     }).join('') || ('<span style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>');
+      wireHides(grid);
       // hydrate thumbnails + details from each stage's JSON
       list.slice(0, 24).forEach(function (s) {
         fetch('/api/stages/' + encodeURIComponent(s.id)).then(function (r) { return r.json(); }).then(function (st) {
@@ -398,7 +492,14 @@
       });
     };
     render(d.stages);
+    var searchTimer = null;
     document.getElementById('q').oninput = function () {
+      if (tbActive) {
+        // Testbench search hits the server (the shelf isn't fully loaded client-side).
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(loadTestbench, 250);
+        return;
+      }
       var q = this.value.trim().toLowerCase();
       render(!q ? d.stages : d.stages.filter(function (s) { return (s.name || '').toLowerCase().indexOf(q) >= 0; }));
     };
