@@ -31,13 +31,13 @@ var TAC = {
   PLAYER_H: 1.7,            // player height (m)
   EYE_H: 1.5,               // player eye height above feet
   CHEST_H: 1.1,             // LOS / hit reference height
-  WALK_SPEED: 1.9,          // sneak speed m/s (silent)
-  RUN_SPEED: 4.6,           // run speed m/s
+  WALK_SPEED: 3.3,          // sneak speed m/s (silent)
+  RUN_SPEED: 7.8,           // run speed m/s
   MOVE_RAMP_TICKS: 12,      // ticks to reach full speed from standstill (0.24 s)
   MOVE_RAMP_MIN: 0.3,       // starting speed fraction — taps nudge, holds run (noisy)
   GRAVITY: 20.0,
   JUMP_V: 7.0,              // ~1.2 m apex
-  STEP_UP: 0.35,            // max ledge auto-step (m)
+  STEP_UP: 0.35,            // default max ledge auto-step (m); stage.stepUp may raise to 0.55
   PITCH_MAX: 14563,         // ~+80 deg in angle units
   PITCH_MIN: -14563,
 
@@ -45,9 +45,9 @@ var TAC = {
   FIRE_CD: 9,               // ticks between player shots
   LOCK_COS: 0.906,          // auto lock-on cone: ~25 deg around the player's FACING
   LOCK_RANGE: 24.0,         // auto lock-on max distance — just past enemy vision
-  BULLET_SPEED: 55.0,
+  BULLET_SPEED: 88.0,
   BULLET_TTL: 90,           // ticks (~99 m max range)
-  ENEMY_BULLET_SPEED: 22.0,
+  ENEMY_BULLET_SPEED: 36.0,
   ENEMY_BULLET_TTL: 200,
 
   NOISE_RUN_R: 9.0,         // running footstep noise radius (m)
@@ -56,24 +56,24 @@ var TAC = {
   NOISE_SHOT_R: 28.0,
   NOISE_BLAST_R: 45.0,
 
-  VISION_RANGE: 20.0,
-  VISION_COS2: 0.587,       // cos^2(40 deg) — half-angle of the standard cone
-  SNIPER_RANGE: 60.0,
+  VISION_RANGE: 26.0,
+  VISION_COS2: 0.470,       // cos^2(~47 deg) — widened half-angle of the standard cone
+  SNIPER_RANGE: 66.0,
   SNIPER_COS2: 0.75,        // cos^2(30 deg)
   GAUGE_MAX: 100.0,
-  GAUGE_DECAY: 1.5,
+  GAUGE_DECAY: 1.2,
   SUSPICIOUS_AT: 45.0,
 
   SOLDIER_HP: 2,
-  SOLDIER_PATROL_SPEED: 1.2,
-  SOLDIER_INVESTIGATE_SPEED: 1.6,
-  SOLDIER_CHASE_SPEED: 2.4,
+  SOLDIER_PATROL_SPEED: 2.5,
+  SOLDIER_INVESTIGATE_SPEED: 3.7,
+  SOLDIER_CHASE_SPEED: 5.6,
   SOLDIER_R: 0.4,
   SOLDIER_H: 1.8,
-  RIFLE_CD: 60,             // ticks between a soldier's aimed shots (1.2 s)
+  RIFLE_CD: 52,             // ticks between a soldier's aimed shots (1.04 s)
   RIFLE_AIM: 20,            // aim-telegraph ticks before each shot (yellow line)
   RIFLE_SUPPRESS_CD: 90,    // cadence of blind suppressive fire from trenches
-  RIFLE_REACT: 35,          // aim delay after becoming alert (0.7 s of counterplay)
+  RIFLE_REACT: 28,          // aim delay after becoming alert (0.56 s of counterplay)
   RIFLE_RANGE: 22.0,        // soldier stops and shoots inside this distance
   ENEMY_TURN_RATE: 500,     // angle units per tick (~2.75 deg)
 
@@ -85,7 +85,7 @@ var TAC = {
   GATLING_SHOT_EVERY: 5,
   GATLING_SWEEP: 2730,      // sweep amplitude in angle units (~15 deg)
   GATLING_ALERT_TURN: 220,  // tracking turn rate when alerted
-  GATLING_VISION: 32.0,     // emplacement optics: sees as far as its bullets fly
+  GATLING_VISION: 36.0,     // emplacement optics: sees as far as its bullets fly
 
   SNIPER_HP: 2,
   SNIPER_R: 0.4,
@@ -107,6 +107,24 @@ var TAC = {
   SNIPER_COOLDOWN: 110,
   SNIPER_WARN_DECAY: 5,
 
+  // APC / light armored vehicle (type 7): a slow, high-HP rolling gun. Its
+  // FRONT+SIDE armour (a cone around the hull's facing) shrugs off every small
+  // round — you must flank to the REAR to do damage, or hit it with explosives
+  // (grenades / barrels ignore armour entirely). A hull-mounted machine gun
+  // suppresses while the turret is slow to swing round.
+  APC_HP: 8,
+  APC_R: 0.7,               // wide hull
+  APC_H: 1.6,
+  APC_PATROL_SPEED: 1.6,    // ponderous track speed while idle/searching
+  APC_ADVANCE_SPEED: 2.6,   // grinds toward the player once alerted
+  APC_TURN: 70,             // slow hull yaw (angle units/tick) — flank the rear
+  APC_VISION: 26.0,         // commander optics
+  APC_ARMOR_COS: 0.5,       // front+side armour arc: |angle to hull facing| < 60 deg is a bounce (cos 60 = 0.5)
+  APC_GUN_CD: 8,            // ticks between machine-gun rounds
+  APC_GUN_BURST: 60,        // ticks firing
+  APC_GUN_RELOAD: 40,       // ticks silent between bursts
+  APC_RANGE: 24.0,          // opens up inside this distance
+
   BARREL_R: 0.5,
   BARREL_H: 1.0,
   BARREL_ROLL: 5.0,
@@ -126,9 +144,9 @@ var TAC = {
   DRONE_R: 0.5,
   DRONE_H: 0.5,
   DRONE_FLY_Y: 3.2,         // hover height above its spawn ground
-  DRONE_PATROL_SPEED: 2.2,
-  DRONE_CHASE_SPEED: 3.4,
-  DRONE_DIVE_SPEED: 4.5,    // descent rate during the kamikaze dive
+  DRONE_PATROL_SPEED: 4.4,
+  DRONE_CHASE_SPEED: 6.6,
+  DRONE_DIVE_SPEED: 8.2,    // descent rate during the kamikaze dive
   DRONE_DIVE_AT: 2.4,       // horizontal distance that triggers the dive
   DRONE_BOOM_AT: 1.1,       // 3D distance to the player that sets off the boom
   DRONE_BLAST_R: 1.6,
@@ -137,7 +155,7 @@ var TAC = {
   OPERATOR_HP: 1,
   OPERATOR_R: 0.4,
   OPERATOR_H: 1.7,
-  OPERATOR_FLEE_SPEED: 3.0,
+  OPERATOR_FLEE_SPEED: 5.1,
 
   PILOT_SPEED: 5.0,         // player-piloted drone flight speed
   PILOT_ALT: 6.0,           // hover height — clears every wall and platform
@@ -348,6 +366,8 @@ function TacWorld(stage) {
   w.timeLimit = tacQ(stage.timeLimit || 600);
   w.maxTicks = Math.floor(w.timeLimit / TAC.TICK);
   w.tick = 0;
+  // per-stage auto step-up: opt-in via stage.stepUp, clamped [0.35, 0.55]
+  w.stepUp = tacQ(Math.min(0.55, Math.max(0.35, stage.stepUp === undefined ? TAC.STEP_UP : stage.stepUp)));
 
   w.px = tacQ(stage.playerStart.x);
   w.pz = tacQ(stage.playerStart.z);
@@ -371,7 +391,8 @@ function TacWorld(stage) {
   w.scopeSteerT = 0;        // scoped-aim ramp counter (precision tap -> fast sweep)
   w.grenadeCd = 0;          // grenade recharge (0 = ready to throw)
   w.grenades = [];          // live grenades {x,y,z,vx,vy,vz,alive}
-  w.prevB = 0;              // previous tick's buttons (for edge detection)
+  w.prevB = 255;            // all buttons "held" at spawn: a button already down on (re)load/retry is NOT a fresh edge — must be released and re-pressed to fire (prevents scope/drone/grenade misfire that roots the body)
+  w.fireGate = false;       // true while piloting/scoping — blocks held-fire spillover into body fire until FIRE is released
   w.dead = false;
   w.clearedFlag = false;
   w.timedOutFlag = false;
@@ -604,17 +625,17 @@ TacWorld.prototype.addBarrel = function (x, z) {
 };
 
 TacWorld.prototype.addEnemy = function (spec) {
-  var type = spec.type === 'gatling' ? 1 : (spec.type === 'sniper' ? 2 : (spec.type === 'drone' ? 3 : (spec.type === 'operator' ? 4 : (spec.type === 'bomber' ? 5 : (spec.type === 'shield' ? 6 : 0)))));
-  var defHp = type === 1 ? TAC.GATLING_HP : (type === 2 ? TAC.SNIPER_HP : (type === 3 ? TAC.DRONE_HP : (type === 4 ? TAC.OPERATOR_HP : (type === 5 ? TAC.BOMBER_HP : (type === 6 ? TAC.SHIELD_HP : TAC.SOLDIER_HP)))));
+  var type = spec.type === 'gatling' ? 1 : (spec.type === 'sniper' ? 2 : (spec.type === 'drone' ? 3 : (spec.type === 'operator' ? 4 : (spec.type === 'bomber' ? 5 : (spec.type === 'shield' ? 6 : (spec.type === 'apc' ? 7 : 0))))));
+  var defHp = type === 1 ? TAC.GATLING_HP : (type === 2 ? TAC.SNIPER_HP : (type === 3 ? TAC.DRONE_HP : (type === 4 ? TAC.OPERATOR_HP : (type === 5 ? TAC.BOMBER_HP : (type === 6 ? TAC.SHIELD_HP : (type === 7 ? TAC.APC_HP : TAC.SOLDIER_HP))))));
   var hp = spec.hp ? Math.floor(spec.hp) : defHp;
   var yawDeg = tacQ(spec.yaw || 0);
   var yawQ = Math.floor(yawDeg * 182.04444444444445) & 65535;
   var hasPatrol = spec.patrolX !== undefined && spec.patrolZ !== undefined;
   var en = {
-    type: type,                     // 0 soldier, 1 gatling, 2 sniper, 3 drone, 4 operator, 5 bomber
+    type: type,                     // 0 soldier, 1 gatling, 2 sniper, 3 drone, 4 operator, 5 bomber, 6 shield, 7 apc
     x: tacQ(spec.x), z: tacQ(spec.z), y: 0.0, homeY: 0.0,
-    r: type === 1 ? TAC.GATLING_R : (type === 2 ? TAC.SNIPER_R : (type === 3 ? TAC.DRONE_R : (type === 4 ? TAC.OPERATOR_R : (type === 5 ? TAC.BOMBER_R : (type === 6 ? TAC.SHIELD_R : TAC.SOLDIER_R))))),
-    h: type === 1 ? TAC.GATLING_H : (type === 2 ? TAC.SNIPER_H : (type === 3 ? TAC.DRONE_H : (type === 4 ? TAC.OPERATOR_H : (type === 5 ? TAC.BOMBER_H : (type === 6 ? TAC.SHIELD_H : TAC.SOLDIER_H))))),
+    r: type === 1 ? TAC.GATLING_R : (type === 2 ? TAC.SNIPER_R : (type === 3 ? TAC.DRONE_R : (type === 4 ? TAC.OPERATOR_R : (type === 5 ? TAC.BOMBER_R : (type === 6 ? TAC.SHIELD_R : (type === 7 ? TAC.APC_R : TAC.SOLDIER_R)))))),
+    h: type === 1 ? TAC.GATLING_H : (type === 2 ? TAC.SNIPER_H : (type === 3 ? TAC.DRONE_H : (type === 4 ? TAC.OPERATOR_H : (type === 5 ? TAC.BOMBER_H : (type === 6 ? TAC.SHIELD_H : (type === 7 ? TAC.APC_H : TAC.SOLDIER_H)))))),
     yawQ: yawQ, baseYawQ: yawQ,
     hp: hp, alive: true,
     group: spec.group ? Math.floor(spec.group) : 0,
@@ -727,7 +748,7 @@ TacWorld.prototype.groundY = function (x, z, refY, r) {
       if (pf < best) best = pf;
     }
   }
-  var lim = refY + TAC.STEP_UP;
+  var lim = refY + w.stepUp;
   w.forBoxesIn(x - r, z - r, x + r, z + r, function (bi) {
     var b = w.boxes[bi];
     if (!b.alive) return;
@@ -823,7 +844,7 @@ TacWorld.prototype.slopeUnder = function (x, z, y) {
 // slides, corners deflect smoothly around (no snagging). Returns {x, z}.
 TacWorld.prototype.moveCircle = function (x, z, y, r, h, dx, dz) {
   var w = this;
-  var blockAbove = y + TAC.STEP_UP; // a box blocks if its top is above this and its base (0) is below head
+  var blockAbove = y + w.stepUp; // a box blocks if its top is above this and its base (0) is below head
   var nx = x + dx;
   var nz = z + dz;
   for (var iter = 0; iter < 3; iter++) {
@@ -1139,6 +1160,11 @@ TacWorld.prototype.stepPlayer = function (input) {
   var grenEdge = (input.b & 16) !== 0 && (w.prevB & 16) === 0;
   var scopeEdge = (input.b & 32) !== 0 && (w.prevB & 32) === 0;
   w.prevB = input.b;
+
+  // Fire gate: once piloting/scoping ends, the still-held FIRE must be released
+  // before the body will shoot again — otherwise the detonation/scope press
+  // spills straight into held-fire auto-shooting. Released FIRE clears the gate.
+  if ((input.b & 2) === 0) w.fireGate = false;
   if (w.grenadeCd > 0) w.grenadeCd--;
   w.playerJammed = w.inActiveJammer(w.px, w.pz);
 
@@ -1172,6 +1198,7 @@ TacWorld.prototype.stepPlayer = function (input) {
       w.fireScopedShot();
       w.scopeShots--;
     }
+    if ((input.b & 2) !== 0) w.fireGate = true; // held FIRE while scoped must not spill into body fire on scope-off
     w.faceQ = w.aimYawQ;
     // periscope style: in a pit you stay crouched and rest the scope on the
     // lip — hidden while sniping; the shot's NOISE is what gives you away
@@ -1188,6 +1215,7 @@ TacWorld.prototype.stepPlayer = function (input) {
   }
   if (w.pilot) {
     var pd = w.pilot;
+    if ((input.b & 2) !== 0) w.fireGate = true; // held FIRE while piloting must not spill into body fire on recall/detonate
     // the EMP veil fries YOUR drone exactly like an enemy's — symmetric. It
     // dies and detonates the moment it crosses in (no homing payoff); shoot
     // the switch console first if you need that airspace.
@@ -1372,7 +1400,7 @@ TacWorld.prototype.stepPlayer = function (input) {
 
   // fire (held) — rounds leave the actual gun muzzle (forward-right of the
   // body, at the gun's height), not the body center
-  if ((input.b & 2) !== 0 && w.fireCd === 0 && w.ammo !== 0) {
+  if (!w.fireGate && (input.b & 2) !== 0 && w.fireCd === 0 && w.ammo !== 0) {
     if (w.py < -0.45) w.fireFlash = 8; // tiny settle-back tail; holding FIRE keeps you up
     var mfx = tacSinQ(w.faceQ);
     var mfz = tacCosQ(w.faceQ);
@@ -1591,7 +1619,7 @@ TacWorld.prototype.fireScopedShot = function () {
   }
   w.addNoise(w.px, w.pz, TAC.NOISE_SHOT_R);
   w.events.scopeShot = true;
-  if (hitEnemy >= 0) w.damageEnemy(w.enemies[hitEnemy], TAC.SCOPE_DMG);
+  if (hitEnemy >= 0) w.damageEnemy(w.enemies[hitEnemy], TAC.SCOPE_DMG, ox, oz);
 };
 
 TacWorld.prototype.hurtPlayer = function (dmg, kx, kz) {
@@ -1611,9 +1639,28 @@ TacWorld.prototype.hurtPlayer = function (dmg, kx, kz) {
   }
 };
 
-TacWorld.prototype.damageEnemy = function (en, dmg) {
+TacWorld.prototype.damageEnemy = function (en, dmg, srcX, srcZ) {
   var w = this;
   if (!en.alive) return;
+  // APC armour: small-arms fire from within the front/side arc bounces off.
+  // srcX/srcZ is the shot's origin; when omitted (explosions) armour is
+  // ignored, so grenades and barrels always punch through. Rear hits land.
+  if (en.type === 7 && srcX !== undefined) {
+    var afx = tacSinQ(en.yawQ);
+    var afz = tacCosQ(en.yawQ);
+    var adx = srcX - en.x;
+    var adz = srcZ - en.z;
+    var al = Math.sqrt(adx * adx + adz * adz);
+    if (al > 0.0001) {
+      var adot = (adx / al) * afx + (adz / al) * afz;
+      if (adot >= TAC.APC_ARMOR_COS) { // shot came from the frontal/side arc
+        w.events.armorBlock = true;
+        if (!w.events.armorBlocks) w.events.armorBlocks = [];
+        w.events.armorBlocks.push({ x: en.x, y: en.y + en.h * 0.6, z: en.z });
+        return;
+      }
+    }
+  }
   en.hp -= dmg;
   w.events.enemyHit = true;
   if (!w.events.hits) w.events.hits = [];
@@ -1902,7 +1949,7 @@ TacWorld.prototype.stepBullets = function () {
         if (!en.alive) continue;
         var te = tacSegCylinder(bu.x, bu.y, bu.z, nx, ny, nz, en.x, en.y, en.z, en.r, tacEnemyH(en));
         if (te < 0.0) continue;
-        w.damageEnemy(en, 1);
+        w.damageEnemy(en, 1, bu.x, bu.z);
         bu.alive = false;
         hitEnemy = true;
         break;
@@ -2309,6 +2356,7 @@ TacWorld.prototype.stepEnemies = function () {
   var range2 = TAC.VISION_RANGE * TAC.VISION_RANGE;
   var snipRange2 = TAC.SNIPER_RANGE * TAC.SNIPER_RANGE;
   var gatRange2 = TAC.GATLING_VISION * TAC.GATLING_VISION;
+  var apcRange2 = TAC.APC_VISION * TAC.APC_VISION;
 
   for (var i = 0; i < w.enemies.length; i++) {
     var en = w.enemies[i];
@@ -2357,6 +2405,7 @@ TacWorld.prototype.stepEnemies = function () {
     else if (en.type === 3) w.stepDrone(en, range2);
     else if (en.type === 5) w.stepBomber(en, range2);
     else if (en.type === 6) w.stepShield(en, range2);
+    else if (en.type === 7) w.stepApc(en, apcRange2);
     else w.stepOperator(en, range2);
   }
 };
@@ -2629,6 +2678,80 @@ TacWorld.prototype.stepGatling = function (en, range2) {
     w.events.gatlingShot = true;
     if (!w.events.eshots) w.events.eshots = [];
     w.events.eshots.push({ x: en.x, z: en.z, gat: true });
+  }
+};
+
+// APC / light armored vehicle: a slow rolling gun with a high HP pool and a
+// frontal/side armour arc (handled in damageEnemy). It grinds toward the
+// player, keeps the hull pointed at them (slow yaw — flank the REAR), and
+// suppresses with a hull machine gun in bursts. Explosives ignore its armour.
+TacWorld.prototype.stepApc = function (en, range2) {
+  var w = this;
+  w.visionGauge(en, range2, TAC.VISION_COS2, w.sneaking ? 0.5 : 1.0);
+
+  if (en.state === 2) {
+    var dx = w.px - en.x;
+    var dz = w.pz - en.z;
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    // hull turns slowly toward the player — the whole reason a flanker can
+    // stay on its blind rear quarter
+    en.yawQ = tacTurnToward(en.yawQ, tacYawFor(dx, dz), TAC.APC_TURN);
+    // grind forward until inside firing range, then hold and shoot
+    if (dist > TAC.APC_RANGE * 0.8) {
+      w.moveEnemy(en, w.px, w.pz, TAC.APC_ADVANCE_SPEED);
+    }
+    if (!en.seesPlayer) {
+      en.gauge -= TAC.GAUGE_DECAY;
+      if (en.gauge <= 0.0) { en.state = 0; en.gauge = 0.0; }
+    }
+    // hull machine gun: burst / reload cadence, only when it can see the target
+    en.cycleT++;
+    var fireCyc = en.cycleT % (TAC.APC_GUN_BURST + TAC.APC_GUN_RELOAD);
+    if ((en.state === 2 && en.seesPlayer) && fireCyc < TAC.APC_GUN_BURST &&
+        (fireCyc % TAC.APC_GUN_CD) === 0 && dist <= TAC.APC_RANGE) {
+      var aq = en.yawQ;
+      var s = tacSinQ(aq);
+      var c = tacCosQ(aq);
+      var muzY = en.y + en.h - 0.4;
+      var vy = 0.0;
+      if (dist > 1.0) {
+        var wantY = w.playerChestY();
+        vy = (wantY - muzY) / (dist / TAC.ENEMY_BULLET_SPEED);
+        var vmax = TAC.ENEMY_BULLET_SPEED * 0.5;
+        if (vy > vmax) vy = vmax;
+        if (vy < -vmax) vy = -vmax;
+      }
+      w.bullets.push({
+        x: en.x + s * 0.9, y: muzY, z: en.z + c * 0.9,
+        sx: en.x, sy: muzY, sz: en.z,
+        vx: s * TAC.ENEMY_BULLET_SPEED, vy: vy, vz: c * TAC.ENEMY_BULLET_SPEED,
+        ttl: TAC.ENEMY_BULLET_TTL, fromPlayer: false, alive: true, gat: true
+      });
+      w.events.gatlingShot = true;
+      if (!w.events.eshots) w.events.eshots = [];
+      w.events.eshots.push({ x: en.x, z: en.z, gat: true });
+    }
+  } else if (en.state === 1) {
+    // investigating a noise: creep toward it, hull leading
+    var ax = en.tx - en.x, az = en.tz - en.z;
+    en.yawQ = tacTurnToward(en.yawQ, tacYawFor(ax, az), TAC.APC_TURN);
+    var arr = w.moveEnemy(en, en.tx, en.tz, TAC.APC_PATROL_SPEED);
+    if (arr) {
+      en.pauseT++;
+      if (en.pauseT >= TAC.INVESTIGATE_PAUSE) { en.state = 0; en.gauge = 0.0; en.pauseT = 0; }
+    }
+  } else {
+    // idle patrol: roll between waypoints if given, else hold the spawn bearing
+    if (en.hasPatrol) {
+      var gx = en.patToB ? en.patX : en.homeX;
+      var gz = en.patToB ? en.patZ : en.homeZ;
+      var gdx = gx - en.x, gdz = gz - en.z;
+      en.yawQ = tacTurnToward(en.yawQ, tacYawFor(gdx, gdz), TAC.APC_TURN);
+      var got = w.moveEnemy(en, gx, gz, TAC.APC_PATROL_SPEED);
+      if (got) en.patToB = !en.patToB;
+    } else {
+      en.yawQ = tacTurnToward(en.yawQ, en.baseYawQ, TAC.APC_TURN);
+    }
   }
 };
 

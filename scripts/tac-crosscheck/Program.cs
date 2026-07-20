@@ -79,7 +79,7 @@ static class Program
 
         // ---- full-stage simulation traces ----
         string dir = args.Length > 0 ? args[0] : "stages";
-        string[] names = { "kitchen", "breach", "expiry", "extract", "castle" };
+        string[] names = { "kitchen", "breach", "expiry", "extract", "castle", "steps", "armor" };
         for (int sIdx = 0; sIdx < names.Length; sIdx++)
         {
             string json = File.ReadAllText(Path.Combine(dir, names[sIdx] + ".json"));

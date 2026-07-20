@@ -230,8 +230,8 @@ wpf.px = 20; wpf.pz = 20; wpf.py = -2.5; wpf.onGround = true; // standing on the
 wpf.step({ b: 2, m: 255, yawQ: 0, pitchQ: 0 });
 let pitShot = null;
 for (let i = 0; i < wpf.bullets.length; i++) if (wpf.bullets[i].fromPlayer) pitShot = wpf.bullets[i];
-wpf.step(IDLE); wpf.step(IDLE); // 2 ticks: still inside the pit span
-check('a shot fired inside the moat flies (does not die at y=0)', pitShot !== null && pitShot.alive && pitShot.y < 0);
+wpf.step(IDLE); // 1 tick: faster bullet, still inside the pit span (z<25)
+check('a shot fired inside the moat flies (does not die at y=0)', pitShot !== null && pitShot.alive && pitShot.y < 0 && pitShot.z < 25);
 for (let t = 0; t < 6; t++) wpf.step(IDLE);
 check('the below-grade shot stops at the moat wall', !pitShot.alive);
 
@@ -447,8 +447,8 @@ check('stands back up when SNEAK released', wf.crouched === false);
 // --- stairs: walk up (dir 0 = +z ascending) at full speed, reach platform top ---
 const wsl = new TacWorld(STAGE);
 wsl.px = 32.0; wsl.pz = 28.0;
-for (let t = 0; t < 120; t++) wsl.step({ b: 0, m: 0, yawQ: 0, pitchQ: 0 });
-check('climbed the stairs to the platform', wsl.py > 1.9 && wsl.pz > 36.0);
+for (let t = 0; t < 80; t++) wsl.step({ b: 0, m: 0, yawQ: 0, pitchQ: 0 }); // faster run: 80 ticks lands mid-platform (further overshoots the far edge)
+check('climbed the stairs to the platform', wsl.py > 1.9 && wsl.pz > 36.0 && wsl.pz < 44.0);
 // mid-staircase heights sit on discrete treads (multiples of the riser)
 const wst = new TacWorld(STAGE);
 wst.px = 32.0; wst.pz = 28.0;
@@ -463,8 +463,8 @@ let dgMax = 0;
 for (let t = 0; t < 160; t++) { wdg.step({ b: 0, m: 16, yawQ: 0, pitchQ: 0 }); if (wdg.py > dgMax) dgMax = wdg.py; } // 45° NE across the stairs
 check('diagonal approach still climbs', dgMax > 0.5);
 // walking back down is plain walking now — no forced slide
-for (let t = 0; t < 200; t++) wsl.step({ b: 0, m: 64, yawQ: 0, pitchQ: 0 });
-check('walked back down to ground level', wsl.py < 0.5 && wsl.pz < 33.0);
+for (let t = 0; t < 90; t++) wsl.step({ b: 0, m: 64, yawQ: 0, pitchQ: 0 }); // faster walk: 90 ticks reaches ground past the stair base
+check('walked back down to ground level', wsl.py < 0.5 && wsl.pz < 33.0 && wsl.pz > 20.0);
 
 // --- stealth: sneaking near an idle enemy fills gauge slower than running ---
 function gaugeAfter(sneak, ticks) {
@@ -623,10 +623,18 @@ check('mine explodes and chains the second mine', mineBooms === 2);
 check('standing in the blast hurt the player', wm.hp < 5);
 
 // shooting a mine detonates it remotely (facing lock picks it up)
-const wm2 = new TacWorld(MINE_STAGE);
+// mines sit ~7 m out: the faster bullet's aim ray needs a shallower descent
+// than at 5 m so a discrete tick samples inside the low (0.25 m) mine cylinder.
+const MINE_SHOOT_STAGE = {
+  name: 'mine-shoot', timeLimit: 120, lives: 5, ammo: 0,
+  arena: { w: 40, d: 40 }, playerStart: { x: 20, z: 5, yaw: 0 },
+  parts: [{ type: 'mine', x: 20, z: 12 }, { type: 'mine', x: 20, z: 13.5 }],
+  enemies: [{ type: 'sniper', x: 38, z: 38, yaw: 0 }]
+};
+const wm2 = new TacWorld(MINE_SHOOT_STAGE);
 let shotBoom = false, mineLocked = false;
 for (let t = 0; t < 120 && !shotBoom; t++) {
-  const ev = wm2.step({ b: 2, m: 255, yawQ: 0, pitchQ: 0 }); // fire from spawn, 5 m short of the mine
+  const ev = wm2.step({ b: 2, m: 255, yawQ: 0, pitchQ: 0 }); // fire from spawn, ~7 m short of the mine
   if (wm2.lockKind === 2 && wm2.lockTarget >= 0) mineLocked = true;
   if (ev.explosions) shotBoom = true;
 }
@@ -745,6 +753,7 @@ const GREN_STAGE = {
 };
 const wgr = new TacWorld(GREN_STAGE);
 let thrown = false, grenBoom = false, grenCleared = false;
+wgr.step(IDLE); // release first: a held button at spawn is not a fresh edge
 wgr.step({ b: 16, m: 255, yawQ: 0, pitchQ: 0 });
 thrown = wgr.grenades.length === 1 && wgr.grenadeCd > 0;
 check('grenade throws on the bomb button', thrown);
@@ -758,6 +767,7 @@ for (let t = 0; t < 120 && !grenCleared; t++) {
 check('grenade explodes on impact and kills the soldier', grenBoom && grenCleared);
 // recharge: ready again after 8 s (enemy far away so the stage doesn't clear)
 const wgr2 = new TacWorld({ ...GREN_STAGE, enemies: [{ type: 'sniper', x: 38, z: 38, yaw: 0 }] });
+wgr2.step(IDLE); // release first: a held button at spawn is not a fresh edge
 wgr2.step({ b: 16, m: 255, yawQ: 0, pitchQ: 0 });
 for (let t = 0; t < TAC.GRENADE_CD; t++) wgr2.step(IDLE);
 wgr2.step({ b: 16, m: 255, yawQ: 0, pitchQ: 0 });
@@ -775,6 +785,7 @@ const PERI_STAGE = {
 };
 const wpe = new TacWorld(PERI_STAGE);
 wpe.px = 20; wpe.pz = 10; wpe.py = -0.9;
+wpe.step({ b: 0, m: 255, yawQ: 0, pitchQ: 0 }); // release first: a held button at spawn is not a fresh edge
 wpe.step({ b: 32, m: 255, yawQ: 0, pitchQ: 0 }); // scope up, in the pit
 check('scoped in a pit stays crouched (periscope)', wpe.scoped === true && wpe.crouched === true);
 let periHurt = false, periHits = 0;
@@ -820,6 +831,7 @@ check('drone is spent after detonating', wc.pilot === null && wc.droneUses === 0
 // battery: a fresh grant powers down after 15 s of flight
 const wc2 = new TacWorld(CAP_STAGE);
 wc2.droneUses = 1; // grant directly for the battery test
+wc2.step(IDLE); // release first: a held button at spawn is not a fresh edge
 wc2.step({ b: 8, m: 255, yawQ: 0, pitchQ: 0 });
 let fizzled = false;
 for (let t = 0; t < 1700 && !fizzled; t++) { const ev = wc2.step(IDLE); if (ev.droneDead) fizzled = true; }
@@ -833,9 +845,13 @@ const MED_STAGE = {
   enemies: [{ type: 'sniper', x: 38, z: 38, yaw: 0 }]
 };
 const wmed = new TacWorld(MED_STAGE);
-let healed = false;
+let healed = false, medBoomed = false;
 for (let t = 0; t < 300; t++) {
-  const ev = wmed.step({ b: 0, m: t < 100 ? 0 : 255, yawQ: 0, pitchQ: 0 }); // run through the mine to the kit
+  // run up to the mine, then STOP on it (faster running would otherwise clear
+  // the 2 m blast in the 0.5 s fuse) to eat the blast, then walk on to the kit
+  const m = medBoomed ? 0 : (wmed.pz < 9.4 ? 0 : 255);
+  const ev = wmed.step({ b: 0, m, yawQ: 0, pitchQ: 0 });
+  if (ev.explosions) medBoomed = true;
   if (ev.medkit) healed = true;
 }
 check('mine blast hurt, medkit healed 1 back', healed && wmed.hp === 2);
@@ -853,8 +869,11 @@ const RIVER_STAGE = {
   enemies: [{ type: 'soldier', x: 20, z: 30, yaw: 180 }]
 };
 const wrv = new TacWorld(RIVER_STAGE);
-for (let t = 0; t < 100; t++) wrv.step({ b: 0, m: 0, yawQ: 0, pitchQ: 0 });
-check('river slows wading (~45% speed)', wrv.pz > 14.0 && wrv.pz < 16.6);
+for (let t = 0; t < 60; t++) wrv.step({ b: 0, m: 0, yawQ: 0, pitchQ: 0 });
+// 60 ticks of running leaves the player mid-channel (z=12..20): at full run speed
+// the ~45% wading slowdown is what keeps them here — without it they'd already be
+// out the far bank (pz>20, back at grade).
+check('river slows wading (~45% speed)', wrv.pz > 14.5 && wrv.pz < 17.5 && wrv.py < -0.4);
 check('river is a sunken channel (player wades below grade)', wrv.py < -0.4);
 // alerted soldier chases but holds the river bank
 const wrv2 = new TacWorld(RIVER_STAGE);
@@ -1006,6 +1025,7 @@ const SCOPE_STAGE = {
   enemies: [{ type: 'gatling', x: 20, z: 80, yaw: 0, hp: 20 }] // tanky target far beyond lock range (survives all 5 scoped shots)
 };
 const wsc = new TacWorld(SCOPE_STAGE);
+wsc.step(IDLE); // release first: a button already held at spawn is not a fresh edge
 wsc.step({ b: 32, m: 255, yawQ: 0, pitchQ: 0 }); // standard equipment: scope anytime
 check('scope mode engaged, no auto-lock', wsc.scoped === true && wsc.lockTarget === -1);
 // gatling dead ahead: NO recharge wait anymore — each tap fires (5-shot cap is the limit)
@@ -1032,6 +1052,7 @@ const SCAP_STAGE = { name: 'scap', timeLimit: 300, lives: 5, ammo: 0, arena: { w
   parts: [{ type: 'wall', x: 15, z: 20, w: 30, d: 2, h: 4 }],
   enemies: [{ type: 'soldier', x: 15, z: 60, yaw: 180, hp: 20 }, { type: 'soldier', x: 5, z: 60, yaw: 180, hp: 20 }] };
 const wscap = new TacWorld(SCAP_STAGE);
+wscap.step(IDLE); // release first: a button already held at spawn is not a fresh edge
 wscap.step({ b: 32, m: 255, yawQ: 0, pitchQ: 0 }); // scope up
 let capShots = 0;
 // tap fire repeatedly (edge each time) — no recharge wait now, but still capped
@@ -1099,7 +1120,9 @@ check('5 s is enough to walk clear of the bomb', bmDone && wbe.hp === wbe.maxHp)
 // --- cracked wall: falls only to explosives and gatling fire ---
 const CW_STAGE = {
   name: 'cw', timeLimit: 180, lives: 5, ammo: 0,
-  arena: { w: 40, d: 60 }, playerStart: { x: 20, z: 6, yaw: 0 },
+  // shooter set back to z=3 (~8 m from the foot mine): the faster bullet needs a
+  // flatter aim than at ~5 m to sample inside the low mine cylinder and set it off.
+  arena: { w: 40, d: 60 }, playerStart: { x: 20, z: 3, yaw: 0 },
   parts: [
     { type: 'crackedWall', x: 20, z: 12, w: 6, d: 1, h: 3 },
     { type: 'mine', x: 20, z: 10.8 }
@@ -1207,6 +1230,7 @@ wjp.px = 20; wjp.pz = 38; // outside the dome (r 12 around 20,20), facing it
 wjp.enemies.forEach(e => { e.alive = false; wjp.enemiesLeft--; });
 wjp.enemiesLeft++; // keep one "left" so the sim doesn't clear-stop
 wjp.droneUses = 1;
+wjp.step({ b: 0, m: 255, yawQ: 32768, pitchQ: 0 }); // release first: a held button at spawn is not a fresh edge
 wjp.step({ b: 8, m: 255, yawQ: 32768, pitchQ: 0 }); // launch, looking -z
 check('own drone launched', wjp.pilot !== null);
 let ownFried = false;

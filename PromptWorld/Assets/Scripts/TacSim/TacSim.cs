@@ -17,8 +17,8 @@ public static class TAC
     public const double PLAYER_H = 1.7;
     public const double EYE_H = 1.5;
     public const double CHEST_H = 1.1;
-    public const double WALK_SPEED = 1.9;
-    public const double RUN_SPEED = 4.6;
+    public const double WALK_SPEED = 3.3;
+    public const double RUN_SPEED = 7.8;
     public const double MOVE_RAMP_TICKS = 12.0;
     public const double MOVE_RAMP_MIN = 0.3;
     public const double GRAVITY = 20.0;
@@ -30,9 +30,9 @@ public static class TAC
     public const int FIRE_CD = 9;
     public const double LOCK_COS = 0.906;
     public const double LOCK_RANGE = 24.0;
-    public const double BULLET_SPEED = 55.0;
+    public const double BULLET_SPEED = 88.0;
     public const int BULLET_TTL = 90;
-    public const double ENEMY_BULLET_SPEED = 22.0;
+    public const double ENEMY_BULLET_SPEED = 36.0;
     public const int ENEMY_BULLET_TTL = 200;
 
     public const double NOISE_RUN_R = 9.0;
@@ -41,24 +41,24 @@ public static class TAC
     public const double NOISE_SHOT_R = 28.0;
     public const double NOISE_BLAST_R = 45.0;
 
-    public const double VISION_RANGE = 20.0;
-    public const double VISION_COS2 = 0.587;
-    public const double SNIPER_RANGE = 60.0;
+    public const double VISION_RANGE = 26.0;
+    public const double VISION_COS2 = 0.470;
+    public const double SNIPER_RANGE = 66.0;
     public const double SNIPER_COS2 = 0.75;
     public const double GAUGE_MAX = 100.0;
-    public const double GAUGE_DECAY = 1.5;
+    public const double GAUGE_DECAY = 1.2;
     public const double SUSPICIOUS_AT = 45.0;
 
     public const int SOLDIER_HP = 2;
-    public const double SOLDIER_PATROL_SPEED = 1.2;
-    public const double SOLDIER_INVESTIGATE_SPEED = 1.6;
-    public const double SOLDIER_CHASE_SPEED = 2.4;
+    public const double SOLDIER_PATROL_SPEED = 2.5;
+    public const double SOLDIER_INVESTIGATE_SPEED = 3.7;
+    public const double SOLDIER_CHASE_SPEED = 5.6;
     public const double SOLDIER_R = 0.4;
     public const double SOLDIER_H = 1.8;
-    public const int RIFLE_CD = 60;
+    public const int RIFLE_CD = 52;
     public const int RIFLE_AIM = 20;
     public const int RIFLE_SUPPRESS_CD = 90;
-    public const int RIFLE_REACT = 35;
+    public const int RIFLE_REACT = 28;
     public const double RIFLE_RANGE = 22.0;
     public const int ENEMY_TURN_RATE = 500;
 
@@ -70,7 +70,7 @@ public static class TAC
     public const int GATLING_SHOT_EVERY = 5;
     public const int GATLING_SWEEP = 2730;
     public const int GATLING_ALERT_TURN = 220;
-    public const double GATLING_VISION = 32.0;
+    public const double GATLING_VISION = 36.0;
 
     public const int SNIPER_HP = 2;
     public const double SNIPER_R = 0.4;
@@ -92,6 +92,21 @@ public static class TAC
     public const int SNIPER_COOLDOWN = 110;
     public const int SNIPER_WARN_DECAY = 5;
 
+    // APC / light armored vehicle (type 7): front+side armour bounces small arms;
+    // flank the REAR or use explosives. Hull machine gun suppresses in bursts.
+    public const int APC_HP = 8;
+    public const double APC_R = 0.7;
+    public const double APC_H = 1.6;
+    public const double APC_PATROL_SPEED = 1.6;
+    public const double APC_ADVANCE_SPEED = 2.6;
+    public const int APC_TURN = 70;
+    public const double APC_VISION = 26.0;
+    public const double APC_ARMOR_COS = 0.5; // front/side arc: |angle to hull facing| < 60 deg bounces
+    public const int APC_GUN_CD = 8;
+    public const int APC_GUN_BURST = 60;
+    public const int APC_GUN_RELOAD = 40;
+    public const double APC_RANGE = 24.0;
+
     public const double BARREL_R = 0.5;
     public const double BARREL_H = 1.0;
     public const double BARREL_ROLL = 5.0;
@@ -111,9 +126,9 @@ public static class TAC
     public const double DRONE_R = 0.5;
     public const double DRONE_H = 0.5;
     public const double DRONE_FLY_Y = 3.2;
-    public const double DRONE_PATROL_SPEED = 2.2;
-    public const double DRONE_CHASE_SPEED = 3.4;
-    public const double DRONE_DIVE_SPEED = 4.5;
+    public const double DRONE_PATROL_SPEED = 4.4;
+    public const double DRONE_CHASE_SPEED = 6.6;
+    public const double DRONE_DIVE_SPEED = 8.2;
     public const double DRONE_DIVE_AT = 2.4;
     public const double DRONE_BOOM_AT = 1.1;
     public const double DRONE_BLAST_R = 1.6;
@@ -122,7 +137,7 @@ public static class TAC
     public const int OPERATOR_HP = 1;
     public const double OPERATOR_R = 0.4;
     public const double OPERATOR_H = 1.7;
-    public const double OPERATOR_FLEE_SPEED = 3.0;
+    public const double OPERATOR_FLEE_SPEED = 5.1;
 
     public const double PILOT_SPEED = 5.0;
     public const double PILOT_ALT = 6.0;
@@ -231,10 +246,12 @@ public class TacEvents
     public bool scopeOn, scopeOff, scopeShot, grenadeThrow;
     public bool radio, corpseFound;
     public bool shieldBlock;
+    public bool armorBlock;
     public bool droneLaunch, droneDive, droneDetonate, droneDead, droneGranted, droneCrash;
     public int crushed;
     public List<TacKill> kills;
     public List<TacXYZ> hits;
+    public List<TacXYZ> armorBlocks;
     public List<TacXZ> eshots;
     public List<TacExplosion> explosions;
     public List<TacNoise> noises;
@@ -248,7 +265,7 @@ public class TacIntelPick { public int left; }
 
 public class TacWorld
 {
-    public double arenaW, arenaD, timeLimit;
+    public double arenaW, arenaD, timeLimit, stepUp;
     public int maxTicks, tick;
     public double px, pz, py, vy;
     public int yawQ, faceQ, pitchQ;
@@ -269,7 +286,7 @@ public class TacWorld
     public List<TacSlide> slides = new List<TacSlide>();
     public List<TacSwitch> switches = new List<TacSwitch>();
     public int scopeCd, scopeShots, fireFlash;
-    public bool crouched, scoped, playerJammed;
+    public bool crouched, scoped, playerJammed, fireGate;
     public int aimYawQ, aimPitchQ;
     public List<TacEnemy> enemies = new List<TacEnemy>();
     public List<TacBullet> bullets = new List<TacBullet>();
@@ -305,6 +322,8 @@ public class TacWorld
         w.timeLimit = Q(stage.Num("timeLimit", 600.0));
         w.maxTicks = (int)Math.Floor(w.timeLimit / TAC.TICK);
         w.tick = 0;
+        // per-stage auto step-up: opt-in via stage.stepUp, clamped [0.35, 0.55]
+        w.stepUp = Q(Math.Min(0.55, Math.Max(0.35, stage.Num("stepUp", TAC.STEP_UP))));
 
         var ps = stage.Obj("playerStart");
         w.px = Q(ps.Num("x"));
@@ -330,7 +349,8 @@ public class TacWorld
         w.pilot = null;
         w.scopeSteerT = 0;
         w.grenadeCd = 0;
-        w.prevB = 0;
+        w.prevB = 255; // all buttons "held" at spawn: a button already down on (re)load/retry is NOT a fresh edge — must be released and re-pressed (prevents scope/drone/grenade misfire that roots the body)
+        w.fireGate = false;
         w.dead = false;
         w.clearedFlag = false;
         w.timedOutFlag = false;
@@ -564,8 +584,8 @@ public class TacWorld
     public void AddEnemy(TacJson.JObj spec)
     {
         string sty = spec.Str("type");
-        int type = sty == "gatling" ? 1 : (sty == "sniper" ? 2 : (sty == "drone" ? 3 : (sty == "operator" ? 4 : (sty == "bomber" ? 5 : (sty == "shield" ? 6 : 0)))));
-        int defHp = type == 1 ? TAC.GATLING_HP : (type == 2 ? TAC.SNIPER_HP : (type == 3 ? TAC.DRONE_HP : (type == 4 ? TAC.OPERATOR_HP : (type == 5 ? TAC.BOMBER_HP : (type == 6 ? TAC.SHIELD_HP : TAC.SOLDIER_HP)))));
+        int type = sty == "gatling" ? 1 : (sty == "sniper" ? 2 : (sty == "drone" ? 3 : (sty == "operator" ? 4 : (sty == "bomber" ? 5 : (sty == "shield" ? 6 : (sty == "apc" ? 7 : 0))))));
+        int defHp = type == 1 ? TAC.GATLING_HP : (type == 2 ? TAC.SNIPER_HP : (type == 3 ? TAC.DRONE_HP : (type == 4 ? TAC.OPERATOR_HP : (type == 5 ? TAC.BOMBER_HP : (type == 6 ? TAC.SHIELD_HP : (type == 7 ? TAC.APC_HP : TAC.SOLDIER_HP))))));
         double hpIn = spec.Num("hp", 0.0);
         int hp = hpIn != 0.0 ? (int)Math.Floor(hpIn) : defHp;
         double yawDeg = Q(spec.Num("yaw", 0.0));
@@ -575,8 +595,8 @@ public class TacWorld
         {
             type = type,
             x = Q(spec.Num("x")), z = Q(spec.Num("z")), y = 0.0, homeY = 0.0,
-            r = type == 1 ? TAC.GATLING_R : (type == 2 ? TAC.SNIPER_R : (type == 3 ? TAC.DRONE_R : (type == 4 ? TAC.OPERATOR_R : (type == 5 ? TAC.BOMBER_R : (type == 6 ? TAC.SHIELD_R : TAC.SOLDIER_R))))),
-            h = type == 1 ? TAC.GATLING_H : (type == 2 ? TAC.SNIPER_H : (type == 3 ? TAC.DRONE_H : (type == 4 ? TAC.OPERATOR_H : (type == 5 ? TAC.BOMBER_H : (type == 6 ? TAC.SHIELD_H : TAC.SOLDIER_H))))),
+            r = type == 1 ? TAC.GATLING_R : (type == 2 ? TAC.SNIPER_R : (type == 3 ? TAC.DRONE_R : (type == 4 ? TAC.OPERATOR_R : (type == 5 ? TAC.BOMBER_R : (type == 6 ? TAC.SHIELD_R : (type == 7 ? TAC.APC_R : TAC.SOLDIER_R)))))),
+            h = type == 1 ? TAC.GATLING_H : (type == 2 ? TAC.SNIPER_H : (type == 3 ? TAC.DRONE_H : (type == 4 ? TAC.OPERATOR_H : (type == 5 ? TAC.BOMBER_H : (type == 6 ? TAC.SHIELD_H : (type == 7 ? TAC.APC_H : TAC.SOLDIER_H)))))),
             yawQ = yawQ, baseYawQ = yawQ,
             hp = hp, alive = true,
             group = spec.Has("group") ? (int)Math.Floor(spec.Num("group")) : 0,
@@ -692,7 +712,7 @@ public class TacWorld
                 if (pf < best) best = pf;
             }
         }
-        double lim = refY + TAC.STEP_UP;
+        double lim = refY + w.stepUp;
         double bestBox = best;
         w.ForBoxesIn(x - r, z - r, x + r, z + r, (bi) =>
         {
@@ -800,7 +820,7 @@ public class TacWorld
     public TacMove MoveCircle(double x, double z, double y, double r, double h, double dx, double dz)
     {
         var w = this;
-        double blockAbove = y + TAC.STEP_UP;
+        double blockAbove = y + w.stepUp;
         double nx = x + dx;
         double nz = z + dz;
         for (int iter = 0; iter < 3; iter++)
@@ -1092,6 +1112,11 @@ public class TacWorld
         bool grenEdge = (input.b & 16) != 0 && (w.prevB & 16) == 0;
         bool scopeEdge = (input.b & 32) != 0 && (w.prevB & 32) == 0;
         w.prevB = input.b;
+
+        // Fire gate: once piloting/scoping ends, the still-held FIRE must be released
+        // before the body will shoot again — otherwise the detonation/scope press
+        // spills straight into held-fire auto-shooting. Released FIRE clears the gate.
+        if ((input.b & 2) == 0) w.fireGate = false;
         if (w.grenadeCd > 0) w.grenadeCd--;
         w.playerJammed = w.InActiveJammer(w.px, w.pz);
 
@@ -1130,6 +1155,7 @@ public class TacWorld
                 w.FireScopedShot();
                 w.scopeShots--;
             }
+            if ((input.b & 2) != 0) w.fireGate = true; // held FIRE while scoped must not spill into body fire on scope-off
             w.faceQ = w.aimYawQ;
             w.crouched = w.py < -0.45;
             w.lockTarget = -1;
@@ -1147,6 +1173,7 @@ public class TacWorld
         if (w.pilot != null)
         {
             var pd = w.pilot;
+            if ((input.b & 2) != 0) w.fireGate = true; // held FIRE while piloting must not spill into body fire on recall/detonate
             if (w.InActiveJammer(pd.x, pd.z))
             {
                 w.events.jamZap = new TacXYZ { x = pd.x, y = pd.y, z = pd.z };
@@ -1335,7 +1362,7 @@ public class TacWorld
 
         w.UpdateLock();
 
-        if ((input.b & 2) != 0 && w.fireCd == 0 && w.ammo != 0)
+        if (!w.fireGate && (input.b & 2) != 0 && w.fireCd == 0 && w.ammo != 0)
         {
             if (w.py < -0.45) w.fireFlash = 8;
             double mfx = TacMath.SinQ(w.faceQ);
@@ -1573,7 +1600,7 @@ public class TacWorld
         }
         w.AddNoise(w.px, w.pz, TAC.NOISE_SHOT_R);
         w.events.scopeShot = true;
-        if (hitEnemy >= 0) w.DamageEnemy(w.enemies[hitEnemy], TAC.SCOPE_DMG);
+        if (hitEnemy >= 0) w.DamageEnemy(w.enemies[hitEnemy], TAC.SCOPE_DMG, ox, oz);
     }
 
     public void HurtPlayer(int dmg, double kx, double kz)
@@ -1596,10 +1623,32 @@ public class TacWorld
         }
     }
 
-    public void DamageEnemy(TacEnemy en, int dmg)
+    public void DamageEnemy(TacEnemy en, int dmg, double srcX = double.NaN, double srcZ = double.NaN)
     {
         var w = this;
         if (!en.alive) return;
+        // APC armour: small-arms fire from the front/side arc bounces off. srcX/srcZ
+        // is the shot origin; when NaN (explosions) armour is ignored so grenades and
+        // barrels always punch through. Rear hits land.
+        if (en.type == 7 && !double.IsNaN(srcX))
+        {
+            double afx = TacMath.SinQ(en.yawQ);
+            double afz = TacMath.CosQ(en.yawQ);
+            double adx = srcX - en.x;
+            double adz = srcZ - en.z;
+            double al = Math.Sqrt(adx * adx + adz * adz);
+            if (al > 0.0001)
+            {
+                double adot = (adx / al) * afx + (adz / al) * afz;
+                if (adot >= TAC.APC_ARMOR_COS)
+                {
+                    w.events.armorBlock = true;
+                    if (w.events.armorBlocks == null) w.events.armorBlocks = new List<TacXYZ>();
+                    w.events.armorBlocks.Add(new TacXYZ { x = en.x, y = en.y + en.h * 0.6, z = en.z });
+                    return;
+                }
+            }
+        }
         en.hp -= dmg;
         w.events.enemyHit = true;
         if (w.events.hits == null) w.events.hits = new List<TacXYZ>();
@@ -1914,7 +1963,7 @@ public class TacWorld
                     if (!en.alive) continue;
                     double te = TacMath.SegCylinder(bu.x, bu.y, bu.z, nx, ny, nz, en.x, en.y, en.z, en.r, TacEnemyH(en));
                     if (te < 0.0) continue;
-                    w.DamageEnemy(en, 1);
+                    w.DamageEnemy(en, 1, bu.x, bu.z);
                     bu.alive = false;
                     hitEnemy = true;
                     break;
@@ -2339,6 +2388,7 @@ public class TacWorld
         double range2 = TAC.VISION_RANGE * TAC.VISION_RANGE;
         double snipRange2 = TAC.SNIPER_RANGE * TAC.SNIPER_RANGE;
         double gatRange2 = TAC.GATLING_VISION * TAC.GATLING_VISION;
+        double apcRange2 = TAC.APC_VISION * TAC.APC_VISION;
 
         for (int i = 0; i < w.enemies.Count; i++)
         {
@@ -2392,6 +2442,7 @@ public class TacWorld
             else if (en.type == 3) w.StepDrone(en, range2);
             else if (en.type == 5) w.StepBomber(en, range2);
             else if (en.type == 6) w.StepShield(en, range2);
+            else if (en.type == 7) w.StepApc(en, apcRange2);
             else w.StepOperator(en, range2);
         }
     }
@@ -2701,6 +2752,88 @@ public class TacWorld
             w.events.gatlingShot = true;
             if (w.events.eshots == null) w.events.eshots = new List<TacXZ>();
             w.events.eshots.Add(new TacXZ { x = en.x, z = en.z, gat = true });
+        }
+    }
+
+    // APC / light armored vehicle: slow rolling gun, frontal/side armour arc
+    // (handled in DamageEnemy). Grinds toward the player, hull turns slowly
+    // (flank the REAR), suppresses with a hull machine gun in bursts.
+    public void StepApc(TacEnemy en, double range2)
+    {
+        var w = this;
+        w.VisionGauge(en, range2, TAC.VISION_COS2, w.sneaking ? 0.5 : 1.0);
+
+        if (en.state == 2)
+        {
+            double dx = w.px - en.x;
+            double dz = w.pz - en.z;
+            double dist = Math.Sqrt(dx * dx + dz * dz);
+            en.yawQ = TacMath.TurnToward(en.yawQ, TacMath.YawFor(dx, dz), TAC.APC_TURN);
+            if (dist > TAC.APC_RANGE * 0.8)
+            {
+                w.MoveEnemy(en, w.px, w.pz, TAC.APC_ADVANCE_SPEED);
+            }
+            if (!en.seesPlayer)
+            {
+                en.gauge -= TAC.GAUGE_DECAY;
+                if (en.gauge <= 0.0) { en.state = 0; en.gauge = 0.0; }
+            }
+            en.cycleT++;
+            int fireCyc = en.cycleT % (TAC.APC_GUN_BURST + TAC.APC_GUN_RELOAD);
+            if ((en.state == 2 && en.seesPlayer) && fireCyc < TAC.APC_GUN_BURST &&
+                (fireCyc % TAC.APC_GUN_CD) == 0 && dist <= TAC.APC_RANGE)
+            {
+                int aq = en.yawQ;
+                double s = TacMath.SinQ(aq);
+                double c = TacMath.CosQ(aq);
+                double muzY = en.y + en.h - 0.4;
+                double vy = 0.0;
+                if (dist > 1.0)
+                {
+                    double wantY = w.PlayerChestY();
+                    vy = (wantY - muzY) / (dist / TAC.ENEMY_BULLET_SPEED);
+                    double vmax = TAC.ENEMY_BULLET_SPEED * 0.5;
+                    if (vy > vmax) vy = vmax;
+                    if (vy < -vmax) vy = -vmax;
+                }
+                w.bullets.Add(new TacBullet
+                {
+                    x = en.x + s * 0.9, y = muzY, z = en.z + c * 0.9,
+                    sx = en.x, sy = muzY, sz = en.z,
+                    vx = s * TAC.ENEMY_BULLET_SPEED, vy = vy, vz = c * TAC.ENEMY_BULLET_SPEED,
+                    ttl = TAC.ENEMY_BULLET_TTL, fromPlayer = false, alive = true, gat = true
+                });
+                w.events.gatlingShot = true;
+                if (w.events.eshots == null) w.events.eshots = new List<TacXZ>();
+                w.events.eshots.Add(new TacXZ { x = en.x, z = en.z, gat = true });
+            }
+        }
+        else if (en.state == 1)
+        {
+            double ax = en.tx - en.x, az = en.tz - en.z;
+            en.yawQ = TacMath.TurnToward(en.yawQ, TacMath.YawFor(ax, az), TAC.APC_TURN);
+            bool arr = w.MoveEnemy(en, en.tx, en.tz, TAC.APC_PATROL_SPEED);
+            if (arr)
+            {
+                en.pauseT++;
+                if (en.pauseT >= TAC.INVESTIGATE_PAUSE) { en.state = 0; en.gauge = 0.0; en.pauseT = 0; }
+            }
+        }
+        else
+        {
+            if (en.hasPatrol)
+            {
+                double gx = en.patToB ? en.patX : en.homeX;
+                double gz = en.patToB ? en.patZ : en.homeZ;
+                double gdx = gx - en.x, gdz = gz - en.z;
+                en.yawQ = TacMath.TurnToward(en.yawQ, TacMath.YawFor(gdx, gdz), TAC.APC_TURN);
+                bool got = w.MoveEnemy(en, gx, gz, TAC.APC_PATROL_SPEED);
+                if (got) en.patToB = !en.patToB;
+            }
+            else
+            {
+                en.yawQ = TacMath.TurnToward(en.yawQ, en.baseYawQ, TAC.APC_TURN);
+            }
         }
     }
 

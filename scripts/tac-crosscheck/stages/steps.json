@@ -1,0 +1,26 @@
+{
+  "name": "steps",
+  "timeLimit": 300,
+  "lives": 3,
+  "ammo": 0,
+  "stepUp": 0.55,
+  "arena": { "w": 48, "d": 64 },
+  "playerStart": { "x": 24, "z": 6, "yaw": 0 },
+  "parts": [
+    { "type": "block", "x": 24, "z": 12, "w": 10, "d": 4, "h": 0.5 },
+    { "type": "block", "x": 24, "z": 16, "w": 10, "d": 4, "h": 1.0 },
+    { "type": "block", "x": 24, "z": 20, "w": 10, "d": 4, "h": 1.5 },
+    { "type": "block", "x": 18, "z": 28, "w": 3, "d": 3, "h": 0.4 },
+    { "type": "block", "x": 30, "z": 28, "w": 3, "d": 3, "h": 0.55 },
+    { "type": "block", "x": 24, "z": 34, "w": 3, "d": 3, "h": 0.6 },
+    { "type": "rock", "x": 14, "z": 40, "w": 4, "d": 2 },
+    { "type": "wall", "x": 34, "z": 40, "w": 2, "d": 10 },
+    { "type": "slope", "x": 24, "z": 46, "w": 5, "d": 6, "h": 2, "dir": 0 },
+    { "type": "platform", "x": 24, "z": 54, "w": 10, "d": 10, "h": 2 },
+    { "type": "pit", "x": 10, "z": 50, "w": 6, "d": 6, "depth": 1.2 }
+  ],
+  "enemies": [
+    { "type": "soldier", "x": 16, "z": 44, "yaw": 180, "patrolX": 30, "patrolZ": 44 },
+    { "type": "soldier", "x": 24, "z": 56, "yaw": 180 }
+  ]
+}
