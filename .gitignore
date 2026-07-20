@@ -4,6 +4,7 @@ PromptWorld/[Tt]emp/
 PromptWorld/[Oo]bj/
 PromptWorld/[Bb]uild/
 PromptWorld/[Bb]uilds/
+PromptWorld/.utmp/
 node_modules/
 .wrangler/
 PromptWorld/[Ll]ogs/
