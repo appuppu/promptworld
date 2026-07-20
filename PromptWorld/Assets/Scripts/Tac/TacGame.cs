@@ -176,7 +176,10 @@ public class TacGame : MonoBehaviour
         cam.farClipPlane = 260f;
         audioKit = gameObject.AddComponent<TacAudioKit>();
         BuildUi();
-        ShowList();
+        // First launch: a one-time intro that says what the game is. Afterwards go
+        // straight to the stage list.
+        if (PlayerPrefs.GetInt("tac_onboarded", 0) == 0) ShowOnboarding();
+        else ShowList();
 
         // Deep links: a shared ?stage=<id>&key=<editKey> URL. Cold start arrives
         // in Application.absoluteURL; a tap while running fires deepLinkActivated.
@@ -393,7 +396,7 @@ public class TacGame : MonoBehaviour
         // ---- stage list (mirrors tac-home.html, stacked for portrait) ----
         listRoot = MakePanel("list", TacUi.Bg);
         // header sits snug against the safe-area top (user: trim the gap above PROMPT WORLD)
-        var brand = TacUi.Label(listRoot, "", 20, TacUi.Fg, TextAnchor.MiddleLeft, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -38), new Vector2(-24, -4), false);
+        var brand = TacUi.Label(listRoot, "", 22, TacUi.Fg, TextAnchor.MiddleLeft, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -40), new Vector2(-24, -4), true);
         brand.supportRichText = true;
         brand.text = TacUi.Track("PROMPT") + " <color=#4dd2c3>" + TacUi.Track("WORLD") + "</color>";
         StartCoroutine(FadeRiseIn((RectTransform)brand.transform, 0f, 0.6f, 12f)); // logo entrance (mirrors web)
@@ -549,6 +552,40 @@ public class TacGame : MonoBehaviour
             if (ch.name == "panelbg") continue;
             Destroy(ch.gameObject);
         }
+    }
+
+    // ------------------------------------------------------- onboarding (1x) --
+    // First-launch intro: three lines that say what the game is + a START button.
+    // Shown once (PlayerPrefs 'tac_onboarded'), then never again.
+    void ShowOnboarding()
+    {
+        var ob = MakePanel("onboard", TacUi.Bg);
+        ob.gameObject.SetActive(true);
+        var title = TacUi.Label(ob, "", 26, TacUi.Fg, TextAnchor.MiddleCenter, new Vector2(0, 0.78f), new Vector2(1, 0.86f), Vector2.zero, Vector2.zero, true);
+        title.supportRichText = true;
+        title.text = TacUi.Track("PROMPT") + " <color=#4dd2c3>" + TacUi.Track("WORLD") + "</color>";
+        StartCoroutine(FadeRiseIn((RectTransform)title.transform, 0f, 0.6f, 14f));
+
+        string[] keys = { "obL1", "obL2", "obL3" };
+        for (int i = 0; i < keys.Length; i++)
+        {
+            float top = 0.64f - i * 0.13f;
+            var l = TacUi.Label(ob, TacLoc.T(keys[i]), 13, TacUi.Promo, TextAnchor.UpperCenter,
+                new Vector2(0.1f, top), new Vector2(0.9f, top + 0.12f), Vector2.zero, Vector2.zero);
+            l.horizontalOverflow = HorizontalWrapMode.Wrap;
+            StartCoroutine(FadeIn((RectTransform)l.transform, 0.15f + i * 0.12f, 0.6f));
+        }
+
+        Text bt;
+        var start = TacUi.Btn(ob, TacLoc.T("obStart"), 15, TacUi.Teal,
+            new Vector2(0.2f, 0.12f), new Vector2(0.8f, 0.19f), Vector2.zero, Vector2.zero, () =>
+            {
+                Haptic.Tap();
+                PlayerPrefs.SetInt("tac_onboarded", 1); PlayerPrefs.Save();
+                Object.Destroy(ob.gameObject);
+                ShowList();
+            }, out bt);
+        StartCoroutine(FadeIn((RectTransform)start.transform, 0.5f, 0.6f));
     }
 
     // ----------------------------------------------------------- stage list --
@@ -868,6 +905,14 @@ public class TacGame : MonoBehaviour
         rt.anchoredPosition = rest;
     }
 
+    // Stage thumbnail: prefer the angled 3D preview, fall back to the flat map.
+    static Texture2D PreviewTex(TacJson.JObj st, int w, int h)
+    {
+        var tex = TacPreview3D.Render(st);
+        if (tex != null) return tex;
+        return TacThumb.Draw(st, w, h);
+    }
+
     // Fade a rect in (no movement) — for header title/buttons.
     IEnumerator FadeIn(RectTransform rt, float delay, float dur)
     {
@@ -912,6 +957,7 @@ public class TacGame : MonoBehaviour
         btn.colors = cbtn;
         btn.onClick.AddListener(() =>
         {
+            Haptic.Tap();
             if (embeddedJson != null) StartStage(embeddedJson, null, nm);
             else if (stageCache.ContainsKey(sid)) StartStage(stageCache[sid], sid, nm);
             else StartCoroutine(LoadAndStart(sid, nm));
@@ -930,7 +976,7 @@ public class TacGame : MonoBehaviour
         descLbl.verticalOverflow = VerticalWrapMode.Truncate;
         if (embeddedJson != null)
         {
-            raw.texture = TacThumb.Draw(TacJson.Parse(embeddedJson), 120, 80);
+            raw.texture = PreviewTex(TacJson.Parse(embeddedJson), 120, 80);
             FillCardDetail(embeddedJson, nameLbl, descLbl);
         }
         else StartCoroutine(LoadThumb(sid, raw, nameLbl, descLbl));
@@ -978,7 +1024,7 @@ public class TacGame : MonoBehaviour
         stageCache[sid] = got;
         try
         {
-            raw.texture = TacThumb.Draw(TacJson.Parse(got), 120, 80);
+            raw.texture = PreviewTex(TacJson.Parse(got), 120, 80);
             FillCardDetail(got, nameLbl, descLbl);
         }
         catch (System.Exception) { }
@@ -1058,7 +1104,7 @@ public class TacGame : MonoBehaviour
         // this translucent overlay) is the star of the briefing
         var mapBox = TacUi.Box(briefRoot, TacUi.Hex(0x07090C), TacUi.Line, new Vector2(0.05f, 0.26f), new Vector2(0.38f, 0.46f), Vector2.zero, Vector2.zero);
         var mraw = TacUi.Rect("map", mapBox, Vector2.zero, Vector2.one, new Vector2(4, 4), new Vector2(-4, -4)).gameObject.AddComponent<RawImage>();
-        try { mraw.texture = TacThumb.Draw(stageDoc, 120, 150); } catch (System.Exception) { }
+        try { mraw.texture = PreviewTex(stageDoc, 120, 150); } catch (System.Exception) { }
         string desc = TacLoc.Pick(stageDoc.Has("desc") ? stageDoc.Obj("desc") : null, "");
         var dt = TacUi.Label(briefRoot, desc, 11, TacUi.Promo, TextAnchor.UpperLeft, new Vector2(0.42f, 0.26f), new Vector2(0.95f, 0.395f), Vector2.zero, Vector2.zero);
         dt.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -1689,6 +1735,7 @@ public class TacGame : MonoBehaviour
                     if (firstClear)
                     {
                         // World-first clear = this run just published the stage. Celebrate.
+                        Haptic.Success();
                         var banner = TacUi.Label(resultRoot, TacLoc.T("firstClear"), 22, TacUi.Warn, TextAnchor.MiddleCenter,
                             new Vector2(0, 0.80f), new Vector2(1, 0.90f), Vector2.zero, Vector2.zero, true);
                         TacUi.Label(resultRoot, TacLoc.T("firstClearSub"), 12, TacUi.Fg, TextAnchor.MiddleCenter,

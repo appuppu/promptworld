@@ -708,7 +708,14 @@ var sfx = {
   toss: function () { blip(400, 900, 0.12, 'triangle', 0.35); },
   clear: function () { blip(523, 523, 0.12, 'square', 0.5); blip(659, 659, 0.12, 'square', 0.5, 0.13); blip(784, 784, 0.24, 'square', 0.5, 0.26); },
   dead: function () { blip(300, 40, 0.7, 'sawtooth', 0.6); },
-  block: function () { blip(900, 500, 0.05, 'square', 0.25); }
+  block: function () { blip(900, 500, 0.05, 'square', 0.25); },
+  // World-first-clear fanfare: a bright rising arpeggio topped with a shimmer.
+  fanfare: function () {
+    blip(523, 523, 0.12, 'square', 0.5); blip(659, 659, 0.12, 'square', 0.5, 0.11);
+    blip(784, 784, 0.12, 'square', 0.5, 0.22); blip(1047, 1047, 0.35, 'square', 0.55, 0.33);
+    blip(1319, 1568, 0.4, 'triangle', 0.35, 0.4);
+  },
+  tap: function () { blip(1200, 1200, 0.03, 'square', 0.18); }
 };
 
 // ---------------------------------------------------------------- music
@@ -1735,6 +1742,7 @@ function celebrateFirstClear() {
     '<div class="celebs">' + T('firstClearSub') + '</div></div>';
   box.style.display = 'flex';
   spawnConfetti();
+  try { sfx.fanfare(); } catch (e) { }
 }
 function celebrateRecord() {
   var box = document.getElementById('celebrate');
