@@ -1313,7 +1313,7 @@ async function handleApi(request, env, url) {
     return json({ stages: await opListPublished(env, url.searchParams.get('q'), url.searchParams.get('sort'), url.searchParams.get('game'), url.searchParams.get('playerId')) });
   }
 
-  const stageMatch = path.match(/^\/api\/stages\/([a-z0-9]+)(\/(clear|publish|ghost|vote|stats|score|scores|update))?$/);
+  const stageMatch = path.match(/^\/api\/stages\/([a-z0-9]+)(\/(clear|publish|ghost|vote|hide|stats|score|scores|update))?$/);
   if (!stageMatch) return json({ error: 'Not found.' }, 404);
   const id = stageMatch[1];
   const action = stageMatch[3];
