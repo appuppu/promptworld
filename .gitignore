@@ -48,3 +48,4 @@ store-media/
 # Cron job logs (self-rotating; local runtime state, not source)
 scripts/gc-courses/gc.log
 scripts/gc-courses/cron.log
+scripts/daily-courses/cron.log
