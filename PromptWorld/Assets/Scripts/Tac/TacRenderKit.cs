@@ -260,6 +260,22 @@ public static class TacRenderKit
             }
         }
 
+        // ladders: two side rails + rungs up the near (z1) face.
+        // BoxAabb signature is (x0, z0, x1, z1, y0, y1, color).
+        var ladCol = new Color(0.62f, 0.55f, 0.42f);
+        foreach (var l in w.ladders)
+        {
+            double hgt = l.yTop - l.yBase, zf = l.z1 - 0.05;
+            BoxAabb(root, l.x0, zf - 0.05, l.x0 + 0.1, zf + 0.05, l.yBase, l.yTop, ladCol);
+            BoxAabb(root, l.x1 - 0.1, zf - 0.05, l.x1, zf + 0.05, l.yBase, l.yTop, ladCol);
+            int rungs = System.Math.Max(2, (int)System.Math.Round(hgt / 0.45));
+            for (int ri = 0; ri <= rungs; ri++)
+            {
+                double ry = l.yBase + (hgt * ri / rungs);
+                BoxAabb(root, l.x0, zf - 0.04, l.x1, zf + 0.04, ry - 0.04, ry + 0.04, ladCol);
+            }
+        }
+
     }
 
     // pickup view (dynamic: hidden once consumed; TacGame keeps the list)

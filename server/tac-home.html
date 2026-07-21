@@ -598,6 +598,9 @@
           block3d(pt.x, pt.z, w2, d2, '#9cc8d6', '#5a7f8a');
         } else if (pt.type === 'door') {
           block3d(pt.x, pt.z, w2, d2, '#6b8494', '#3f5460');
+        } else if (pt.type === 'ladder') {
+          c.fillStyle = '#9e8a5f';
+          c.fillRect(X2(pt.x - (pt.w || 1) / 2), Z2(pt.z + (pt.d || 1) / 2), (pt.w || 1) * sc2, (pt.d || 1) * sc2);
         } else if (pt.type === 'slope') {
           block3d(pt.x, pt.z, w2, d2, '#636a76', '#3a4048');
         } else if (pt.type === 'river') {

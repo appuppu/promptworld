@@ -62,6 +62,9 @@ var TAC = {
   DOOR_OPEN_MAX: 8,         // openQ at fully open; >= DOOR_PASS_Q counts as passable
   DOOR_PASS_Q: 4,           // openQ at/above which the door no longer blocks (half-open)
 
+  LADDER_CLIMB_SPEED: 3.2,  // m/s climb rate while a move key is held on a ladder
+  LADDER_REACH: 0.55,       // how far outside the ladder footprint still counts as "on" it
+
   VISION_RANGE: 26.0,
   VISION_COS2: 0.470,       // cos^2(~47 deg) — widened half-angle of the standard cone
   SNIPER_RANGE: 66.0,
@@ -387,6 +390,7 @@ function TacWorld(stage) {
   w.faceQ = w.yawQ;         // character facing = last movement direction; aim follows this
   w.pitchQ = 0;
   w.onGround = true;
+  w.climbing = false;       // true while clinging to / climbing a ladder
   w.moveT = 0;              // consecutive moving ticks (drives the speed ramp)
   w.fireCd = 0;
   w.hp = stage.lives ? Math.floor(stage.lives) : 1;
@@ -413,6 +417,7 @@ function TacWorld(stage) {
   w.medkits = [];           // {x,z,y,alive} heals 1 hp on touch (only if hurt)
   w.rivers = [];            // {x0,z0,x1,z1} slow water; ground enemies refuse to enter
   w.trenches = [];          // {x0,z0,x1,z1} entrenched cover (see bullet rules)
+  w.ladders = [];           // {x0,z0,x1,z1,yBase,yTop} vertical climb zones (see stepPlayer)
   w.slides = [];            // rockslides {pileX,pileZ,w,d,dx,dz,postX,postZ,postY,triggered,boulders:[]}
   w.switches = [];          // {x,z,y,r,alive} EMP switches: each projects its own dome
   w.scopeCd = 0;            // scoped-shot recharge (standard equipment)
@@ -455,6 +460,16 @@ function TacWorld(stage) {
     else if (p.type === 'crackedWall') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 3, p.y0 || 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'glass') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 5, p.y0 || 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'door') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 6, 0); var db = w.boxes[w.boxes.length - 1]; db.open = false; db.openQ = 0; w.doors.push(w.boxes.length - 1); if (p.tint) db.tint = String(p.tint); }
+    else if (p.type === 'ladder') {
+      // vertical climb zone from yBase (=y0) up to yBase+h. Non-solid: the player
+      // occupies its space and climbs; not a wall, not a floor.
+      var lhw = tacQ((p.w === undefined ? 1.0 : p.w)) / 2.0;
+      var lhd = tacQ((p.d === undefined ? 1.0 : p.d)) / 2.0;
+      var lcx = tacQ(p.x), lcz = tacQ(p.z);
+      var lBase = tacQ(p.y0 || 0);
+      var lTop = lBase + tacQ(p.h === undefined ? 3.0 : p.h);
+      w.ladders.push({ x0: lcx - lhw, z0: lcz - lhd, x1: lcx + lhw, z1: lcz + lhd, yBase: lBase, yTop: lTop });
+    }
     else if (p.type === 'slope') { w.addSlope(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, p.dir || 0, p.y0 || 0); if (p.tint) w.slopes[w.slopes.length - 1].tint = String(p.tint); }
     else if (p.type === 'barrel') w.addBarrel(p.x, p.z);
     else if (p.type === 'mine') w.mines.push({ x: tacQ(p.x), z: tacQ(p.z), y: 0.0, fuse: -1, alive: true });
@@ -599,6 +614,19 @@ TacWorld.prototype.trenchAt = function (x, z) {
     if (x >= t.x0 && x <= t.x1 && z >= t.z0 && z <= t.z1) return i;
   }
   return -1;
+};
+// The ladder the player at (x,z,y) can climb, or null. Overlap is the footprint
+// grown by LADDER_REACH so you grab it from just beside it; vertically valid from
+// its base up to a little above its top (so you can climb off onto the platform).
+TacWorld.prototype.ladderAt = function (x, z, y) {
+  var R = TAC.LADDER_REACH;
+  for (var i = 0; i < this.ladders.length; i++) {
+    var l = this.ladders[i];
+    if (x < l.x0 - R || x > l.x1 + R || z < l.z0 - R || z > l.z1 + R) continue;
+    if (y < l.yBase - 0.4 || y > l.yTop + 0.1) continue;
+    return l;
+  }
+  return null;
 };
 TacWorld.prototype.inActiveJammer = function (x, z) {
   for (var i = 0; i < this.switches.length; i++) {
@@ -1456,36 +1484,64 @@ TacWorld.prototype.stepPlayer = function (input) {
     w.pz = res.z;
   }
 
-  // jump (edge)
-  if ((input.b & 1) !== 0 && w.onGround) {
-    w.vy = TAC.JUMP_V;
-    w.onGround = false;
-    w.events.jumped = true;
-  }
-
-  // vertical
-  var dv = TAC.GRAVITY * TAC.TICK;
-  w.vy = w.vy - dv;
-  var dyy = w.vy * TAC.TICK;
-  w.py = w.py + dyy;
-  if (w.vy > 0.0) {
-    var ceil = w.ceilingY(w.px, w.pz, TAC.PLAYER_R, w.py - dyy);
-    if (w.py + TAC.PLAYER_H > ceil) {
-      w.py = ceil - TAC.PLAYER_H;
-      w.vy = 0.0;
-    }
-  }
-  var g = w.groundY(w.px, w.pz, w.onGround ? w.py + 0.01 : w.py, TAC.PLAYER_R);
-  if (w.py <= g && w.vy <= 0.0) {
-    if (!w.onGround && w.vy < -6.0) {
-      w.addNoise(w.px, w.pz, TAC.NOISE_LAND_R);
-      w.events.landed = true;
-    }
-    w.py = g;
+  // LADDER climb: while the player's circle overlaps a ladder footprint within
+  // its vertical span, they cling to it — gravity is suppressed. Holding a move
+  // key climbs UP at LADDER_CLIMB_SPEED; releasing holds height; jump kicks off.
+  // Climbing past the top steps onto whatever floor is there; walking off the
+  // footprint horizontally drops back into normal gravity. Camera-direction
+  // independent, so it is trivially deterministic.
+  var onLadder = w.ladderAt(w.px, w.pz, w.py);
+  var jumpEdge = (input.b & 1) !== 0;
+  if (onLadder && !jumpEdge) {
+    w.climbing = true;
     w.vy = 0.0;
-    w.onGround = true;
-  } else if (w.py > g + 0.02) {
     w.onGround = false;
+    if (moving && w.py < onLadder.yTop) {
+      var cstep = TAC.LADDER_CLIMB_SPEED * TAC.TICK;
+      var ceilL = w.ceilingY(w.px, w.pz, TAC.PLAYER_R, w.py);
+      var capY = ceilL - TAC.PLAYER_H;
+      var ny = w.py + cstep;
+      if (ny > onLadder.yTop) ny = onLadder.yTop;
+      if (ny > capY) ny = capY; // don't climb into a ceiling
+      w.py = ny;
+    }
+    // settle onto a floor if one is right under the feet at the top (dismount)
+    var gl = w.groundY(w.px, w.pz, w.py + 0.01, TAC.PLAYER_R);
+    if (w.py <= gl) { w.py = gl; w.onGround = true; w.climbing = false; }
+  } else {
+    w.climbing = false;
+
+    // jump (edge) — from ground OR while clinging to a ladder (kick off)
+    if (jumpEdge && (w.onGround || onLadder)) {
+      w.vy = TAC.JUMP_V;
+      w.onGround = false;
+      w.events.jumped = true;
+    }
+
+    // vertical
+    var dv = TAC.GRAVITY * TAC.TICK;
+    w.vy = w.vy - dv;
+    var dyy = w.vy * TAC.TICK;
+    w.py = w.py + dyy;
+    if (w.vy > 0.0) {
+      var ceil = w.ceilingY(w.px, w.pz, TAC.PLAYER_R, w.py - dyy);
+      if (w.py + TAC.PLAYER_H > ceil) {
+        w.py = ceil - TAC.PLAYER_H;
+        w.vy = 0.0;
+      }
+    }
+    var g = w.groundY(w.px, w.pz, w.onGround ? w.py + 0.01 : w.py, TAC.PLAYER_R);
+    if (w.py <= g && w.vy <= 0.0) {
+      if (!w.onGround && w.vy < -6.0) {
+        w.addNoise(w.px, w.pz, TAC.NOISE_LAND_R);
+        w.events.landed = true;
+      }
+      w.py = g;
+      w.vy = 0.0;
+      w.onGround = true;
+    } else if (w.py > g + 0.02) {
+      w.onGround = false;
+    }
   }
 
   // auto lock-on: pick the enemy closest to the view center, within the lock
@@ -1495,7 +1551,7 @@ TacWorld.prototype.stepPlayer = function (input) {
 
   // fire (held) — rounds leave the actual gun muzzle (forward-right of the
   // body, at the gun's height), not the body center
-  if (!w.fireGate && (input.b & 2) !== 0 && w.fireCd === 0 && w.ammo !== 0) {
+  if (!w.fireGate && !w.climbing && (input.b & 2) !== 0 && w.fireCd === 0 && w.ammo !== 0) {
     if (w.py < -0.45) w.fireFlash = 8; // tiny settle-back tail; holding FIRE keeps you up
     var mfx = tacSinQ(w.faceQ);
     var mfz = tacCosQ(w.faceQ);

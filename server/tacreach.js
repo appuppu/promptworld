@@ -216,6 +216,27 @@ function tacAnalyzeReachability(stage) {
       var cur = q.pop();
       var cx3 = cur[0], cz3 = cur[1], li = cur[2];
       var y = surfaces[cz3 * W + cx3][li];
+      // LADDER: if this node sits at a ladder's base, the player can climb it to
+      // the top. Add an edge to the surface nearest yTop in every cell the ladder
+      // covers (its base and its top landing), so a platform reachable only by a
+      // ladder counts as reachable on foot.
+      if (w.ladders && w.ladders.length) {
+        var wx = (cx3 + 0.5) * CELL, wz = (cz3 + 0.5) * CELL;
+        for (var ldi = 0; ldi < w.ladders.length; ldi++) {
+          var lad = w.ladders[ldi];
+          if (wx < lad.x0 - 0.55 || wx > lad.x1 + 0.55 || wz < lad.z0 - 0.55 || wz > lad.z1 + 0.55) continue;
+          if (y < lad.yBase - 0.5 || y > lad.yTop - 0.5) continue; // must be near/below the top to still climb
+          // enqueue the top surface in the ladder's footprint cells + one ring
+          var lcx0 = Math.max(0, Math.floor((lad.x0 - 0.5) / CELL)), lcx1 = Math.min(W - 1, Math.floor((lad.x1 + 0.5) / CELL));
+          var lcz0 = Math.max(0, Math.floor((lad.z0 - 0.5) / CELL)), lcz1 = Math.min(D - 1, Math.floor((lad.z1 + 0.5) / CELL));
+          for (var tz = lcz0; tz <= lcz1; tz++) for (var tx = lcx0; tx <= lcx1; tx++) {
+            var ts = surfaces[tz * W + tx];
+            var tp = -1;
+            for (var tk = ts.length - 1; tk >= 0; tk--) { if (ts[tk] <= lad.yTop + 0.5 && ts[tk] >= lad.yTop - 0.6) { tp = tk; break; } }
+            if (tp >= 0 && !seen[tz * W + tx][tp]) { seen[tz * W + tx][tp] = true; q.push([tx, tz, tp]); }
+          }
+        }
+      }
       for (var d = 0; d < 4; d++) {
         var nx = cx3 + DIRS[d][0], nz = cz3 + DIRS[d][1];
         if (nx < 0 || nx >= W || nz < 0 || nz >= D) continue;

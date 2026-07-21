@@ -2316,6 +2316,18 @@ function render(alpha) {
   world.trenches.forEach(function (t) { drawPit(t.x0, t.z0, t.x1, t.z1, TAC.TRENCH_DEPTH, [0.2, 0.18, 0.15]); });
   world.pitDefs.forEach(function (t) { drawPit(t.x0, t.z0, t.x1, t.z1, t.depth, [0.24, 0.22, 0.2]); });
   world.rivers.forEach(function (r) { drawPit(r.x0, r.z0, r.x1, r.z1, TAC.RIVER_DEPTH, [0.1, 0.14, 0.2]); });
+  // ladders: two side rails + evenly spaced rungs up the near face (z1 side)
+  world.ladders.forEach(function (l) {
+    var lcx = (l.x0 + l.x1) / 2, lw = l.x1 - l.x0, hgt = l.yTop - l.yBase, zf = l.z1 - 0.05;
+    var rc = [0.62, 0.55, 0.42];
+    draw(mCube, l.x0 + 0.08, l.yBase + hgt / 2, zf, 0, 0.08, hgt, 0.08, rc[0], rc[1], rc[2], 1);
+    draw(mCube, l.x1 - 0.08, l.yBase + hgt / 2, zf, 0, 0.08, hgt, 0.08, rc[0], rc[1], rc[2], 1);
+    var rungs = Math.max(2, Math.round(hgt / 0.45));
+    for (var ri = 0; ri <= rungs; ri++) {
+      var ry = l.yBase + (hgt * ri / rungs);
+      draw(mCube, lcx, ry, zf, 0, lw, 0.06, 0.06, rc[0], rc[1], rc[2], 1);
+    }
+  });
 
   // rockslides: pile of boulders + the wooden support post (shoot it!)
   world.slides.forEach(function (sl) {

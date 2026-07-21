@@ -45,6 +45,8 @@ public static class TAC
     public const int DOOR_SLIDE_TICKS = 8;
     public const int DOOR_OPEN_MAX = 8;
     public const int DOOR_PASS_Q = 4;
+    public const double LADDER_CLIMB_SPEED = 3.2;
+    public const double LADDER_REACH = 0.55;
 
     public const double VISION_RANGE = 26.0;
     public const double VISION_COS2 = 0.470;
@@ -210,6 +212,7 @@ public class TacInput { public int b, m, yawQ, pitchQ; }
 public class TacBox { public double x0, z0, x1, z1, yb, h; public int kind, hp; public bool alive; public string tint; public bool open; public int openQ, closeT; }
 public class TacSlopePart { public double x0, z0, x1, z1, h, y0, ux, uz, rise; public int dir, steps; public string tint; }
 public class TacRect { public double x0, z0, x1, z1; }
+public class TacLadder { public double x0, z0, x1, z1, yBase, yTop; }
 public class TacPit { public double x0, z0, x1, z1, depth; }
 public class TacBarrel { public double x, z, y, dx, dz; public int state, fuse; public bool alive; }
 public class TacMine { public double x, z, y; public int fuse; public bool alive; }
@@ -279,6 +282,7 @@ public class TacWorld
     public double px, pz, py, vy, playerStartY;
     public int yawQ, faceQ, pitchQ;
     public bool onGround;
+    public bool climbing;
     public int moveT, fireCd, hp, maxHp, ammo, hurtCd, lockTarget, lockKind, droneUses;
     public TacPilot pilot;
     public int scopeSteerT, grenadeCd, prevB;
@@ -293,6 +297,7 @@ public class TacWorld
     public List<TacMedkit> medkits = new List<TacMedkit>();
     public List<TacRect> rivers = new List<TacRect>();
     public List<TacRect> trenches = new List<TacRect>();
+    public List<TacLadder> ladders = new List<TacLadder>();
     public List<TacSlide> slides = new List<TacSlide>();
     public List<TacSwitch> switches = new List<TacSwitch>();
     public int scopeCd, scopeShots, fireFlash;
@@ -348,6 +353,7 @@ public class TacWorld
         w.faceQ = w.yawQ;
         w.pitchQ = 0;
         w.onGround = true;
+        w.climbing = false;
         w.moveT = 0;
         w.fireCd = 0;
         double lives = stage.Num("lives", 0.0);
@@ -395,6 +401,15 @@ public class TacWorld
             else if (ty == "crackedWall") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 3, p.Has("y0") ? p.Num("y0") : 0.0);
             else if (ty == "glass") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 5, p.Has("y0") ? p.Num("y0") : 0.0);
             else if (ty == "door") { w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 6, 0.0); var db = w.boxes[w.boxes.Count - 1]; db.open = false; db.openQ = 0; w.doors.Add(w.boxes.Count - 1); if (p.Has("tint")) db.tint = p.Str("tint"); }
+            else if (ty == "ladder")
+            {
+                double lhw = Q(p.Has("w") ? p.Num("w") : 1.0) / 2.0;
+                double lhd = Q(p.Has("d") ? p.Num("d") : 1.0) / 2.0;
+                double lcx = Q(p.Num("x")), lcz = Q(p.Num("z"));
+                double lBase = Q(p.Has("y0") ? p.Num("y0") : 0.0);
+                double lTop = lBase + Q(p.Has("h") ? p.Num("h") : 3.0);
+                w.ladders.Add(new TacLadder { x0 = lcx - lhw, z0 = lcz - lhd, x1 = lcx + lhw, z1 = lcz + lhd, yBase = lBase, yTop = lTop });
+            }
             else if (ty == "slope") { w.AddSlope(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, (int)p.Num("dir", 0.0), p.Has("y0") ? p.Num("y0") : 0.0); if (p.Has("tint")) w.slopes[w.slopes.Count - 1].tint = p.Str("tint"); }
             else if (ty == "barrel") w.AddBarrel(p.Num("x"), p.Num("z"));
             else if (ty == "mine") w.mines.Add(new TacMine { x = Q(p.Num("x")), z = Q(p.Num("z")), y = 0.0, fuse = -1, alive = true });
@@ -551,6 +566,19 @@ public class TacWorld
             if (x >= t.x0 && x <= t.x1 && z >= t.z0 && z <= t.z1) return i;
         }
         return -1;
+    }
+    // The ladder the player at (x,z,y) can climb, or null (mirrors JS ladderAt).
+    public TacLadder LadderAt(double x, double z, double y)
+    {
+        double R = TAC.LADDER_REACH;
+        for (int i = 0; i < ladders.Count; i++)
+        {
+            var l = ladders[i];
+            if (x < l.x0 - R || x > l.x1 + R || z < l.z0 - R || z > l.z1 + R) continue;
+            if (y < l.yBase - 0.4 || y > l.yTop + 0.1) continue;
+            return l;
+        }
+        return null;
     }
     public bool InActiveJammer(double x, double z)
     {
@@ -1406,46 +1434,73 @@ public class TacWorld
             w.pz = res.z;
         }
 
-        if ((input.b & 1) != 0 && w.onGround)
+        // LADDER climb (mirrors the JS sim): cling while overlapping a ladder,
+        // gravity suppressed. Moving climbs up; still holds; jump kicks off.
+        var onLadder = w.LadderAt(w.px, w.pz, w.py);
+        bool jumpEdge = (input.b & 1) != 0;
+        if (onLadder != null && !jumpEdge)
         {
-            w.vy = TAC.JUMP_V;
-            w.onGround = false;
-            w.events.jumped = true;
-        }
-
-        double dv = TAC.GRAVITY * TAC.TICK;
-        w.vy = w.vy - dv;
-        double dyy = w.vy * TAC.TICK;
-        w.py = w.py + dyy;
-        if (w.vy > 0.0)
-        {
-            double ceil = w.CeilingY(w.px, w.pz, TAC.PLAYER_R, w.py - dyy);
-            if (w.py + TAC.PLAYER_H > ceil)
-            {
-                w.py = ceil - TAC.PLAYER_H;
-                w.vy = 0.0;
-            }
-        }
-        double g = w.GroundY(w.px, w.pz, w.onGround ? w.py + 0.01 : w.py, TAC.PLAYER_R);
-        if (w.py <= g && w.vy <= 0.0)
-        {
-            if (!w.onGround && w.vy < -6.0)
-            {
-                w.AddNoise(w.px, w.pz, TAC.NOISE_LAND_R);
-                w.events.landed = true;
-            }
-            w.py = g;
+            w.climbing = true;
             w.vy = 0.0;
-            w.onGround = true;
-        }
-        else if (w.py > g + 0.02)
-        {
             w.onGround = false;
+            if (moving && w.py < onLadder.yTop)
+            {
+                double cstep = TAC.LADDER_CLIMB_SPEED * TAC.TICK;
+                double ceilL = w.CeilingY(w.px, w.pz, TAC.PLAYER_R, w.py);
+                double capY = ceilL - TAC.PLAYER_H;
+                double ny = w.py + cstep;
+                if (ny > onLadder.yTop) ny = onLadder.yTop;
+                if (ny > capY) ny = capY;
+                w.py = ny;
+            }
+            double gl = w.GroundY(w.px, w.pz, w.py + 0.01, TAC.PLAYER_R);
+            if (w.py <= gl) { w.py = gl; w.onGround = true; w.climbing = false; }
+        }
+        else
+        {
+            w.climbing = false;
+
+            if (jumpEdge && (w.onGround || onLadder != null))
+            {
+                w.vy = TAC.JUMP_V;
+                w.onGround = false;
+                w.events.jumped = true;
+            }
+
+            double dv = TAC.GRAVITY * TAC.TICK;
+            w.vy = w.vy - dv;
+            double dyy = w.vy * TAC.TICK;
+            w.py = w.py + dyy;
+            if (w.vy > 0.0)
+            {
+                double ceil = w.CeilingY(w.px, w.pz, TAC.PLAYER_R, w.py - dyy);
+                if (w.py + TAC.PLAYER_H > ceil)
+                {
+                    w.py = ceil - TAC.PLAYER_H;
+                    w.vy = 0.0;
+                }
+            }
+            double g = w.GroundY(w.px, w.pz, w.onGround ? w.py + 0.01 : w.py, TAC.PLAYER_R);
+            if (w.py <= g && w.vy <= 0.0)
+            {
+                if (!w.onGround && w.vy < -6.0)
+                {
+                    w.AddNoise(w.px, w.pz, TAC.NOISE_LAND_R);
+                    w.events.landed = true;
+                }
+                w.py = g;
+                w.vy = 0.0;
+                w.onGround = true;
+            }
+            else if (w.py > g + 0.02)
+            {
+                w.onGround = false;
+            }
         }
 
         w.UpdateLock();
 
-        if (!w.fireGate && (input.b & 2) != 0 && w.fireCd == 0 && w.ammo != 0)
+        if (!w.fireGate && !w.climbing && (input.b & 2) != 0 && w.fireCd == 0 && w.ammo != 0)
         {
             if (w.py < -0.45) w.fireFlash = 8;
             double mfx = TacMath.SinQ(w.faceQ);

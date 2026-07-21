@@ -99,13 +99,13 @@ function validateTacStage(data) {
   // understands it, but new stages cannot place it.
   // 'jammer' retired 2026-07-18: the EMP veil is now projected by the switch itself.
   // 'scope' pickup retired 2026-07-18: the scope is standard equipment now.
-  const TAC_PART_TYPES = new Set(['rock', 'wall', 'platform', 'slope', 'barrel', 'mine', 'medkit', 'river', 'trench', 'switch', 'crackedWall', 'glass', 'door', 'intel', 'exit', 'lamp', 'searchlight', 'block', 'pit']);
+  const TAC_PART_TYPES = new Set(['rock', 'wall', 'platform', 'slope', 'barrel', 'mine', 'medkit', 'river', 'trench', 'switch', 'crackedWall', 'glass', 'door', 'ladder', 'intel', 'exit', 'lamp', 'searchlight', 'block', 'pit']);
   const parts = data.parts || [];
   if (!Array.isArray(parts) || parts.length > TAC_LIMITS.maxParts)
     errors.push(`parts must be an array of at most ${TAC_LIMITS.maxParts} objects.`);
   else parts.forEach((p, i) => {
     if (!p || typeof p !== 'object' || !TAC_PART_TYPES.has(p.type)) {
-      errors.push(`parts[${i}]: unknown type '${p && p.type}'. Valid: rock, wall, platform, slope, barrel, mine, medkit, river, trench, switch, crackedWall, glass, door, intel, exit, lamp, searchlight, block, pit.`);
+      errors.push(`parts[${i}]: unknown type '${p && p.type}'. Valid: rock, wall, platform, slope, barrel, mine, medkit, river, trench, switch, crackedWall, glass, door, ladder, intel, exit, lamp, searchlight, block, pit.`);
       return;
     }
     if (!inArena(p.x, p.z)) { errors.push(`parts[${i}]: (x, z) must lie inside the arena.`); return; }
@@ -131,7 +131,7 @@ function validateTacStage(data) {
     // and on slope + crackedWall (a raised staircase / a breachable wall on an
     // upper floor of a multi-story build). Default 0 = ground, so old stages are
     // untouched.
-    if (['block', 'slope', 'crackedWall', 'glass'].includes(p.type) && p.y0 !== undefined && !inRange(p.y0, 0, 20))
+    if (['block', 'slope', 'crackedWall', 'glass', 'ladder'].includes(p.type) && p.y0 !== undefined && !inRange(p.y0, 0, 20))
       errors.push(`parts[${i}]: y0 must be within [0, 20].`);
     const TINTABLE = new Set(['block', 'rock', 'wall', 'platform', 'crackedWall', 'slope', 'glass', 'door']);
     if (p.tint !== undefined) {
@@ -2076,6 +2076,16 @@ NIGHT OPS — "night": true at the top level of the stage JSON:
   hiding in. It is NOT destructible (blasts don't break it) — it's a mechanism,
   not cover. The open/close state is a deterministic function of positions, so
   replays stay exact.
+- { "type": "ladder", "x", "z", "w"?1, "d"?1, "h"?3, "y0"?0 }  A vertical climb
+  zone from y0 up to y0+h. Walk onto it and HOLD any move key to climb UP; let go
+  and you CLING at that height (no fall); JUMP to kick off. You cannot fire while
+  climbing (both hands on the rungs — you're exposed). It's a SPACE-SAVER: a
+  slope needs a long run of floor, a ladder rises straight up in ~1 m of
+  footprint, so it's the vertical link for tight towers and interiors. Place its
+  top flush with the platform edge it serves (y0 = the floor it starts on, h =
+  the gap to the deck above). Enemies do NOT climb ladders — they're a
+  player-only route. REACHABILITY counts a platform reachable if a ladder rises
+  to it, so a ladder is a valid sole route to an elevated intel/medkit/exit.
 - { "type": "barrel", "x", "z" }  Explosive barrel. One bullet ignites it: it
   rolls away from the shot for 3 seconds, then explodes (radius 2.6 m, kills
   any enemy, hurts the player, chain-ignites other barrels). Also standable.
