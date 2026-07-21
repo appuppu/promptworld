@@ -6,11 +6,12 @@
 //   GET  /api/stages/:id            -> stage JSON (draft fetch starts a test session)
 //   POST /api/stages/:id/clear     -> record a browser clear (editKey required)
 //   POST /api/stages/:id/publish   -> ONLY allowed after a clear is recorded
+//   DELETE /api/stages/:id         -> delete an OWNED, unpublished stage (editKey)
 //   GET  /api/stages                -> list of published stages
 //
 // MCP (used by anyone's Claude — Streamable HTTP, JSON-RPC 2.0):
-//   POST /mcp  with tools: get_toolbox, create_stage, stage_status,
-//              publish_stage, list_stages
+//   POST /mcp  with tools: get_toolbox, create_stage, update_stage, delete_stage,
+//              stage_status, publish_stage, list_stages
 //
 // Trust model: publish is gated on a recorded clear. Clears are checked
 // against real elapsed session time (and soon: replay certificates).
@@ -124,8 +125,12 @@ function validateTacStage(data) {
     }
     if (p.type === 'slope' && p.dir !== undefined && ![0, 1, 2, 3].includes(p.dir))
       errors.push(`parts[${i}]: slope dir must be 0 (+z), 1 (+x), 2 (-z) or 3 (-x).`);
-    if (p.type === 'block' && p.y0 !== undefined && !inRange(p.y0, 0, 20))
-      errors.push(`parts[${i}]: block y0 must be within [0, 20].`);
+    // y0 lifts a part's BOTTOM off the ground. Valid on block (freeform floats),
+    // and on slope + crackedWall (a raised staircase / a breachable wall on an
+    // upper floor of a multi-story build). Default 0 = ground, so old stages are
+    // untouched.
+    if (['block', 'slope', 'crackedWall'].includes(p.type) && p.y0 !== undefined && !inRange(p.y0, 0, 20))
+      errors.push(`parts[${i}]: y0 must be within [0, 20].`);
     const TINTABLE = new Set(['block', 'rock', 'wall', 'platform', 'crackedWall', 'slope']);
     if (p.tint !== undefined) {
       if (!TINTABLE.has(p.type)) errors.push(`parts[${i}]: tint is only valid on block/rock/wall/platform/crackedWall/slope.`);
@@ -724,6 +729,42 @@ function stageGame(stageOrJson) {
 
 // Update an EXISTING stage in place (same id/URL) instead of minting a new draft.
 // This is how a creator ITERATES on a course without burning the create quota.
+// Delete a stage the caller owns. Auth is the editKey (only the creator has it),
+// OR an admin token. POLICY (creator-decided 2026-07-21): only UNPUBLISHED stages
+// (status 'draft' or 'unverified') may be deleted — a PUBLISHED stage carries
+// other players' scores, votes and play records, so removing it would erase their
+// data; those must go through an admin. The delete is a hard row removal plus a
+// sweep of every child table keyed on this stage id (votes/hides/scores/plays),
+// so no orphan rows linger.
+async function opDeleteStage(env, id, editKey, request, creatorToken) {
+  const admin = isAdminToken(env, creatorToken);
+  const row = await opGetStage(env, id);
+  if (!row) return { status: 404, body: { error: 'No stage with that id.' } };
+  if (!admin && (!editKey || row.edit_key !== editKey)) {
+    return { status: 403, body: { error: 'Invalid editKey — only the creator can delete this stage.' } };
+  }
+  // Published stages are protected: they hold other players' records. Only an
+  // admin token may remove one.
+  if (!admin && row.status === 'published') {
+    return {
+      status: 409,
+      body: {
+        error: 'This stage is PUBLISHED and cannot be deleted — other players\' scores, votes and play records are attached to it. Only unpublished stages (draft/testbench) can be deleted by their creator.',
+        status_: row.status,
+      },
+    };
+  }
+  // Hard-remove the stage and every child row keyed on its id, so nothing orphans.
+  await env.promptworld_stages.batch([
+    env.promptworld_stages.prepare('DELETE FROM votes  WHERE stage_id = ?').bind(id),
+    env.promptworld_stages.prepare('DELETE FROM hides  WHERE stage_id = ?').bind(id),
+    env.promptworld_stages.prepare('DELETE FROM scores WHERE stage_id = ?').bind(id),
+    env.promptworld_stages.prepare('DELETE FROM plays  WHERE stage_id = ?').bind(id),
+    env.promptworld_stages.prepare('DELETE FROM stages WHERE id = ?').bind(id),
+  ]);
+  return { status: 200, body: { deleted: true, id, name: row.name } };
+}
+
 // Auth is the editKey (only the creator has it). Updating a PUBLISHED stage sends
 // it BACK to draft and discards its clear/ghost — the content changed, so it must
 // be re-cleared and re-published (keeps the clear record honest).
@@ -1366,6 +1407,17 @@ async function handleApi(request, env, url) {
     return json({ id: row.id, top: await opTopScores(env, row.id) });
   }
 
+  // DELETE /api/stages/:id — remove a stage the caller owns (REST twin of the
+  // delete_stage MCP tool). editKey in the body (or an admin token) authorizes it;
+  // only unpublished stages are deletable. No 'action' segment — the bare id path.
+  if (!action && method === 'DELETE') {
+    let dbody = {};
+    try { dbody = await request.json(); } catch { /* editKey may be absent for admins */ }
+    const creatorTok = adminReq ? request.headers.get('X-Admin-Token') : request.headers.get('X-Creator-Token');
+    const result = await opDeleteStage(env, id, String(dbody.editKey ?? ''), request, creatorTok);
+    return json(result.body, result.status);
+  }
+
   if (method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
   let body = {};
   try { body = await request.json(); } catch { /* handled below */ }
@@ -1652,6 +1704,10 @@ returns a creatorToken — remember it and pass it in later create_stage calls s
 stages share one identity. ALWAYS ASK the creator for their display name ("made by
 ___") before that first create_stage and pass it as creatorName; don't silently
 mint an anonymous one. Players (people who only play) never need any identity.
+SERVER-ENFORCED: without a creatorToken, create_stage REJECTS the call unless you
+pass creatorName AND creatorConfirmed: true (= the human explicitly approved that
+name). It also REJECTS any stage whose JSON lacks nameLoc {en,ja,zh,es,ko} and
+desc {en,ja,zh,es,ko} — write all five languages yourself before creating.
 
 WORKFLOW (follow exactly):
 0. ALWAYS ASK THE CREATOR THESE THINGS FIRST — do not decide any of them yourself:
@@ -1757,12 +1813,15 @@ PARTS (terrain)
   Corridor/maze builder. Blocks everything.
 - { "type": "platform", "x", "z", "w", "d", "h"? }  Standable raised ground,
   default h 2. Put snipers on these. Reach the top via a slope.
-- { "type": "slope", "x", "z", "w", "d", "h"?, "dir" }  STAIRCASE from ground
-  (low edge) up to h (high edge). dir = ascend direction: 0 +z, 1 +x, 2 -z,
-  3 -x. Discrete treads (risers ~0.3 m) — reliably walkable up AND down from
-  any angle, at normal speed. Climbing is still exposure: you rise into enemy
-  sightlines with every tread. Match h to the platform it leads to and place
-  it adjacent.
+- { "type": "slope", "x", "z", "w", "d", "h"?, "dir", "y0"?0 }  STAIRCASE from
+  y0 (low edge) up to y0+h (high edge). dir = ascend direction: 0 +z, 1 +x,
+  2 -z, 3 -x. Discrete treads (risers ~0.3 m) — reliably walkable up AND down
+  from any angle, at normal speed. Climbing is still exposure: you rise into
+  enemy sightlines with every tread. Match h to the platform it leads to and
+  place it adjacent. y0 > 0 raises the WHOLE flight off the ground so it climbs
+  between UPPER floors of a multi-story build (floor N to floor N+1) — it needs
+  its own route up to its base, exactly like a raised platform. Set y0 to the
+  floor it starts on and h to the gap to the next floor.
 GOALS — "goal" field at the top level of the stage JSON:
 - omitted or "eliminate": clear = kill every hostile (the classic mode).
 - "extract": clear = collect EVERY intel part, then stand in the exit zone.
@@ -1782,11 +1841,15 @@ FREEFORM BUILDING — parts "block" and "pit": build ANYTHING.
   FLOAT — players walk beneath, bullets fly under, jumps bump their head on
   the underside. Compose: towers (tall thin blocks), walls with arches (two
   pillars + a floating lintel), bridges over pits/rivers (long flat block at
-  y0), multi-story keeps (stacked blocks with 0.35-high blocks as stairs —
-  steps up to 0.4 m are climbed automatically, anything higher needs a jump
-  of ~1.2 m), islands (broad low block ringed by river parts). tint sets the
-  render color; pick a restrained palette — the game is near-monochrome, so
-  one or two accent tints read beautifully.
+  y0), multi-story keeps (a floor is a broad block at y0 = the storey height;
+  connect storeys with a RAISED SLOPE — slope with y0 set to the lower floor,
+  h = the gap to the next — the reliable indoor staircase; 0.35-high step
+  blocks still work for a single knee-high ledge but a full flight is one
+  raised slope, not a stack), islands (broad low block ringed by river parts).
+  Roof a room by resting a broad block at y0 = wall height; the interior stays
+  a play space (drones hover at 3 m so a roofed room denies them). tint sets
+  the render color; pick a restrained palette — the game is near-monochrome,
+  so one or two accent tints read beautifully.
 - { "type": "pit", "x", "z", "w", "d", "depth"?1.5 }  A dug-out hole of any
   depth (trench/river are fixed-depth presets of the same idea). Deeper than
   ~1.2 m cannot be jumped out of — provide a slope or stairs, or make falling
@@ -1873,13 +1936,15 @@ NIGHT OPS — "night": true at the top level of the stage JSON:
 - { "type": "exit", "x", "z", "w"?, "d"? }  The extraction zone (default 4x4).
   Standing in it with all intel collected clears the stage instantly, so
   gate it with danger — an exposed sprint, a gatling lane, a veil.
-- { "type": "crackedWall", "x", "z", "w", "d", "h"? }  Breachable wall,
+- { "type": "crackedWall", "x", "z", "w", "d", "h"?, "y0"?0 }  Breachable wall,
   default h 3. Rifle and scope fire just thud off it — it falls ONLY to
   explosives (grenade, bomber bomb, barrel, mine, kamikaze drone) or to
   sustained fire from an ENGAGED gatling (~40 rounds chew through; idle
   suppression sweeps never demolish geometry). Razed walls open new
   routes AND new sightlines, for both sides. Use it to gate shortcuts behind
-  an explosive spend, or as cover with an expiry date in gatling lanes.
+  an explosive spend, or as cover with an expiry date in gatling lanes. y0 > 0
+  raises it off the ground (a breachable section on an upper floor, or a
+  floating breakable lintel over a doorway).
 - { "type": "barrel", "x", "z" }  Explosive barrel. One bullet ignites it: it
   rolls away from the shot for 3 seconds, then explodes (radius 2.6 m, kills
   any enemy, hurts the player, chain-ignites other barrels). Also standable.
@@ -2013,9 +2078,12 @@ WORKFLOW (auto-publish on first clear — no separate publish step)
    - desc {en,ja,zh,es,ko}: a 1-2 sentence promo blurb per language (1-220 chars)
      — what makes this arena fun. Ask the human if they want to write it or leave
      it to you; either way YOU produce all five languages.
-   Put BOTH inside the stage JSON. There is NO publish step to add them later, so
-   a stage created without them shows up untranslated with no blurb on every
-   client (web + app). This is mandatory, not optional.
+   Put BOTH inside the stage JSON. SERVER-ENFORCED: create_stage REJECTS a stage
+   missing any of the five languages in either field — the draft is not created.
+1b. CONFIRM THE CREATOR before creating: reuse the stored creatorToken when you
+   have one. Minting a NEW identity (no token) requires asking the human for
+   their display name and passing creatorName + creatorConfirmed: true — the
+   server rejects the call otherwise. Never invent the name or the confirmation.
 2. create_stage with the arena JSON (game:"tac") INCLUDING nameLoc + desc. The
    stage goes LIVE on the testbench (検証待ち) shelf immediately: anyone can find,
    search, and play it in the app and web. You get an id, editKey (SAVE IT — it's
@@ -2045,13 +2113,14 @@ const MCP_TOOLS = [
   {
     name: 'create_stage',
     title: 'Create a stage',
-    description: 'Validates and saves a new stage. It goes LIVE on the testbench (検証待ち) shelf immediately — anyone can play it in the app and web, and the FIRST verified clear auto-publishes it (no separate publish step). Returns the stage id, an editKey (keep it — needed to edit later), and a testUrl. IMPORTANT: put localized names (nameLoc) and a localized description (desc) INSIDE the stage JSON at creation — there is no publish step to add them later, so a stage created without them shows up untranslated with no blurb.',
+    description: 'Validates and saves a new stage. It goes LIVE on the testbench (検証待ち) shelf immediately — anyone can play it in the app and web, and the FIRST verified clear auto-publishes it (no separate publish step). Returns the stage id, an editKey (keep it — needed to edit later), and a testUrl. SERVER-ENFORCED PRECONDITIONS (creation is REJECTED otherwise): (1) the stage JSON must include nameLoc and desc localized in ALL of en/ja/zh/es/ko; (2) the creator must be confirmed — pass an existing creatorToken, or ask the human for their display name and pass creatorName + creatorConfirmed: true. Do both BEFORE calling.',
     inputSchema: {
       type: 'object',
       properties: {
-        stage: { type: 'object', description: 'The stage JSON document (see get_toolbox for the schema). MUST include: "nameLoc" {en,ja,zh,es,ko} localized stage names (each 1-60 chars) and "desc" {en,ja,zh,es,ko} a 1-2 sentence promo blurb per language (each 1-220 chars). YOU are the translator — always produce all five languages yourself. Without these the stage appears untranslated and description-less on every client.' },
-        creatorToken: { type: 'string', description: 'Your creator identity token from a previous create_stage response. Omit on first use — one is minted automatically.' },
-        creatorName: { type: 'string', description: 'The creator\'s chosen display name — the "made by ___" credit (max 30 chars). ALWAYS ask the human for this before the first create_stage; only fall back to "anonymous" if they decline. Used only when creatorToken is omitted (i.e. minting a new identity).' },
+        stage: { type: 'object', description: 'The stage JSON document (see get_toolbox for the schema). MUST include: "nameLoc" {en,ja,zh,es,ko} localized stage names (each 1-60 chars) and "desc" {en,ja,zh,es,ko} a 1-2 sentence promo blurb per language (each 1-220 chars). YOU are the translator — always produce all five languages yourself. SERVER-ENFORCED: creation is rejected if any of the five languages is missing from either field.' },
+        creatorToken: { type: 'string', description: 'Your creator identity token from a previous create_stage response. Omit on first use — one is minted automatically (which then REQUIRES creatorName + creatorConfirmed).' },
+        creatorName: { type: 'string', description: 'The creator\'s chosen display name — the "made by ___" credit (max 30 chars). REQUIRED when creatorToken is omitted (minting a new identity): ALWAYS ask the human for it first; only fall back to "anonymous" if they explicitly decline.' },
+        creatorConfirmed: { type: 'boolean', description: 'REQUIRED (true) when creatorToken is omitted: asserts you showed the human the creator name that will be credited and they explicitly approved it. Never set true without actually asking them.' },
       },
       required: ['stage'],
     },
@@ -2069,6 +2138,20 @@ const MCP_TOOLS = [
         creatorToken: { type: 'string', description: 'Your creator identity token (optional). Pass it so your edits are attributed and, for the operator, exempt from rate limits.' },
       },
       required: ['id', 'editKey', 'stage'],
+    },
+  },
+  {
+    name: 'delete_stage',
+    title: 'Delete a stage you created',
+    description: 'Permanently deletes a stage you created — use it to remove a draft/testbench arena you no longer want on the shelf. Requires the editKey (only the creator has it). SERVER-ENFORCED LIMIT: only UNPUBLISHED stages (still on the 検証待ち testbench, no verified clear yet) can be deleted this way; a PUBLISHED stage is refused (409) because other players\' scores, votes and play records are attached to it — deleting it would erase their data. Deletion is irreversible; confirm with the human before calling.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The id of the stage to delete.' },
+        editKey: { type: 'string', description: 'The editKey from when the stage was created (only the creator has it). Required.' },
+        creatorToken: { type: 'string', description: 'Your creator identity token (optional). The operator admin token also authorizes deletion.' },
+      },
+      required: ['id', 'editKey'],
     },
   },
   {
@@ -2106,6 +2189,36 @@ const MCP_TOOLS = [
   },
 ];
 
+// MCP creation gate (user rule 2026-07-21): a course must be COMPLETE before even
+// its draft/testbench copy exists — localized name + description in all five
+// languages, and the creator attribution explicitly confirmed by the human.
+// Runs only on the MCP (AI-agent) path; humans creating via the web forms are
+// unaffected. A reused creatorToken counts as an already-confirmed identity, so
+// established creators (and the daily automation) keep working unprompted.
+const MCP_LOC_LANGS = ['en', 'ja', 'zh', 'es', 'ko'];
+function mcpCreateGate(stage, args) {
+  const problems = [];
+  const checkLoc = (obj, field, maxLen, what) => {
+    if (typeof obj !== 'object' || obj === null) {
+      problems.push(`stage.${field} is missing: provide ${what} as {en,ja,zh,es,ko} — you are the translator, write all five languages yourself.`);
+      return;
+    }
+    for (const l of MCP_LOC_LANGS) {
+      const v = obj[l];
+      if (typeof v !== 'string' || v.trim().length < 1) problems.push(`stage.${field}.${l} is missing or empty.`);
+      else if (v.length > maxLen) problems.push(`stage.${field}.${l} exceeds ${maxLen} characters.`);
+    }
+  };
+  checkLoc(stage.nameLoc, 'nameLoc', 60, 'the localized stage name');
+  checkLoc(stage.desc, 'desc', 220, 'a 1-2 sentence promo blurb');
+  if (!args.creatorToken) {
+    const cn = typeof args.creatorName === 'string' ? args.creatorName.trim() : '';
+    if (cn.length < 1) problems.push('creatorName is missing: ask the human creator for their display name (the "made by ___" credit) before creating.');
+    if (args.creatorConfirmed !== true) problems.push('creatorConfirmed is not true: show the human the creator name that will be credited, get their explicit OK, then retry with creatorConfirmed: true. Never set it without actually asking them.');
+  }
+  return problems;
+}
+
 async function mcpCallTool(env, origin, name, args, request) {
   switch (name) {
     case 'get_toolbox':
@@ -2114,6 +2227,17 @@ async function mcpCallTool(env, origin, name, args, request) {
     case 'create_stage': {
       if (!args || typeof args.stage !== 'object' || args.stage === null) {
         return { text: 'Error: pass the stage JSON document as the "stage" argument.', isError: true };
+      }
+      const gate = mcpCreateGate(args.stage, args);
+      if (gate.length > 0) {
+        return {
+          text: JSON.stringify({
+            error: 'Creation blocked — a course must be complete before its draft is created. Nothing was created.',
+            problems: gate,
+            howToProceed: 'Fix every problem, then call create_stage again: (1) put nameLoc and desc INSIDE the stage JSON, each covering ALL of en/ja/zh/es/ko; (2) confirm the creator — pass an existing creatorToken, or ask the human for their display name and retry with creatorName + creatorConfirmed: true.',
+          }, null, 2),
+          isError: true,
+        };
       }
       const result = await opCreateStage(env, origin, args.stage, request, args.creatorToken, args.creatorName);
       return { text: JSON.stringify(result.body, null, 2), isError: result.status >= 400 };
@@ -2124,6 +2248,11 @@ async function mcpCallTool(env, origin, name, args, request) {
         return { text: 'Error: pass the replacement stage JSON as the "stage" argument.', isError: true };
       }
       const result = await opUpdateStage(env, origin, String(args.id ?? ''), String(args.editKey ?? ''), args.stage, request, args.creatorToken);
+      return { text: JSON.stringify(result.body, null, 2), isError: result.status >= 400 };
+    }
+
+    case 'delete_stage': {
+      const result = await opDeleteStage(env, String(args?.id ?? ''), String(args?.editKey ?? ''), request, args?.creatorToken);
       return { text: JSON.stringify(result.body, null, 2), isError: result.status >= 400 };
     }
 

@@ -262,9 +262,10 @@
           <caption>Arguments</caption>
           <thead><tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td class="pn">stage</td><td class="pt">object</td><td><span class="req">required</span></td><td>The full stage JSON — playerStart, goal, parts, and optional bg / music / hideGhost. See the toolbox schema.</td></tr>
-            <tr><td class="pn">creatorToken</td><td class="pt">string</td><td><span class="opt">optional</span></td><td>Your identity token from a previous create. Omit on first use — one is minted and returned.</td></tr>
-            <tr><td class="pn">creatorName</td><td class="pt">string</td><td><span class="opt">optional</span></td><td>The "made by ___" credit (≤30 chars). Always asked of the human on first use; only used when a new identity is minted.</td></tr>
+            <tr><td class="pn">stage</td><td class="pt">object</td><td><span class="req">required</span></td><td>The full stage JSON — playerStart, goal, parts, and optional bg / music / hideGhost. See the toolbox schema. Must include <code class="inline">nameLoc</code> and <code class="inline">desc</code> localized in all of en/ja/zh/es/ko — creation is rejected without them.</td></tr>
+            <tr><td class="pn">creatorToken</td><td class="pt">string</td><td><span class="opt">optional</span></td><td>Your identity token from a previous create. Omit on first use — one is minted and returned (which then requires creatorName + creatorConfirmed).</td></tr>
+            <tr><td class="pn">creatorName</td><td class="pt">string</td><td><span class="req">required*</span></td><td>The "made by ___" credit (≤30 chars). *Required when no creatorToken is passed: always ask the human for it before creating.</td></tr>
+            <tr><td class="pn">creatorConfirmed</td><td class="pt">boolean</td><td><span class="req">required*</span></td><td>*Required (true) when no creatorToken is passed: asserts the human saw and explicitly approved the creator name that will be credited.</td></tr>
           </tbody>
         </table>
         <p class="returns"><b>Returns</b> — <code class="inline">id</code>, <code class="inline">editKey</code>, <code class="inline">testUrl</code>, <code class="inline">playUrl</code>, <code class="inline">status: "draft"</code>, and on first use a <code class="inline">creatorToken</code> to reuse.</p>
@@ -278,9 +279,12 @@
       <span class="k">"timeLimit"</span>: <span class="n">60</span>,
       <span class="k">"playerStart"</span>: { <span class="k">"x"</span>: <span class="n">-12</span>, <span class="k">"y"</span>: <span class="n">-2.5</span> },
       <span class="k">"goal"</span>: { <span class="k">"x"</span>: <span class="n">20</span>, <span class="k">"y"</span>: <span class="n">-2.3</span>, <span class="k">"w"</span>: <span class="n">1.4</span>, <span class="k">"h"</span>: <span class="n">2.6</span> },
-      <span class="k">"parts"</span>: [ { <span class="k">"type"</span>: <span class="s">"solid"</span>, <span class="k">"x"</span>: <span class="n">0</span>, <span class="k">"y"</span>: <span class="n">-4</span>, <span class="k">"w"</span>: <span class="n">40</span>, <span class="k">"h"</span>: <span class="n">1</span> } ]
+      <span class="k">"parts"</span>: [ { <span class="k">"type"</span>: <span class="s">"solid"</span>, <span class="k">"x"</span>: <span class="n">0</span>, <span class="k">"y"</span>: <span class="n">-4</span>, <span class="k">"w"</span>: <span class="n">40</span>, <span class="k">"h"</span>: <span class="n">1</span> } ],
+      <span class="k">"nameLoc"</span>: { <span class="k">"en"</span>: <span class="s">"Split Second"</span>, <span class="k">"ja"</span>: <span class="s">"一瞬の隙"</span>, <span class="k">"zh"</span>: <span class="s">"千钧一发"</span>, <span class="k">"es"</span>: <span class="s">"Fracción de segundo"</span>, <span class="k">"ko"</span>: <span class="s">"찰나의 순간"</span> },
+      <span class="k">"desc"</span>: { <span class="k">"en"</span>: <span class="s">"One jump, one chance."</span>, <span class="k">"ja"</span>: <span class="s">"一度のジャンプに全てを懸けろ。"</span>, <span class="k">"zh"</span>: <span class="s">"一跳定胜负。"</span>, <span class="k">"es"</span>: <span class="s">"Un salto, una oportunidad."</span>, <span class="k">"ko"</span>: <span class="s">"단 한 번의 점프."</span> }
     },
-    <span class="k">"creatorName"</span>: <span class="s">"Aki"</span>
+    <span class="k">"creatorName"</span>: <span class="s">"Aki"</span>,
+    <span class="k">"creatorConfirmed"</span>: <span class="v">true</span>
   }
 }</pre></div>
       </div>
@@ -305,6 +309,27 @@
           </tbody>
         </table>
         <div class="note warn"><b>Updating a published stage sends it back to draft.</b> The content changed, so its old clear and ghost are discarded — it must be re-cleared and re-published. This keeps every published clear record honest.</div>
+      </div>
+    </div>
+
+    <!-- delete_stage -->
+    <div class="tool">
+      <div class="head">
+        <span class="name">delete_stage</span>
+        <span class="tag write">write</span>
+        <p class="summary">Permanently remove a stage you created — for pulling a draft or testbench arena you no longer want on the shelf. Requires the editKey.</p>
+      </div>
+      <div class="body">
+        <table class="params">
+          <caption>Arguments</caption>
+          <thead><tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="pn">id</td><td class="pt">string</td><td><span class="req">required</span></td><td>The stage to delete.</td></tr>
+            <tr><td class="pn">editKey</td><td class="pt">string</td><td><span class="req">required</span></td><td>The editKey from create — only the creator holds it.</td></tr>
+            <tr><td class="pn">creatorToken</td><td class="pt">string</td><td><span class="opt">optional</span></td><td>The operator admin token also authorizes deletion.</td></tr>
+          </tbody>
+        </table>
+        <div class="note warn"><b>Only unpublished stages can be deleted.</b> A published stage carries other players' scores, votes and play records, so it is refused (409) — removing it would erase their data. Deletion is irreversible; the AI confirms with the human first.</div>
       </div>
     </div>
 
