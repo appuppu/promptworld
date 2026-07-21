@@ -20,6 +20,10 @@ public class TacGame : MonoBehaviour
 
     // camera / input state
     float camYaw, camPitch = -0.12f;
+    // smoothed follow distance: indoors the camera pulls in so walls/ceilings never
+    // sit between it and the player. Pull-in is instant (no clipping); easing back
+    // out is slow so leaving a doorway doesn't pop the view.
+    float camDistS = 5.2f;
     // scope magnification (render-side only — FOV never touches the sim/hit math).
     // Lower FOV = more zoom. Two-finger pinch drives it while scoped.
     const float ScopeFovMin = 7f;    // max zoom-in
@@ -76,6 +80,14 @@ public class TacGame : MonoBehaviour
     MoBody snapPrevPilot, snapCurPilot;         // pilot drone
     MoBody[] snapPrevE = new MoBody[0], snapCurE = new MoBody[0]; // enemies
     bool snapReady;   // false until the first tick pair exists (else lerp has no prev)
+    // The frame that starts a run does heavy one-off work (world build, HUD,
+    // StartMusic), so the NEXT frame's Time.deltaTime spikes — up to the 0.333 s
+    // maximumDeltaTime clamp, i.e. ~16 ticks of accumulator in one frame. With
+    // the 5-ticks-per-frame cap that backlog takes several frames to drain, and
+    // during the drain the sim replays PAST ticks (the run "freezes" until real
+    // time catches up — the reported "wait a bit and it unfreezes"). We swallow
+    // the first play frame's dt so the sim starts from a clean accumulator.
+    bool primePlayFrame;
     readonly List<Transform> searchPivots = new List<Transform>();
     readonly List<Renderer> waterViews = new List<Renderer>();
 
@@ -716,6 +728,7 @@ public class TacGame : MonoBehaviour
     void ShowList()
     {
         mode = Mode.List;
+        loadSeq++; // back on the list: any in-flight stage fetch is obsolete
         // Leaving any deep-link preview: back to normal published-course flow.
         previewDraft = false;
         if (uiDirty) { uiDirty = false; BuildUiRefresh(); return; }
@@ -1261,11 +1274,33 @@ public class TacGame : MonoBehaviour
         ShowList();
     }
 
+    // Selection token: every navigation (card tap, prev/next, play, back-to-list)
+    // bumps it, and an in-flight stage fetch only opens its briefing if it is
+    // still the LATEST selection. Without this, rapid taps raced: whichever
+    // response arrived last would open ITS briefing — a different course than
+    // the one the player last picked — or even yank a running game back to a
+    // briefing when a slow response landed mid-play.
+    int loadSeq;
+
     IEnumerator LoadAndStart(string sid, string nm)
     {
+        int my = ++loadSeq;
+        Toast(TacLoc.T("loading"), 15f);
         string got = null;
         yield return TacNet.GetJson("/api/stages/" + sid, (j) => got = j, null);
+        if (my != loadSeq) yield break; // stale: the player moved on
         if (got != null) { stageCache[sid] = got; StartStage(got, sid, nm); }
+        else
+        {
+            Toast(TacLoc.T("offline"), 3f); // a silent dead tap reads as a freeze
+            // prev/next advanced briefIndex optimistically; the fetch failed, so
+            // point it back at the course still on screen or ▶ would skip one
+            if (mode == Mode.Brief)
+            {
+                int cur = briefList.FindIndex(e => e.sid == stageId);
+                if (cur >= 0) briefIndex = cur;
+            }
+        }
     }
 
     // ------------------------------------------------------------- lifecycle --
@@ -1274,14 +1309,20 @@ public class TacGame : MonoBehaviour
         try { StartStageInner(json, sid, nm); }
         catch (System.Exception ex)
         {
-            msgText.text = "ERR " + ex.GetType().Name + ": " + ex.Message;
-            msgUntil = Time.time + 8f;
             Debug.LogException(ex);
+            // msgText lives under the HUD, which is hidden on the list screen —
+            // an error there was invisible and left a half-built briefing with
+            // no buttons (the "app froze" report). Toast renders on any screen;
+            // then restore a working list so the player is never stranded.
+            Toast("ERR " + ex.GetType().Name + ": " + ex.Message, 8f);
+            try { ShowList(); } catch (System.Exception) { }
         }
     }
 
     void StartStageInner(string json, string sid, string nm)
     {
+        loadSeq++;       // this briefing is now the truth — drop in-flight fetches
+        toastUntil = 0f; // dismiss the LOADING toast
         attract = false; // leaving the home diorama: sounds/HUD reactions resume
         stageJson = json;
         stageId = sid;
@@ -1383,11 +1424,13 @@ public class TacGame : MonoBehaviour
 
     void BeginPlayInner()
     {
+        loadSeq++; // a late stage fetch must never yank a running game to a briefing
         // the brief screen may have prebuilt the pristine (never-stepped) world
         // for its 3D vista — reuse it; otherwise build fresh
         if (world == null || world.tick != 0) BuildWorldView();
         recs.Clear();
         acc = 0;
+        primePlayFrame = true; // swallow the next frame's dt spike (see field comment)
         // seed the snapshot with the spawn pose; snapReady flips true after the
         // first real tick, so until then views render straight at the current pose
         snapReady = false; snapPrevP = default(MoBody); snapCurP = default(MoBody);
@@ -1981,6 +2024,10 @@ public class TacGame : MonoBehaviour
         }
         if (mode != Mode.Play || world == null) return;
         ReadTouches();
+        // First frame of the run: its dt covers the heavy start work, not real
+        // play time — starting the sim from it would backlog the accumulator and
+        // stall input. Consume the spike once and begin cleanly next frame.
+        if (primePlayFrame) { primePlayFrame = false; UpdateViews(); UpdateCamera(); UpdateHud(); return; }
         acc += Time.deltaTime;
         int steps = 0;
         while (acc >= TAC.TICK && steps < 5)
@@ -2913,8 +2960,24 @@ public class TacGame : MonoBehaviour
             dist = 5.2f;
         }
         var dir = new Vector3(Mathf.Sin(camYaw) * Mathf.Cos(camPitch), Mathf.Sin(camPitch), Mathf.Cos(camYaw) * Mathf.Cos(camPitch));
-        var eye = pivot - dir * dist;
-        float minY = (float)world.GroundY(eye.x, eye.z, 1000.0, 0.2) + 0.3f;
+        // camera collision: cast pivot → desired eye against the solid boxes and stop
+        // short of the first wall/ceiling, so indoor stages keep the player in view
+        var dEye = pivot - dir * dist;
+        double camT = 2.0;
+        for (int cbi = 0; cbi < w.boxes.Count; cbi++)
+        {
+            var cb = w.boxes[cbi];
+            if (!cb.alive) continue;
+            double t = TacWorld.SegBoxT(pivot.x, pivot.y, pivot.z, dEye.x, dEye.y, dEye.z, cb);
+            if (t < camT) camT = t;
+        }
+        float wantDist = camT <= 1.0 ? Mathf.Max(0.5f, dist * (float)camT - 0.35f) : dist;
+        if (wantDist < camDistS) camDistS = wantDist;
+        else camDistS += (wantDist - camDistS) * Mathf.Min(1f, Time.deltaTime * 4f);
+        var eye = pivot - dir * camDistS;
+        // floor clamp referenced to the PLAYER's height, not the sky: under a roof,
+        // refY=1000 made the roof count as "ground" and warped the camera on top of it
+        float minY = (float)world.GroundY(eye.x, eye.z, pivot.y, 0.2) + 0.3f;
         if (eye.y < minY) eye.y = minY;
         cam.transform.position = Vector3.Lerp(cam.transform.position, eye, SmAlpha(0.05f));
         cam.transform.rotation = Quaternion.LookRotation(pivot + new Vector3(0, 0.0f, 0) - cam.transform.position, Vector3.up);
