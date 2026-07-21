@@ -374,6 +374,7 @@ function TacWorld(stage) {
   w.px = tacQ(stage.playerStart.x);
   w.pz = tacQ(stage.playerStart.z);
   w.py = 0.0;
+  w.playerStartY = (stage.playerStart.y === undefined || stage.playerStart.y === null) ? NaN : tacQ(stage.playerStart.y);
   w.vy = 0.0;
   var yawDeg = tacQ(stage.playerStart.yaw || 0);
   w.yawQ = Math.floor(yawDeg * 182.04444444444445) & 65535; // deg -> units
@@ -534,10 +535,17 @@ function TacWorld(stage) {
   }
   w.buildGrid();
   // settle entities onto terrain
-  w.py = w.groundY(w.px, w.pz, 1000.0, TAC.PLAYER_R);
+  // playerStart.y (optional): the floor the player spawns on. Like enemy spawnY,
+  // it settles to the surface at that height instead of the tallest — needed to
+  // start a player INSIDE a roofed room. Omitted (NaN) keeps the old behavior.
+  w.py = w.groundY(w.px, w.pz, isNaN(w.playerStartY) ? 1000.0 : w.playerStartY, TAC.PLAYER_R);
   for (var k = 0; k < w.enemies.length; k++) {
     var en = w.enemies[k];
-    en.y = w.groundY(en.x, en.z, 1000.0, en.r);
+    // With spawnY set, resolve the floor at THAT height (groundY returns the
+    // tallest surface not above refY+stepUp, so refY=spawnY lands on the floor
+    // the author meant, never the roof above it). Without it, refY=1000 keeps
+    // the original "tallest surface" behavior — existing stages unchanged.
+    en.y = w.groundY(en.x, en.z, isNaN(en.spawnY) ? 1000.0 : en.spawnY, en.r);
     if (en.type === 3) en.y = en.y + TAC.DRONE_FLY_Y; // drones hover above their spawn ground
     en.homeY = en.y;
   }
@@ -639,6 +647,12 @@ TacWorld.prototype.addEnemy = function (spec) {
   var en = {
     type: type,                     // 0 soldier, 1 gatling, 2 sniper, 3 drone, 4 operator, 5 bomber, 6 shield, 7 apc
     x: tacQ(spec.x), z: tacQ(spec.z), y: 0.0, homeY: 0.0,
+    // spawnY = the floor this unit starts on for a MULTI-STORY build. When set,
+    // the settle step snaps to the surface nearest this height instead of the
+    // tallest one under (x,z) — otherwise a unit placed on floor 1 gets sucked
+    // up to the roof. NaN sentinel = not specified (default: tallest surface,
+    // the pre-existing behavior, so old stages are byte-identical).
+    spawnY: (spec.y === undefined || spec.y === null) ? NaN : tacQ(spec.y),
     r: type === 1 ? TAC.GATLING_R : (type === 2 ? TAC.SNIPER_R : (type === 3 ? TAC.DRONE_R : (type === 4 ? TAC.OPERATOR_R : (type === 5 ? TAC.BOMBER_R : (type === 6 ? TAC.SHIELD_R : (type === 7 ? TAC.APC_R : TAC.SOLDIER_R)))))),
     h: type === 1 ? TAC.GATLING_H : (type === 2 ? TAC.SNIPER_H : (type === 3 ? TAC.DRONE_H : (type === 4 ? TAC.OPERATOR_H : (type === 5 ? TAC.BOMBER_H : (type === 6 ? TAC.SHIELD_H : (type === 7 ? TAC.APC_H : TAC.SOLDIER_H)))))),
     yawQ: yawQ, baseYawQ: yawQ,

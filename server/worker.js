@@ -92,6 +92,8 @@ function validateTacStage(data) {
     errors.push('playerStart {x, z} is required and must lie inside the arena.');
   if (data.playerStart && data.playerStart.yaw !== undefined && !inRange(data.playerStart.yaw, 0, 360))
     errors.push('playerStart.yaw, if set, must be within [0, 360] degrees.');
+  if (data.playerStart && data.playerStart.y !== undefined && !inRange(data.playerStart.y, 0, 12))
+    errors.push('playerStart.y, if set, must be within [0, 12] (the floor height to start on, for a roofed multi-story build).');
 
   // 'rockslide' was retired 2026-07-18 (creator feedback) — the sim still
   // understands it, but new stages cannot place it.
@@ -163,6 +165,10 @@ function validateTacStage(data) {
       errors.push(`enemies[${i}]: entrench, if set, must be true or false.`);
     if (e.entrench && e.type !== 'soldier')
       errors.push(`enemies[${i}]: entrench is only valid on soldiers.`);
+    // y (optional): the floor the unit spawns on in a multi-story build. Range
+    // matches part heights; the unit settles to the surface at that height.
+    if (e.y !== undefined && !inRange(e.y, 0, 12))
+      errors.push(`enemies[${i}]: y, if set, must be within [0, 12] (the floor height to spawn on).`);
   });
 
   // Optional localized promo copy: desc {en,ja,zh,es,ko} and nameLoc — written
@@ -1798,7 +1804,9 @@ STAGE JSON SHAPE
                                         // walked up WITHOUT jumping. 0.55 lets knee-high steps
                                         // (kerbs, low decks) be climbed on foot.
   "arena": { "w": 60, "d": 90 },        // meters, each [10, 200]. x in [0,w], z in [0,d]
-  "playerStart": { "x": 30, "z": 5, "yaw": 0 },  // yaw degrees: 0 faces +z (into the arena)
+  "playerStart": { "x": 30, "z": 5, "yaw": 0 },  // yaw degrees: 0 faces +z (into the arena).
+                                        // optional "y": the floor height to start on inside a
+                                        // roofed multi-story build (default: tallest surface).
   "parts": [ ... up to 400 ... ],
   "enemies": [ ... 1 to 100 ... ]
 }
@@ -1978,7 +1986,9 @@ NIGHT OPS — "night": true at the top level of the stage JSON:
 Part sizes w/d in [0.3, 60], heights h in [0.3, 12].
 
 ENEMIES (1-100; clearing the stage = killing all of them)
-- { "type": "soldier", "x", "z", "yaw", "patrolX"?, "patrolZ"?, "group"?, "hp"? }
+Every enemy also takes an optional "y" (the floor to spawn on — see FLOOR
+PLACEMENT below the list; omit on open ground).
+- { "type": "soldier", "x", "z", "yaw", "y"?, "patrolX"?, "patrolZ"?, "group"?, "hp"? }
   Rifle infantry (2 hp) — the standard enemy. Patrols between its spawn and
   (patrolX,patrolZ) if given, investigates noises. When it spots the player it
   closes to ~20 m, stands, and fires single aimed shots (visible 22 m/s
@@ -2023,6 +2033,18 @@ ENEMIES (1-100; clearing the stage = killing all of them)
   while piloting. Place operators as keys that unlock assaults on fortified
   spots (platform snipers, gatling nests) — one per stronghold is good pacing.
 yaw degrees: which way the enemy faces (0 = +z, 90 = +x, 180 = -z, 270 = -x).
+FLOOR PLACEMENT ("y" on any enemy, optional): the height of the FLOOR the unit
+  starts on, for a MULTI-STORY build. Omit it and the unit spawns on the tallest
+  surface at its (x,z) — which, INSIDE a roofed building, is the ROOF: every unit
+  gets sucked to the top and the rooms below sit empty. Set y to the floor's
+  height (ground floor y:0, a second storey at a y0:3 block => y:3, etc.) and the
+  unit settles on the floor at that level instead. A drone with y set hovers ~3 m
+  above THAT floor (so y:3 in a tall room puts it near a 6 m ceiling — give it
+  headroom or it clips the roof; a roofed room shorter than ~3 m has no room for
+  a drone at all). The same "y" works on playerStart to begin a run INSIDE a
+  roofed room. Only meaningful with roofed/stacked geometry; on open ground omit
+  it. Reachability still applies to the player: an enemy on floor 3 is fine even
+  if unreachable, but every intel/medkit/exit must have a foot route.
 
 STEALTH RULES (how detection works)
 - Vision cone: 80-degree cone, 20 m (sniper: 60 deg, 60 m). Blocked by rocks/

@@ -221,6 +221,7 @@ public class TacEnemy
 {
     public int type;
     public double x, z, y, homeY, r, h, gauge, tx, tz, homeX, homeZ, patX, patZ;
+    public double spawnY; // NaN unless specified: the floor this unit settles on (multi-story)
     public int yawQ, baseYawQ, hp, group, state, pauseT, attackCd, bombCd, rifleCd, aimT, suppressT, fireFlash, cycleT, warnT, shieldStagT;
     public bool alive, hasPatrol, patToB, crouched, holdTrench, seesPlayer, diving, crashing, entrench, seekCover, dugIn, corpseSpotted;
     public int idx;
@@ -269,7 +270,7 @@ public class TacWorld
 {
     public double arenaW, arenaD, timeLimit, stepUp;
     public int maxTicks, tick;
-    public double px, pz, py, vy;
+    public double px, pz, py, vy, playerStartY;
     public int yawQ, faceQ, pitchQ;
     public bool onGround;
     public int moveT, fireCd, hp, maxHp, ammo, hurtCd, lockTarget, lockKind, droneUses;
@@ -331,6 +332,9 @@ public class TacWorld
         w.px = Q(ps.Num("x"));
         w.pz = Q(ps.Num("z"));
         w.py = 0.0;
+        // playerStart.y (optional): the floor the player spawns on for a roofed
+        // multi-story build. NaN = unspecified (default: tallest surface).
+        w.playerStartY = ps.Has("y") ? Q(ps.Num("y")) : double.NaN;
         w.vy = 0.0;
         double yawDeg = Q(ps.Num("yaw", 0.0));
         w.yawQ = (int)Math.Floor(yawDeg * 182.04444444444445) & 65535;
@@ -477,11 +481,14 @@ public class TacWorld
         }
 
         w.BuildGrid();
-        w.py = w.GroundY(w.px, w.pz, 1000.0, TAC.PLAYER_R);
+        w.py = w.GroundY(w.px, w.pz, double.IsNaN(w.playerStartY) ? 1000.0 : w.playerStartY, TAC.PLAYER_R);
         for (int k = 0; k < w.enemies.Count; k++)
         {
             var en = w.enemies[k];
-            en.y = w.GroundY(en.x, en.z, 1000.0, en.r);
+            // spawnY set -> settle on the floor at that height (GroundY returns the
+            // tallest surface not above refY+stepUp), never the roof above it.
+            // NaN -> refY 1000 keeps the original tallest-surface behavior.
+            en.y = w.GroundY(en.x, en.z, double.IsNaN(en.spawnY) ? 1000.0 : en.spawnY, en.r);
             if (en.type == 3) en.y = en.y + TAC.DRONE_FLY_Y;
             en.homeY = en.y;
         }
@@ -599,6 +606,7 @@ public class TacWorld
         {
             type = type,
             x = Q(spec.Num("x")), z = Q(spec.Num("z")), y = 0.0, homeY = 0.0,
+            spawnY = spec.Has("y") ? Q(spec.Num("y")) : double.NaN,
             r = type == 1 ? TAC.GATLING_R : (type == 2 ? TAC.SNIPER_R : (type == 3 ? TAC.DRONE_R : (type == 4 ? TAC.OPERATOR_R : (type == 5 ? TAC.BOMBER_R : (type == 6 ? TAC.SHIELD_R : (type == 7 ? TAC.APC_R : TAC.SOLDIER_R)))))),
             h = type == 1 ? TAC.GATLING_H : (type == 2 ? TAC.SNIPER_H : (type == 3 ? TAC.DRONE_H : (type == 4 ? TAC.OPERATOR_H : (type == 5 ? TAC.BOMBER_H : (type == 6 ? TAC.SHIELD_H : (type == 7 ? TAC.APC_H : TAC.SOLDIER_H)))))),
             yawQ = yawQ, baseYawQ = yawQ,
