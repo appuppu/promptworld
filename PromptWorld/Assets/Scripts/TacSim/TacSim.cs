@@ -40,6 +40,11 @@ public static class TAC
     public const double NOISE_LAND_R = 7.0;
     public const double NOISE_SHOT_R = 28.0;
     public const double NOISE_BLAST_R = 45.0;
+    public const double DOOR_TRIGGER_R = 1.8;
+    public const int DOOR_CLOSE_TICKS = 50;
+    public const int DOOR_SLIDE_TICKS = 8;
+    public const int DOOR_OPEN_MAX = 8;
+    public const int DOOR_PASS_Q = 4;
 
     public const double VISION_RANGE = 26.0;
     public const double VISION_COS2 = 0.470;
@@ -202,7 +207,7 @@ public static class TAC
 
 public class TacInput { public int b, m, yawQ, pitchQ; }
 
-public class TacBox { public double x0, z0, x1, z1, yb, h; public int kind, hp; public bool alive; public string tint; }
+public class TacBox { public double x0, z0, x1, z1, yb, h; public int kind, hp; public bool alive; public string tint; public bool open; public int openQ, closeT; }
 public class TacSlopePart { public double x0, z0, x1, z1, h, y0, ux, uz, rise; public int dir, steps; public string tint; }
 public class TacRect { public double x0, z0, x1, z1; }
 public class TacPit { public double x0, z0, x1, z1, depth; }
@@ -281,6 +286,7 @@ public class TacWorld
     public bool dead, clearedFlag, timedOutFlag, sneaking;
 
     public List<TacBox> boxes = new List<TacBox>();
+    public List<int> doors = new List<int>(); // indices into boxes of kind-6 auto doors
     public List<TacSlopePart> slopes = new List<TacSlopePart>();
     public List<TacBarrel> barrels = new List<TacBarrel>();
     public List<TacMine> mines = new List<TacMine>();
@@ -388,6 +394,7 @@ public class TacWorld
             else if (ty == "platform") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, 2);
             else if (ty == "crackedWall") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 3, p.Has("y0") ? p.Num("y0") : 0.0);
             else if (ty == "glass") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 5, p.Has("y0") ? p.Num("y0") : 0.0);
+            else if (ty == "door") { w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 6, 0.0); var db = w.boxes[w.boxes.Count - 1]; db.open = false; db.openQ = 0; w.doors.Add(w.boxes.Count - 1); if (p.Has("tint")) db.tint = p.Str("tint"); }
             else if (ty == "slope") { w.AddSlope(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, (int)p.Num("dir", 0.0), p.Has("y0") ? p.Num("y0") : 0.0); if (p.Has("tint")) w.slopes[w.slopes.Count - 1].tint = p.Str("tint"); }
             else if (ty == "barrel") w.AddBarrel(p.Num("x"), p.Num("z"));
             else if (ty == "mine") w.mines.Add(new TacMine { x = Q(p.Num("x")), z = Q(p.Num("z")), y = 0.0, fuse = -1, alive = true });
@@ -860,6 +867,7 @@ public class TacWorld
             {
                 var b = w.boxes[bi];
                 if (!b.alive) return;
+                if (b.kind == 6 && b.open) return; // open door: walk through
                 if (b.h <= blockAbove) return;
                 if (b.yb >= y + h) return; // floating span is above the mover: pass beneath
                 double cx = nx < b.x0 ? b.x0 : (nx > b.x1 ? b.x1 : nx);
@@ -993,6 +1001,7 @@ public class TacWorld
             if (hit) return;
             var b = w.boxes[bi];
             if (!b.alive) return;
+            if (b.kind == 6 && b.open) return; // open door: vision + bullets pass
             if (losOnly && b.kind == 5) return; // glass: see through it
             double t0 = 0.0, t1 = 1.0;
             if (dx > 0.000001 || dx < -0.000001)
@@ -1091,6 +1100,7 @@ public class TacWorld
         w.tick++;
         w.sneaking = (input.b & 4) != 0;
 
+        w.StepDoors();
         w.StepPlayer(input);
         w.StepBullets();
         w.StepBombs();
@@ -1126,6 +1136,45 @@ public class TacWorld
             w.events.timedOut = true;
         }
         return w.events;
+    }
+
+    // Auto sliding doors (box kind 6). Runs at the START of the tick, a pure
+    // function of last tick's end positions => deterministic, matches the JS sim.
+    public void StepDoors()
+    {
+        var w = this;
+        if (w.doors.Count == 0) return;
+        double trig2 = TAC.DOOR_TRIGGER_R * TAC.DOOR_TRIGGER_R;
+        for (int di = 0; di < w.doors.Count; di++)
+        {
+            var d = w.boxes[w.doors[di]];
+            if (!d.alive) continue;
+            bool wantOpen = w.BodyNearRect(w.px, w.pz, d, trig2);
+            if (!wantOpen)
+            {
+                for (int ei = 0; ei < w.enemies.Count; ei++)
+                {
+                    var en = w.enemies[ei];
+                    if (!en.alive || en.type == 3) continue; // drones fly over
+                    if (w.BodyNearRect(en.x, en.z, d, trig2)) { wantOpen = true; break; }
+                }
+            }
+            if (wantOpen) d.closeT = TAC.DOOR_CLOSE_TICKS;
+            else if (d.closeT > 0) { d.closeT--; if (d.closeT > 0) wantOpen = true; }
+            int prevQ = d.openQ;
+            if (wantOpen) { if (d.openQ < TAC.DOOR_OPEN_MAX) d.openQ++; }
+            else { if (d.openQ > 0) d.openQ--; }
+            if (prevQ == 0 && d.openQ == 1) w.AddNoise((d.x0 + d.x1) / 2.0, (d.z0 + d.z1) / 2.0, TAC.NOISE_LAND_R);
+            d.open = d.openQ >= TAC.DOOR_PASS_Q;
+        }
+    }
+
+    public bool BodyNearRect(double bx, double bz, TacBox b, double trig2)
+    {
+        double qx = bx < b.x0 ? b.x0 : (bx > b.x1 ? b.x1 : bx);
+        double qz = bz < b.z0 ? b.z0 : (bz > b.z1 ? b.z1 : bz);
+        double ox = bx - qx, oz = bz - qz;
+        return (ox * ox + oz * oz) <= trig2;
     }
 
     public void StepPlayer(TacInput input)

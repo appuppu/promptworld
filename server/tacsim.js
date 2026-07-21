@@ -56,6 +56,12 @@ var TAC = {
   NOISE_SHOT_R: 28.0,
   NOISE_BLAST_R: 45.0,
 
+  DOOR_TRIGGER_R: 1.8,      // player/ground-enemy within this (m) opens a door
+  DOOR_CLOSE_TICKS: 50,     // stays open ~1 s after the last body leaves
+  DOOR_SLIDE_TICKS: 8,      // ticks to slide fully open/closed (openQ 0..DOOR_OPEN_MAX)
+  DOOR_OPEN_MAX: 8,         // openQ at fully open; >= DOOR_PASS_Q counts as passable
+  DOOR_PASS_Q: 4,           // openQ at/above which the door no longer blocks (half-open)
+
   VISION_RANGE: 26.0,
   VISION_COS2: 0.470,       // cos^2(~47 deg) — widened half-angle of the standard cone
   SNIPER_RANGE: 66.0,
@@ -419,6 +425,7 @@ function TacWorld(stage) {
   w.playerJammed = false;
   w.enemies = [];           // see addEnemy
   w.bullets = [];           // {x,y,z,vx,vy,vz,ttl,fromPlayer,alive}
+  w.doors = [];             // indices into boxes[] of kind-6 doors (auto sliding)
   w.bombs = [];             // bomber satchels {sx,sy,sz,x,y,z,t,fuse,state 0 fly/1 armed/2 done}
   w.noises = [];            // this tick: {x,z,r}
   w.events = {};
@@ -447,6 +454,7 @@ function TacWorld(stage) {
     else if (p.type === 'platform') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, 2); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'crackedWall') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 3, p.y0 || 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'glass') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 5, p.y0 || 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
+    else if (p.type === 'door') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 6, 0); var db = w.boxes[w.boxes.length - 1]; db.open = false; db.openQ = 0; w.doors.push(w.boxes.length - 1); if (p.tint) db.tint = String(p.tint); }
     else if (p.type === 'slope') { w.addSlope(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, p.dir || 0, p.y0 || 0); if (p.tint) w.slopes[w.slopes.length - 1].tint = String(p.tint); }
     else if (p.type === 'barrel') w.addBarrel(p.x, p.z);
     else if (p.type === 'mine') w.mines.push({ x: tacQ(p.x), z: tacQ(p.z), y: 0.0, fuse: -1, alive: true });
@@ -889,6 +897,7 @@ TacWorld.prototype.moveCircle = function (x, z, y, r, h, dx, dz) {
     w.forBoxesIn(nx - r, nz - r, nx + r, nz + r, function (bi) {
       var b = w.boxes[bi];
       if (!b.alive) return;
+      if (b.kind === 6 && b.open) return; // open door: walk through
       if (b.h <= blockAbove) return;
       if (b.yb >= y + h) return; // floating span is above the mover: pass beneath
       var cx = nx < b.x0 ? b.x0 : (nx > b.x1 ? b.x1 : nx);
@@ -1016,6 +1025,7 @@ TacWorld.prototype.segBlocked = function (x0, y0, z0, x1, y1, z1, losOnly) {
     if (lo.hit) return;
     var b = w.boxes[bi];
     if (!b.alive) return;
+    if (b.kind === 6 && b.open) return; // open door: vision + bullets pass
     if (losOnly && b.kind === 5) return; // glass: see through it
     // slab test on x, z, and y (0..b.h)
     var t0 = 0.0, t1 = 1.0;
@@ -1151,6 +1161,7 @@ TacWorld.prototype.step = function (input) {
   w.tick++;
   w.sneaking = (input.b & 4) !== 0;
 
+  w.stepDoors();
   w.stepPlayer(input);
   w.stepBullets();
   w.stepBombs();
@@ -1180,6 +1191,48 @@ TacWorld.prototype.step = function (input) {
     w.events.timedOut = true;
   }
   return w.events;
+};
+
+// Auto sliding doors (box kind 6). Runs at the START of the tick, before any
+// entity moves, so its decision is a pure function of last tick's END-of-frame
+// positions — fully deterministic and identical on the JS and C# sims. A door
+// opens while the player OR any ground enemy is within DOOR_TRIGGER_R of its
+// footprint, and stays open DOOR_CLOSE_TICKS after the last body leaves. openQ
+// is an integer 0..DOOR_OPEN_MAX that slides one step per tick; the door blocks
+// movement/vision/bullets while openQ < DOOR_PASS_Q (mostly closed). A door that
+// begins opening emits a landing-loud operation noise so enemies past it react.
+TacWorld.prototype.stepDoors = function () {
+  var w = this;
+  if (!w.doors.length) return;
+  var trig2 = TAC.DOOR_TRIGGER_R * TAC.DOOR_TRIGGER_R;
+  for (var di = 0; di < w.doors.length; di++) {
+    var d = w.boxes[w.doors[di]];
+    if (!d.alive) continue; // a door razed by a blast stays gone
+    // nearest-point distance from a body to the door's footprint rectangle
+    var wantOpen = w.bodyNearRect(w.px, w.pz, d, trig2);
+    if (!wantOpen) {
+      for (var ei = 0; ei < w.enemies.length; ei++) {
+        var en = w.enemies[ei];
+        if (!en.alive || en.type === 3) continue; // drones fly over, don't trip doors
+        if (w.bodyNearRect(en.x, en.z, d, trig2)) { wantOpen = true; break; }
+      }
+    }
+    if (wantOpen) d.closeT = TAC.DOOR_CLOSE_TICKS;
+    else if (d.closeT > 0) { d.closeT--; if (d.closeT > 0) wantOpen = true; }
+    var prevQ = d.openQ;
+    if (wantOpen) { if (d.openQ < TAC.DOOR_OPEN_MAX) d.openQ++; }
+    else { if (d.openQ > 0) d.openQ--; }
+    if (prevQ === 0 && d.openQ === 1) w.addNoise((d.x0 + d.x1) / 2.0, (d.z0 + d.z1) / 2.0, TAC.NOISE_LAND_R); // starts opening
+    d.open = d.openQ >= TAC.DOOR_PASS_Q;
+  }
+};
+
+// true if a body circle center (bx,bz) is within sqrt(trig2) of box b's footprint
+TacWorld.prototype.bodyNearRect = function (bx, bz, b, trig2) {
+  var qx = bx < b.x0 ? b.x0 : (bx > b.x1 ? b.x1 : bx);
+  var qz = bz < b.z0 ? b.z0 : (bz > b.z1 ? b.z1 : bz);
+  var ox = bx - qx, oz = bz - qz;
+  return (ox * ox + oz * oz) <= trig2;
 };
 
 TacWorld.prototype.stepPlayer = function (input) {

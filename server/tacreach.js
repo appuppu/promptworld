@@ -81,6 +81,7 @@ function tacAnalyzeReachability(stage) {
     w.forBoxesIn(x, z, x, z, function (bi) {
       var b = w.boxes[bi];
       if (!b.alive) return;
+      if (b.kind === 6) return; // door: a body opens it, so it never blocks standing room
       if (x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) return;
       if (b.yb < y + HEAD && b.h > y + 0.05) ok = false; // box occupies the body space
     });
@@ -93,6 +94,7 @@ function tacAnalyzeReachability(stage) {
     w.forBoxesIn(x, z, x, z, function (bi) {
       var b = w.boxes[bi];
       if (!b.alive) return;
+      if (b.kind === 6) return; // door top slides up; not a standable surface
       if (x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) return;
       cands.push(b.h);
     });
@@ -149,6 +151,7 @@ function tacAnalyzeReachability(stage) {
       for (var ci = 0; ci < cands.length; ci++) {
         var b = w.boxes[cands[ci]];
         if (!b.alive) continue;
+        if (b.kind === 6) continue;                        // door: a body always opens it => passable
         if (b.h <= footY + STEP) continue;                 // steppable: not a wall
         if (b.yb >= footY + HEAD) continue;                // clears the body: pass under
         var cxp = px < b.x0 ? b.x0 : (px > b.x1 ? b.x1 : px);

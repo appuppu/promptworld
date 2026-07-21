@@ -99,13 +99,13 @@ function validateTacStage(data) {
   // understands it, but new stages cannot place it.
   // 'jammer' retired 2026-07-18: the EMP veil is now projected by the switch itself.
   // 'scope' pickup retired 2026-07-18: the scope is standard equipment now.
-  const TAC_PART_TYPES = new Set(['rock', 'wall', 'platform', 'slope', 'barrel', 'mine', 'medkit', 'river', 'trench', 'switch', 'crackedWall', 'glass', 'intel', 'exit', 'lamp', 'searchlight', 'block', 'pit']);
+  const TAC_PART_TYPES = new Set(['rock', 'wall', 'platform', 'slope', 'barrel', 'mine', 'medkit', 'river', 'trench', 'switch', 'crackedWall', 'glass', 'door', 'intel', 'exit', 'lamp', 'searchlight', 'block', 'pit']);
   const parts = data.parts || [];
   if (!Array.isArray(parts) || parts.length > TAC_LIMITS.maxParts)
     errors.push(`parts must be an array of at most ${TAC_LIMITS.maxParts} objects.`);
   else parts.forEach((p, i) => {
     if (!p || typeof p !== 'object' || !TAC_PART_TYPES.has(p.type)) {
-      errors.push(`parts[${i}]: unknown type '${p && p.type}'. Valid: rock, wall, platform, slope, barrel, mine, medkit, river, trench, switch, crackedWall, glass, intel, exit, lamp, searchlight, block, pit.`);
+      errors.push(`parts[${i}]: unknown type '${p && p.type}'. Valid: rock, wall, platform, slope, barrel, mine, medkit, river, trench, switch, crackedWall, glass, door, intel, exit, lamp, searchlight, block, pit.`);
       return;
     }
     if (!inArena(p.x, p.z)) { errors.push(`parts[${i}]: (x, z) must lie inside the arena.`); return; }
@@ -133,9 +133,9 @@ function validateTacStage(data) {
     // untouched.
     if (['block', 'slope', 'crackedWall', 'glass'].includes(p.type) && p.y0 !== undefined && !inRange(p.y0, 0, 20))
       errors.push(`parts[${i}]: y0 must be within [0, 20].`);
-    const TINTABLE = new Set(['block', 'rock', 'wall', 'platform', 'crackedWall', 'slope', 'glass']);
+    const TINTABLE = new Set(['block', 'rock', 'wall', 'platform', 'crackedWall', 'slope', 'glass', 'door']);
     if (p.tint !== undefined) {
-      if (!TINTABLE.has(p.type)) errors.push(`parts[${i}]: tint is only valid on block/rock/wall/platform/crackedWall/slope/glass.`);
+      if (!TINTABLE.has(p.type)) errors.push(`parts[${i}]: tint is only valid on block/rock/wall/platform/crackedWall/slope/glass/door.`);
       else if (!/^#[0-9a-fA-F]{6}$/.test(String(p.tint))) errors.push(`parts[${i}]: tint must be a #rrggbb hex color.`);
     }
     if (p.type === 'pit' && p.depth !== undefined && !inRange(p.depth, 0.5, 6))
@@ -1966,6 +1966,19 @@ NIGHT OPS — "night": true at the top level of the stage JSON:
   observation window, a shoot-to-enter breach that ALSO has a foot route, or a
   skylight/partition. y0 raises it for an upper-floor window. tint colors the
   pane (a faint blue-green reads as glass).
+- { "type": "door", "x", "z", "w", "d", "h"?, "tint"? }  An AUTOMATIC sliding
+  door: default h 3. It OPENS (slides up, ~0.2 s) while the player OR any GROUND
+  enemy is within 1.8 m of it, and re-closes ~1 s after the last body leaves.
+  Closed, it blocks movement, vision AND bullets like a wall; open, all three
+  pass. Opening makes a landing-loud noise (7 m), so a door swinging open can
+  give a sneaking player away to whatever waits on the far side. Drones fly OVER
+  a door (they never trip it). REACHABILITY treats a door as always-passable (a
+  body opens it), so it's safe to gate a required route behind one — unlike glass
+  or a crackedWall. Use it for airlocks between rooms, to break sightlines that
+  reopen as you approach, or to let a patrol wander through a room the player is
+  hiding in. It is NOT destructible (blasts don't break it) — it's a mechanism,
+  not cover. The open/close state is a deterministic function of positions, so
+  replays stay exact.
 - { "type": "barrel", "x", "z" }  Explosive barrel. One bullet ignites it: it
   rolls away from the shot for 3 seconds, then explodes (radius 2.6 m, kills
   any enemy, hurts the player, chain-ignites other barrels). Also standable.

@@ -492,6 +492,8 @@ var COL = {
   crackedTop: [0.60, 0.56, 0.51],
   glass: [0.55, 0.74, 0.82],
   glassTop: [0.72, 0.88, 0.94],
+  door: [0.40, 0.52, 0.60],
+  doorTop: [0.50, 0.64, 0.72],
   bomber: [0.52, 0.32, 0.26],
   slopeTop: [0.68, 0.71, 0.76],
   barrel: [0.92, 0.30, 0.22],
@@ -571,8 +573,8 @@ function bakeStatic(world) {
     return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
   }
   world.boxes.forEach(function (b) {
-    var side = b.kind === 0 ? COL.rock : (b.kind === 1 ? COL.wall : (b.kind === 3 ? COL.cracked : (b.kind === 5 ? COL.glass : COL.platform)));
-    var top = b.kind === 0 ? COL.rockTop : (b.kind === 1 ? COL.wallTop : (b.kind === 3 ? COL.crackedTop : (b.kind === 5 ? COL.glassTop : COL.platformTop)));
+    var side = b.kind === 0 ? COL.rock : (b.kind === 1 ? COL.wall : (b.kind === 3 ? COL.cracked : (b.kind === 5 ? COL.glass : (b.kind === 6 ? COL.door : COL.platform))));
+    var top = b.kind === 0 ? COL.rockTop : (b.kind === 1 ? COL.wallTop : (b.kind === 3 ? COL.crackedTop : (b.kind === 5 ? COL.glassTop : (b.kind === 6 ? COL.doorTop : COL.platformTop))));
     var tint = tintRgb(b.tint);
     if (tint) { top = tint; side = [tint[0] * 0.78, tint[1] * 0.78, tint[2] * 0.78]; }
     var first = ix.length;
@@ -2247,7 +2249,9 @@ function render(alpha) {
     gl.uniform1f(loc.uAlpha, 1);
     var fadedList = [];
     for (var rb = 0; rb < boxRanges.length; rb++) {
-      if (!world.boxes[rb].alive) continue; // razed cracked wall
+      var rbx = world.boxes[rb];
+      if (!rbx.alive) continue; // razed cracked wall
+      if (rbx.kind === 6 && rbx.open) continue; // open door: slid away, don't draw
       if (boxFades[rb] > 0.97) gl.drawElements(gl.TRIANGLES, boxRanges[rb].count, gl.UNSIGNED_SHORT, boxRanges[rb].first * 2);
       else fadedList.push(rb);
     }

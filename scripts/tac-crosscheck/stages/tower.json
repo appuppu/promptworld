@@ -8,6 +8,7 @@
 {"type":"crackedWall","x":20,"z":18,"w":6,"d":1.2,"h":3.0},
 {"type":"glass","x":13,"z":20,"w":6,"d":1.2,"h":2.0,"tint":"#8fd0e0"},
 {"type":"glass","x":27,"z":20,"w":4,"d":1.2,"h":3.0,"y0":3.0},
+{"type":"door","x":20,"z":8,"w":4,"d":1,"h":3.0},
 {"type":"barrel","x":24,"z":22},
 {"type":"medkit","x":13,"z":24}
 ],"enemies":[

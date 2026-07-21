@@ -2501,10 +2501,12 @@ public class TacGame : MonoBehaviour
             if (!ba.alive) { barrelViews[i].SetActive(false); continue; }
             barrelViews[i].transform.position = new Vector3((float)ba.x, (float)ba.y + 0.5f, (float)ba.z);
         }
-        // cracked walls that got razed
+        // cracked walls / glass that got razed, and auto doors that slid open
         for (int i = 0; i < w.boxes.Count; i++)
         {
-            if (!w.boxes[i].alive && boxViews[i].activeSelf) boxViews[i].SetActive(false);
+            var bx2 = w.boxes[i];
+            bool hidden = !bx2.alive || (bx2.kind == 6 && bx2.open); // open door: slid away
+            if (boxViews[i].activeSelf == hidden) boxViews[i].SetActive(!hidden);
         }
 
         // pilot drone — this is the HERO unit, so it gets the same live detail the
