@@ -85,6 +85,19 @@ else
   exit 1
 fi
 
+# Abandoned-course GC soft-delete stamp (same guarded ALTER + hard-verify).
+# The unverified-course sweep in worker.js references stages.hidden_at.
+npx wrangler d1 execute promptworld-stages --remote \
+  --command "ALTER TABLE stages ADD COLUMN hidden_at TEXT" >/dev/null 2>&1 || true
+if npx wrangler d1 execute promptworld-stages --remote --json \
+     --command "SELECT COUNT(*) AS n FROM pragma_table_info('stages') WHERE name='hidden_at'" \
+     | grep -q '"n": *1'; then
+  echo "D1: stages.hidden_at column verified"
+else
+  echo "FATAL: stages.hidden_at column missing — aborting deploy." >&2
+  exit 1
+fi
+
 # Static extras: share card, creator onboarding page, and legal pages
 # (privacy + terms are required for Google AdSense approval).
 cp "$ROOT/server/og-card.png" "$OUT/og-card.png"

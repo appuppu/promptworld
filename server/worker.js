@@ -457,6 +457,12 @@ const RATE_LIMITS = {
 };
 const MIN_CLEAR_MS_TO_PUBLISH = 3000; // trivially short stages cannot be published
 const DRAFT_TTL_DAYS = 7;             // unpublished drafts are garbage-collected
+// Abandoned unverified courses (gcAbandonedUnverified): after this many days of
+// no activity (no attempt/clear/edit) they are SOFT-deleted (hidden from the
+// shelf); after a further HARD window while still hidden+uncleared they are
+// physically removed. Two-stage so an accidental lull is recoverable.
+const UNVERIFIED_SOFT_TTL_DAYS = 14; // no activity for 14d → hide from the shelf
+const UNVERIFIED_HARD_TTL_DAYS = 14; // hidden + quiet a further 14d → delete
 
 // Admin creator tokens: requests carrying one of these bypass the create/update
 // rate limits (the operator is never blocked by their own anti-abuse caps).
@@ -585,6 +591,81 @@ async function cleanupExpiredDrafts(env) {
     .run();
 }
 
+// ------------------------------------------------------- abandoned-course GC
+// The unverified shelf accumulates courses that are created and then left to rot
+// (user, 2026-07-22): either nobody ever tries them, or the last time anyone
+// tried was long ago. We sweep by LAST ACTIVITY, not by creation date — a course
+// someone tried yesterday is alive and must NOT be swept, even if it's old; a
+// course whose last attempt was two weeks ago is abandoned even if it once had
+// players. Last activity = MAX(created_at, latest plays.updated_at for the row).
+// The MIN( ... , '9999') idioms keep NULL out of the comparison: a stage with no
+// plays row uses created_at alone.
+//
+// Only UNVERIFIED, still-uncleared (clears = 0) courses are eligible. A course
+// that has ANY clear is 'published' already and never enters this pool. A course
+// that gets attempts but no clear is "unclearable" — it still gets swept once
+// activity stops, because its last attempt ages just like anything else.
+//
+// The sweep is TWO-STAGE and reversible up to the final step:
+//   • SOFT (logical) delete: last activity older than UNVERIFIED_SOFT_TTL_DAYS
+//     → stamp hidden_at. The row stays in the DB but drops off the testbench
+//     shelf (opListPublished filters hidden_at IS NULL). A later attempt/clear
+//     rescues it (a clear promotes it to 'published'); editing via update_stage
+//     also clears hidden_at. Its own hidden_at is NOT counted as activity.
+//   • HARD (physical) delete: HIDDEN for a further UNVERIFIED_HARD_TTL_DAYS
+//     (hidden_at itself old enough) AND still no clear AND no newer activity
+//     → physical DELETE.
+// Any attempt/clear/edit before the hard delete brings the course back.
+async function gcAbandonedUnverified(env) {
+  const now = Date.now();
+  const softCutoff = new Date(now - UNVERIFIED_SOFT_TTL_DAYS * 86400000).toISOString();
+  const hardCutoff = new Date(now - UNVERIFIED_HARD_TTL_DAYS * 86400000).toISOString();
+  const nowIso = new Date(now).toISOString();
+
+  // last activity for a stage = MAX(created_at, MAX(plays.updated_at)).
+  // Expressed inline so the whole sweep is a single UPDATE/DELETE (no row loop).
+  const lastActivity =
+    "MAX(s.created_at, COALESCE((SELECT MAX(p.updated_at) FROM plays p WHERE p.stage_id = s.id), s.created_at))";
+
+  // Stage 1 — SOFT: hide unverified, uncleared courses whose last activity has
+  // gone quiet for the soft window.
+  const soft = await env.promptworld_stages
+    .prepare(
+      "UPDATE stages AS s SET hidden_at = ? " +
+      "WHERE s.status = 'unverified' AND s.hidden_at IS NULL AND s.clears = 0 " +
+      `AND ${lastActivity} < ?`
+    )
+    .bind(nowIso, softCutoff)
+    .run();
+
+  // Stage 2 — HARD: physically remove courses that stayed hidden, uncleared, and
+  // saw no fresh activity for the hard window past the hide. Delete the child
+  // rows too (same tables opDeleteStage cleans) so nothing orphans.
+  const doomed = await env.promptworld_stages
+    .prepare(
+      "SELECT s.id FROM stages s " +
+      "WHERE s.status = 'unverified' AND s.hidden_at IS NOT NULL AND s.clears = 0 " +
+      `AND s.hidden_at < ? AND ${lastActivity} < ? LIMIT 500`
+    )
+    .bind(hardCutoff, hardCutoff)
+    .all();
+  const ids = (doomed.results || []).map((r) => r.id);
+  for (const id of ids) {
+    await env.promptworld_stages.batch([
+      env.promptworld_stages.prepare('DELETE FROM votes  WHERE stage_id = ?').bind(id),
+      env.promptworld_stages.prepare('DELETE FROM hides  WHERE stage_id = ?').bind(id),
+      env.promptworld_stages.prepare('DELETE FROM scores WHERE stage_id = ?').bind(id),
+      env.promptworld_stages.prepare('DELETE FROM plays  WHERE stage_id = ?').bind(id),
+      env.promptworld_stages.prepare('DELETE FROM stages WHERE id = ?').bind(id),
+    ]);
+  }
+
+  return {
+    softHidden: (soft.meta && soft.meta.changes) || 0,
+    hardDeleted: ids.length,
+  };
+}
+
 // ------------------------------------------------------------ invisible ids
 // Creators get a frictionless identity: the first create_stage silently
 // mints a creator record and hands back a creatorToken for reuse. No signup,
@@ -705,8 +786,8 @@ async function opCreateStage(env, origin, stage, request, creatorToken, creatorN
     playUrl: `${origin}${base}?stage=${id}`,
     status: initialStatus,
     creatorId: creator.id,
-    note: 'UNVERIFIED created. It is LIVE on the 検証待ち / testbench shelf right now — playable by anyone in the app and web (and searchable). The FIRST verified clear (by anyone) auto-promotes it to published. No separate publish step is needed; just have someone clear it. Use the testUrl to play it yourself.',
-    instructionsForClaude: `Tell the human: "Your stage is live on the testbench shelf — anyone can play it now, and the first clear publishes it automatically. Play it yourself here: ${origin}${base}?stage=${id}&key=${editKey}." ALSO tell them explicitly to SAVE this stage id (${id}) and editKey (${editKey}) somewhere, because editing the stage LATER (via update_stage) requires BOTH — there is no account or password to recover them.`,
+    note: 'UNVERIFIED created. It is LIVE on the 検証待ち / testbench shelf right now — playable by anyone in the app and web (and searchable). The FIRST verified clear (by anyone) auto-promotes it to published. No separate publish step is needed; just have someone clear it. Use the testUrl to play it yourself. HOUSEKEEPING: an unverified stage that gets NO activity (no play, clear, or edit) for 14 days is hidden from the shelf, and if it stays untouched a further 14 days it is deleted. Any play/clear/edit resets this, and a clear publishes it permanently — so just clear it and it is safe forever.',
+    instructionsForClaude: `Tell the human: "Your stage is live on the testbench shelf — anyone can play it now, and the first clear publishes it automatically. Play it yourself here: ${origin}${base}?stage=${id}&key=${editKey}. Heads up: if nobody plays, clears, or edits it for 14 days it gets hidden, and after another 14 idle days it's removed — clearing it (or any play/edit) keeps it alive, and a clear publishes it for good." ALSO tell them explicitly to SAVE this stage id (${id}) and editKey (${editKey}) somewhere, because editing the stage LATER (via update_stage) requires BOTH — there is no account or password to recover them.`,
     editNote: `IMPORTANT — save these to edit this stage later: stage id = "${id}", editKey = "${editKey}". Editing later needs BOTH; they cannot be recovered (no account/login). The testUrl above already embeds them.`,
   };
   if (minted) {
@@ -814,8 +895,10 @@ async function opUpdateStage(env, origin, id, editKey, stage, request, creatorTo
   // stats. It has no verified clear yet, so nothing dishonest is preserved.
   const keepUnverified = admin && row.status === 'unverified';
   if (keepUnverified) {
+    // hidden_at cleared: if the GC had soft-hidden this course, editing it is a
+    // clear signal of life — bring it back onto the shelf.
     await env.promptworld_stages
-      .prepare("UPDATE stages SET json = ?, name = ? WHERE id = ?")
+      .prepare("UPDATE stages SET json = ?, name = ?, hidden_at = NULL WHERE id = ?")
       .bind(JSON.stringify(stage), stage.name, id)
       .run();
   } else {
@@ -826,7 +909,7 @@ async function opUpdateStage(env, origin, id, editKey, stage, request, creatorTo
     // next clear re-publishes it. published_at is re-stamped so it sorts on the
     // shelf. (Editing NEVER silently hides a course anymore.)
     await env.promptworld_stages
-      .prepare("UPDATE stages SET json = ?, name = ?, status = 'unverified', cleared_at = NULL, clear_time_ms = NULL, clear_replay = NULL, published_at = ?, test_started_at = NULL WHERE id = ?")
+      .prepare("UPDATE stages SET json = ?, name = ?, status = 'unverified', cleared_at = NULL, clear_time_ms = NULL, clear_replay = NULL, published_at = ?, test_started_at = NULL, hidden_at = NULL WHERE id = ?")
       .bind(JSON.stringify(stage), stage.name, now, id)
       .run();
   }
@@ -1067,7 +1150,8 @@ async function opListPublished(env, query, sort, game, playerId) {
                         CASE WHEN s.survive_n > 0 THEN s.survive_ms_total / s.survive_n ELSE NULL END AS avg_survive_ms
                  FROM stages s
                  LEFT JOIN creators c ON c.id = s.creator_id
-                 WHERE s.status = 'unverified' AND (c.banned IS NULL OR c.banned = 0)`;
+                 WHERE s.status = 'unverified' AND s.hidden_at IS NULL
+                       AND (c.banned IS NULL OR c.banned = 0)`;
     tbSql += game === 'tac' ? " AND s.game = 'tac'" : ' AND s.game IS NULL';
     const tbBinds = [];
     if (q) { tbSql += ' AND (s.name LIKE ? OR s.json LIKE ?)'; tbBinds.push(q, q); }
@@ -1347,6 +1431,19 @@ function json(body, status = 200) {
 async function handleApi(request, env, url) {
   const path = url.pathname.replace(/\/+$/, '');
   const method = request.method;
+
+  // Maintenance GC — sweeps abandoned unverified courses (two-stage soft→hard
+  // delete; see gcAbandonedUnverified). There is no cron on Pages, so an external
+  // scheduler (the local launchd job) POSTs here daily with the GC_TOKEN secret.
+  // Also runs the legacy draft TTL cleanup so both live in one place.
+  if (path === '/api/gc' && method === 'POST') {
+    const token = request.headers.get('X-GC-Token') || url.searchParams.get('token') || '';
+    const expected = env && env.GC_TOKEN ? String(env.GC_TOKEN) : '';
+    if (!expected || token !== expected) return json({ error: 'Forbidden.' }, 403);
+    await cleanupExpiredDrafts(env);
+    const result = await gcAbandonedUnverified(env);
+    return json({ ok: true, ...result });
+  }
 
   if (path === '/api/stages' && method === 'POST') {
     const raw = await request.text();
@@ -2161,7 +2258,7 @@ const MCP_TOOLS = [
   {
     name: 'create_stage',
     title: 'Create a stage',
-    description: 'Validates and saves a new stage. It goes LIVE on the testbench (検証待ち) shelf immediately — anyone can play it in the app and web, and the FIRST verified clear auto-publishes it (no separate publish step). Returns the stage id, an editKey (keep it — needed to edit later), and a testUrl. SERVER-ENFORCED PRECONDITIONS (creation is REJECTED otherwise): (1) the stage JSON must include nameLoc and desc localized in ALL of en/ja/zh/es/ko; (2) the creator must be confirmed — pass an existing creatorToken, or ask the human for their display name and pass creatorName + creatorConfirmed: true. Do both BEFORE calling.',
+    description: 'Validates and saves a new stage. It goes LIVE on the testbench (検証待ち) shelf immediately — anyone can play it in the app and web, and the FIRST verified clear auto-publishes it (no separate publish step). Returns the stage id, an editKey (keep it — needed to edit later), and a testUrl. HOUSEKEEPING (tell the human): an unverified stage with NO activity (play/clear/edit) for 14 days is hidden from the shelf, and after a further 14 idle days it is deleted — a clear publishes it permanently and any play/edit keeps it alive, so it only ever disappears if truly abandoned. SERVER-ENFORCED PRECONDITIONS (creation is REJECTED otherwise): (1) the stage JSON must include nameLoc and desc localized in ALL of en/ja/zh/es/ko; (2) the creator must be confirmed — pass an existing creatorToken, or ask the human for their display name and pass creatorName + creatorConfirmed: true. Do both BEFORE calling.',
     inputSchema: {
       type: 'object',
       properties: {

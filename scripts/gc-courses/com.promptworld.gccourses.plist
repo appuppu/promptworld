@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.promptworld.gccourses</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>/Users/fukushimatakumi/develop/promptworld/scripts/gc-courses/run.sh</string>
+    </array>
+
+    <!-- Fire every day at 06:20 local time (after the 06:03 daily-course job). -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>20</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/fukushimatakumi/develop/promptworld/scripts/gc-courses/cron.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/fukushimatakumi/develop/promptworld/scripts/gc-courses/cron.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/fukushimatakumi/develop/promptworld</string>
+
+    <!-- Make curl resolvable inside launchd's minimal PATH. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

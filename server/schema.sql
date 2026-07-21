@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS stages (
   clear_replay TEXT,
   test_started_at TEXT,
   created_at TEXT NOT NULL,
-  published_at TEXT
+  published_at TEXT,
+  hidden_at TEXT              -- abandoned-course GC: soft-delete timestamp
 );
 
 CREATE INDEX IF NOT EXISTS idx_stages_status ON stages(status, published_at DESC);
@@ -93,3 +94,9 @@ CREATE TABLE IF NOT EXISTS plays (
 -- 'tac' = the 3D TPS stealth shooter (played at /tac). Keeps the two games'
 -- discovery lists separate. Applied 2026-07-17 (deploy-web.sh runs it):
 --   ALTER TABLE stages ADD COLUMN game TEXT;
+
+-- Abandoned-course GC soft-delete stamp: an unverified course with no activity
+-- for UNVERIFIED_SOFT_TTL_DAYS gets hidden_at set (drops off the testbench
+-- shelf); staying hidden + quiet a further UNVERIFIED_HARD_TTL_DAYS deletes it.
+-- Editing or a new attempt/clear clears it. Applied 2026-07-22 (deploy-web.sh):
+--   ALTER TABLE stages ADD COLUMN hidden_at TEXT;
