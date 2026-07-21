@@ -76,6 +76,16 @@
   .tabbtn { background:#07090c; border:1px solid #2a2f38; color:#9aa3ad; padding:9px 18px; font-size:12px; letter-spacing:.14em; cursor:pointer; }
   .tabbtn.on { color:#f2f4f6; border-color:#4dd2c3; }
   .tbmeta { color:#ffd23e; }
+  #refreshBtn { background:#07090c; border:1px solid #2a2f38; color:#9aa3ad; padding:9px 14px; font-size:12px; letter-spacing:.1em; cursor:pointer; margin-left:auto; }
+  #refreshBtn:hover { color:#f2f4f6; border-color:#4dd2c3; }
+  #refreshBtn.spin { color:#4dd2c3; pointer-events:none; }
+  #refreshBtn.spin .ri { display:inline-block; animation:pwspin .8s linear infinite; }
+  @keyframes pwspin { to { transform:rotate(360deg); } }
+  /* pull-to-refresh drawer that peeks above the grid as you drag down */
+  #ptr { height:0; overflow:hidden; text-align:center; color:#4dd2c3; font-size:12px; letter-spacing:.14em; transition:height .18s ease; }
+  #ptr.armed { color:#7dffd0; }
+  #ptr .ri { display:inline-block; }
+  #ptr.spin .ri { animation:pwspin .8s linear infinite; }
 
   .steps { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; margin-bottom:26px; }
   .step { border:1px solid var(--line); padding:20px; }
@@ -145,11 +155,13 @@
 <section id="stages">
   <div class="wrap">
     <h2 data-t="secStages"></h2>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
       <button id="tabMain" class="tabbtn on" type="button"></button>
       <button id="tabTb" class="tabbtn" type="button"></button>
+      <button id="refreshBtn" type="button" title="Refresh"><span class="ri">↻</span></button>
     </div>
     <input id="q" data-p="search" style="width:100%;max-width:340px;background:#07090c;border:1px solid #2a2f38;color:#f2f4f6;padding:11px 14px;font-size:13px;margin-bottom:18px;letter-spacing:.06em" />
+    <div id="ptr"><span class="ri">↻</span> <span id="ptrTxt"></span></div>
     <div class="grid" id="stageGrid"><span id="stageEmpty" data-t="loading"></span></div>
   </div>
 </section>
@@ -301,6 +313,9 @@
   L.en.search = 'Search stages…'; L.ja.search = 'ステージ名で検索…'; L.zh.search = '搜索关卡…'; L.es.search = 'Buscar niveles…'; L.ko.search = '스테이지 검색…';
   L.en.tabMain = 'MISSIONS'; L.ja.tabMain = 'ミッション'; L.zh.tabMain = '任务'; L.es.tabMain = 'MISIONES'; L.ko.tabMain = '미션';
   L.en.tabTb = 'TESTBENCH'; L.ja.tabTb = '検証待ち'; L.zh.tabTb = '待验证'; L.es.tabTb = 'BANCO DE PRUEBAS'; L.ko.tabTb = '검증 대기';
+  L.en.ptrPull = 'Pull to refresh'; L.ja.ptrPull = '引いて更新'; L.zh.ptrPull = '下拉刷新'; L.es.ptrPull = 'Desliza para actualizar'; L.ko.ptrPull = '당겨서 새로고침';
+  L.en.ptrRelease = 'Release to refresh'; L.ja.ptrRelease = '離して更新'; L.zh.ptrRelease = '松开刷新'; L.es.ptrRelease = 'Suelta para actualizar'; L.ko.ptrRelease = '놓으면 새로고침';
+  L.en.ptrLoad = 'Refreshing…'; L.ja.ptrLoad = '更新中…'; L.zh.ptrLoad = '刷新中…'; L.es.ptrLoad = 'Actualizando…'; L.ko.ptrLoad = '새로고침 중…';
   L.en.tbNone = 'CLEARED BY: NONE'; L.ja.tbNone = 'クリア者: なし'; L.zh.tbNone = '通关者: 无'; L.es.tbNone = 'SUPERADO POR: NADIE'; L.ko.tbNone = '클리어: 없음';
   L.en.tbLife = 'avg life'; L.ja.tbLife = '平均生存'; L.zh.tbLife = '平均存活'; L.es.tbLife = 'vida media'; L.ko.tbLife = '평균 생존';
   L.en.tbHint = 'Be the FIRST in the world to clear one — your run becomes its ghost.'; L.ja.tbHint = '世界初クリアを奪え — 君のプレイがゴーストになる。'; L.zh.tbHint = '成为世界首位通关者——你的操作将成为幽灵。'; L.es.tbHint = 'Sé el PRIMERO del mundo en superarlo.'; L.ko.tbHint = '세계 최초 클리어에 도전하라.';
@@ -324,6 +339,33 @@
       if (!id) { id = 'w-' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('pw_pid_web', id); }
       return id;
     } catch (e) { return 'w-anon'; }
+  }
+  // -------------------------------------------------------------------------
+  // TTL cache (localStorage). We snapshot the mission list AND each stage's JSON
+  // so a return visit paints instantly from cache, then silently revalidates in
+  // the background (stale-while-revalidate). A manual refresh (button / pull)
+  // bypasses the cache entirely and always hits the network, so an edit a
+  // creator just made is one gesture away — never "restart the app to see it".
+  var CACHE_TTL = 60000; // 60 s: fresh enough to feel live, long enough to skip refetch on quick revisits
+  function cacheGet(key, maxAge) {
+    try {
+      var raw = localStorage.getItem('pw_c_' + key);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || typeof o.t !== 'number') return null;
+      if (Date.now() - o.t > (maxAge == null ? CACHE_TTL : maxAge)) return null;
+      return o.v;
+    } catch (e) { return null; }
+  }
+  function cachePut(key, val) {
+    try { localStorage.setItem('pw_c_' + key, JSON.stringify({ t: Date.now(), v: val })); } catch (e) { /* quota/full: cache is best-effort */ }
+  }
+  // Fetch JSON with a cache layer. force=true skips the cache read (manual
+  // refresh); otherwise a fresh cache hit resolves immediately. Every successful
+  // network response updates the cache. Returns a Promise of the JSON.
+  function fetchCached(url, key, force) {
+    if (!force) { var hit = cacheGet(key); if (hit != null) return Promise.resolve(hit); }
+    return fetch(url).then(function (r) { return r.json(); }).then(function (v) { cachePut(key, v); return v; });
   }
   // Hide a stage for this device only (server filters it out of future lists).
   function hideStage(id, cardEl) {
@@ -473,7 +515,7 @@
     var qv = (document.getElementById('q').value || '').trim();
     var qs = '/api/stages?game=tac&sort=testbench&playerId=' + encodeURIComponent(playerId()) +
       (qv ? '&q=' + encodeURIComponent(qv) : '');
-    fetch(qs).then(function (r) { return r.json(); }).then(function (d) {
+    return fetch(qs).then(function (r) { return r.json(); }).then(function (d) {
       var esc = function (t) { var e = document.createElement('span'); e.textContent = t || ''; return e.innerHTML; };
       var rows = (d.stages || []).map(function (s) {
         var life = s.avg_survive_ms ? (s.avg_survive_ms / 1000).toFixed(1) + 's' : '—';
@@ -491,11 +533,18 @@
   }
   var tbActive = false;
   tabTb.onclick = function () { tbActive = true; loadTestbench(); };
-  tabMain.onclick = function () { location.reload(); };
 
-  fetch('/api/stages?game=tac&playerId=' + encodeURIComponent(playerId())).then(function (r) { return r.json(); }).then(function (d) {
+  // Load (or reload) the MISSIONS grid. force=true bypasses the TTL cache and
+  // always hits the network — used by the refresh button, pull-to-refresh, and
+  // the MISSIONS tab. On a normal visit force is falsy, so a fresh cache hit
+  // paints instantly and we still refetch in the background if it was stale.
+  function loadMissions(force) {
+    tbActive = false;
+    tabMain.classList.add('on'); tabTb.classList.remove('on');
+    var listKey = 'list_tac_' + playerId();
+    return fetchCached('/api/stages?game=tac&playerId=' + encodeURIComponent(playerId()), listKey, force).then(function (d) {
     var grid = document.getElementById('stageGrid');
-    if (!d.stages || !d.stages.length) { document.getElementById('stageEmpty').textContent = T('empty'); return; }
+    if (!d.stages || !d.stages.length) { grid.innerHTML = '<span id="stageEmpty" style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>'; return; }
     var esc = function (t) { var e = document.createElement('span'); e.textContent = t || ''; return e.innerHTML; };
     var TCOL = { soldier: '#7c9a6e', gatling: '#c0564e', sniper: '#a06ec2', drone: '#a6adba', operator: '#c2a05e', shield: '#5e8ac2', bomber: '#d98a3a', apc: '#8f3a36' };
     var TCODE = { soldier: 'SOL', gatling: 'GAT', sniper: 'SNP', drone: 'DRN', operator: 'OPR', shield: 'SHD', bomber: 'BMB', apc: 'APC' };
@@ -607,9 +656,11 @@
         '<div class="play up">▶ ' + T('playCard') + '</div></a>';
     }).join('') || ('<span style="color:#9aa3ad;font-size:13px">' + T('empty') + '</span>');
       wireHides(grid);
-      // hydrate thumbnails + details from each stage's JSON
+      // hydrate thumbnails + details from each stage's JSON. Cached per stage
+      // (the JSON rarely changes) but the same `force` flag flows through, so a
+      // manual refresh re-pulls each card's JSON and picks up a fresh edit.
       list.slice(0, 24).forEach(function (s) {
-        fetch('/api/stages/' + encodeURIComponent(s.id)).then(function (r) { return r.json(); }).then(function (st) {
+        fetchCached('/api/stages/' + encodeURIComponent(s.id), 'stage_' + s.id, force).then(function (st) {
           if (!st || !st.arena) return;
           var cv = document.querySelector('canvas.thumb[data-sid="' + s.id + '"]');
           if (cv) {
@@ -644,7 +695,73 @@
       var q = this.value.trim().toLowerCase();
       render(!q ? d.stages : d.stages.filter(function (s) { return (s.name || '').toLowerCase().indexOf(q) >= 0; }));
     };
-  }).catch(function () { document.getElementById('stageEmpty').textContent = T('empty'); });
+    }).catch(function () { var e = document.getElementById('stageEmpty'); if (e) e.textContent = T('empty'); });
+  }
+
+  // ---- refresh controls: button + pull-to-refresh, both force a network hit ----
+  var refreshBtn = document.getElementById('refreshBtn');
+  var refreshing = false;
+  function doRefresh() {
+    if (refreshing) return Promise.resolve();
+    refreshing = true;
+    refreshBtn.classList.add('spin');
+    // Always reload MISSIONS from the network; if the user is on the testbench
+    // tab, refresh that shelf instead (it's already network-only).
+    var p = tbActive ? loadTestbench() : loadMissions(true);
+    return Promise.resolve(p).then(function () {}).catch(function () {}).then(function () {
+      refreshing = false; refreshBtn.classList.remove('spin');
+    });
+  }
+  refreshBtn.onclick = doRefresh;
+  // MISSIONS tab now just refetches the list in place — no full page reload.
+  tabMain.onclick = function () {
+    document.getElementById('q').value = '';
+    loadMissions(false);
+  };
+
+  // Pull-to-refresh: only arms at the very top of the page, dragging DOWN. We
+  // track a vertical drag and grow the #ptr drawer; releasing past the threshold
+  // triggers doRefresh(). Purely additive to native scrolling — if we're not at
+  // the top, or the gesture goes up, we never interfere.
+  (function () {
+    var ptr = document.getElementById('ptr'), ptrTxt = document.getElementById('ptrTxt');
+    var startY = 0, pulling = false, dist = 0, THRESH = 64, MAX = 90;
+    ptrTxt.textContent = T('ptrPull');
+    function atTop() { return (window.scrollY || document.documentElement.scrollTop || 0) <= 0; }
+    document.addEventListener('touchstart', function (e) {
+      if (!atTop() || refreshing) { pulling = false; return; }
+      startY = e.touches[0].clientY; pulling = true; dist = 0;
+    }, { passive: true });
+    document.addEventListener('touchmove', function (e) {
+      if (!pulling) return;
+      dist = e.touches[0].clientY - startY;
+      if (dist <= 0) { ptr.style.height = '0'; ptr.classList.remove('armed'); return; }
+      if (!atTop()) { pulling = false; ptr.style.height = '0'; return; }
+      var h = Math.min(dist * 0.5, MAX);
+      ptr.style.transition = 'none';
+      ptr.style.height = h + 'px';
+      if (dist >= THRESH) { ptr.classList.add('armed'); ptrTxt.textContent = T('ptrRelease'); }
+      else { ptr.classList.remove('armed'); ptrTxt.textContent = T('ptrPull'); }
+    }, { passive: true });
+    function endPull() {
+      if (!pulling) return;
+      pulling = false;
+      ptr.style.transition = 'height .18s ease';
+      if (dist >= THRESH) {
+        ptr.classList.add('spin'); ptrTxt.textContent = T('ptrLoad'); ptr.style.height = '34px';
+        doRefresh().then(function () {
+          ptr.classList.remove('spin', 'armed'); ptr.style.height = '0'; ptrTxt.textContent = T('ptrPull');
+        });
+      } else {
+        ptr.classList.remove('armed'); ptr.style.height = '0';
+      }
+      dist = 0;
+    }
+    document.addEventListener('touchend', endPull, { passive: true });
+    document.addEventListener('touchcancel', endPull, { passive: true });
+  })();
+
+  loadMissions(false);
 })();
 </script>
 </body>
