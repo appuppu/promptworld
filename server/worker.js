@@ -99,13 +99,13 @@ function validateTacStage(data) {
   // understands it, but new stages cannot place it.
   // 'jammer' retired 2026-07-18: the EMP veil is now projected by the switch itself.
   // 'scope' pickup retired 2026-07-18: the scope is standard equipment now.
-  const TAC_PART_TYPES = new Set(['rock', 'wall', 'platform', 'slope', 'barrel', 'mine', 'medkit', 'river', 'trench', 'switch', 'crackedWall', 'intel', 'exit', 'lamp', 'searchlight', 'block', 'pit']);
+  const TAC_PART_TYPES = new Set(['rock', 'wall', 'platform', 'slope', 'barrel', 'mine', 'medkit', 'river', 'trench', 'switch', 'crackedWall', 'glass', 'intel', 'exit', 'lamp', 'searchlight', 'block', 'pit']);
   const parts = data.parts || [];
   if (!Array.isArray(parts) || parts.length > TAC_LIMITS.maxParts)
     errors.push(`parts must be an array of at most ${TAC_LIMITS.maxParts} objects.`);
   else parts.forEach((p, i) => {
     if (!p || typeof p !== 'object' || !TAC_PART_TYPES.has(p.type)) {
-      errors.push(`parts[${i}]: unknown type '${p && p.type}'. Valid: rock, wall, platform, slope, barrel, mine, medkit, river, trench, switch, crackedWall, intel, exit, lamp, searchlight, block, pit.`);
+      errors.push(`parts[${i}]: unknown type '${p && p.type}'. Valid: rock, wall, platform, slope, barrel, mine, medkit, river, trench, switch, crackedWall, glass, intel, exit, lamp, searchlight, block, pit.`);
       return;
     }
     if (!inArena(p.x, p.z)) { errors.push(`parts[${i}]: (x, z) must lie inside the arena.`); return; }
@@ -131,11 +131,11 @@ function validateTacStage(data) {
     // and on slope + crackedWall (a raised staircase / a breachable wall on an
     // upper floor of a multi-story build). Default 0 = ground, so old stages are
     // untouched.
-    if (['block', 'slope', 'crackedWall'].includes(p.type) && p.y0 !== undefined && !inRange(p.y0, 0, 20))
+    if (['block', 'slope', 'crackedWall', 'glass'].includes(p.type) && p.y0 !== undefined && !inRange(p.y0, 0, 20))
       errors.push(`parts[${i}]: y0 must be within [0, 20].`);
-    const TINTABLE = new Set(['block', 'rock', 'wall', 'platform', 'crackedWall', 'slope']);
+    const TINTABLE = new Set(['block', 'rock', 'wall', 'platform', 'crackedWall', 'slope', 'glass']);
     if (p.tint !== undefined) {
-      if (!TINTABLE.has(p.type)) errors.push(`parts[${i}]: tint is only valid on block/rock/wall/platform/crackedWall/slope.`);
+      if (!TINTABLE.has(p.type)) errors.push(`parts[${i}]: tint is only valid on block/rock/wall/platform/crackedWall/slope/glass.`);
       else if (!/^#[0-9a-fA-F]{6}$/.test(String(p.tint))) errors.push(`parts[${i}]: tint must be a #rrggbb hex color.`);
     }
     if (p.type === 'pit' && p.depth !== undefined && !inRange(p.depth, 0.5, 6))
@@ -1953,6 +1953,19 @@ NIGHT OPS — "night": true at the top level of the stage JSON:
   an explosive spend, or as cover with an expiry date in gatling lanes. y0 > 0
   raises it off the ground (a breachable section on an upper floor, or a
   floating breakable lintel over a doorway).
+- { "type": "glass", "x", "z", "w", "d", "h"?, "y0"?0, "tint"? }  A window:
+  default h 3. VISION and lock-on pass THROUGH it (both sides SEE each other
+  through the pane), but it physically BLOCKS movement and STOPS bullets. ANY
+  single bullet (rifle, scope, enemy fire) SHATTERS it — the shot is spent and
+  the shatter is gunshot-loud, so nearby enemies come to investigate: you can
+  watch a room through the glass, but the moment you shoot through it you give
+  yourself away and open a hole. Explosions shatter it too. Once shattered the
+  opening is permanent (walk and shoot through freely). REACHABILITY treats
+  intact glass as a solid wall — never gate a REQUIRED route (intel/medkit/exit)
+  behind glass expecting the player to break it; use it for a seen-but-sealed
+  observation window, a shoot-to-enter breach that ALSO has a foot route, or a
+  skylight/partition. y0 raises it for an upper-floor window. tint colors the
+  pane (a faint blue-green reads as glass).
 - { "type": "barrel", "x", "z" }  Explosive barrel. One bullet ignites it: it
   rolls away from the shot for 3 seconds, then explodes (radius 2.6 m, kills
   any enemy, hurts the player, chain-ignites other barrels). Also standable.

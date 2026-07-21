@@ -2872,6 +2872,10 @@ public class TacGame : MonoBehaviour
             Sfx("crash");
             if (!attract) Shake(0.28f, 0.4f);
         }
+        if (ev.glassBreaks != null)
+        {
+            Sfx("crash", 0.7f); // brighter/lighter than a wall; no heavy shake
+        }
         bool anyAlert = false;
         foreach (var en in world.enemies) if (en.alive && en.state == 2) { anyAlert = true; break; }
         if (!attract) audioKit.SetCombat(anyAlert);

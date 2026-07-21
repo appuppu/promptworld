@@ -446,6 +446,7 @@ function TacWorld(stage) {
     else if (p.type === 'wall') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 1); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'platform') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, 2); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'crackedWall') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 3, p.y0 || 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
+    else if (p.type === 'glass') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 5, p.y0 || 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'slope') { w.addSlope(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, p.dir || 0, p.y0 || 0); if (p.tint) w.slopes[w.slopes.length - 1].tint = String(p.tint); }
     else if (p.type === 'barrel') w.addBarrel(p.x, p.z);
     else if (p.type === 'mine') w.mines.push({ x: tacQ(p.x), z: tacQ(p.z), y: 0.0, fuse: -1, alive: true });
@@ -610,7 +611,9 @@ TacWorld.prototype.addBox = function (x, z, bw, bd, h, kind, yb) {
   var cz = tacQ(z);
   var b0 = tacQ(yb || 0);
   // yb = bottom, h = ABSOLUTE top. Ground-based parts keep yb 0 => identical.
-  this.boxes.push({ x0: cx - hw, z0: cz - hd, x1: cx + hw, z1: cz + hd, yb: b0, h: b0 + tacQ(h), kind: kind | 0, alive: true, hp: (kind | 0) === 3 ? TAC.CRACKED_HP : 0, tint: null });
+  // kind 3 (crackedWall) has CRACKED_HP; kind 5 (glass) shatters on 1 hit.
+  var k = kind | 0;
+  this.boxes.push({ x0: cx - hw, z0: cz - hd, x1: cx + hw, z1: cz + hd, yb: b0, h: b0 + tacQ(h), kind: k, alive: true, hp: k === 3 ? TAC.CRACKED_HP : (k === 5 ? 1 : 0), tint: null });
 };
 
 TacWorld.prototype.addSlope = function (x, z, bw, bd, h, dir, y0) {
@@ -796,16 +799,17 @@ TacWorld.prototype.groundY = function (x, z, refY, r) {
   return best;
 };
 
-// first cracked wall (kind 3, alive) the segment hits, or -1. Only gatling
-// rounds and explosions damage these — rifle and scope fire just thuds.
-TacWorld.prototype.segCrackedHit = function (x0, y0, z0, x1, y1, z1) {
+// first alive box of a given kind the segment hits, or -1. Shared by the bullet
+// step: kind 3 = crackedWall (only gatling rounds/explosions chip it), kind 5 =
+// glass (any bullet shatters it). Both stop the bullet.
+TacWorld.prototype.segKindHit = function (kind, x0, y0, z0, x1, y1, z1) {
   var w = this;
   var dx = x1 - x0;
   var dy = y1 - y0;
   var dz = z1 - z0;
   for (var i = 0; i < w.boxes.length; i++) {
     var b = w.boxes[i];
-    if (b.kind !== 3) continue;
+    if (b.kind !== kind) continue;
     if (!b.alive) continue;
     var t0 = 0.0, t1 = 1.0;
     if (dx > 0.000001 || dx < -0.000001) {
@@ -843,6 +847,20 @@ TacWorld.prototype.breakWall = function (bi) {
   b.alive = false;
   if (!w.events.wallBreaks) w.events.wallBreaks = [];
   w.events.wallBreaks.push({ i: bi, x: (b.x0 + b.x1) / 2.0, y: b.h / 2.0, z: (b.z0 + b.z1) / 2.0 });
+};
+
+// Shatter a glass pane (kind 5): removes it, emits a gunshot-loud noise so
+// nearby enemies investigate, and records a glassBreaks event for the renderers
+// (shard burst + tinkle) distinct from the concrete wallBreaks puff.
+TacWorld.prototype.shatterGlass = function (bi) {
+  var w = this;
+  var b = w.boxes[bi];
+  if (!b.alive) return;
+  b.alive = false;
+  var mx = (b.x0 + b.x1) / 2.0, mz = (b.z0 + b.z1) / 2.0;
+  w.addNoise(mx, mz, TAC.NOISE_SHOT_R);
+  if (!w.events.glassBreaks) w.events.glassBreaks = [];
+  w.events.glassBreaks.push({ i: bi, x: mx, y: (b.yb + b.h) / 2.0, z: mz });
 };
 
 // the slope the circle stands on at (x,z,y), or null
@@ -979,7 +997,11 @@ TacWorld.prototype.ceilingY = function (x, z, r, fromY) {
 };
 
 // segment (x0,y0,z0)->(x1,y1,z1) vs static boxes; true if blocked.
-TacWorld.prototype.segBlocked = function (x0, y0, z0, x1, y1, z1) {
+// losOnly (optional): when true, GLASS (kind 5) is treated as transparent — used
+// for sightlines, vision cones and lock-on so a unit can SEE through a window.
+// When false/omitted, glass is solid (bullets and grenades stop on it, then the
+// caller shatters it). Everything else blocks in both modes.
+TacWorld.prototype.segBlocked = function (x0, y0, z0, x1, y1, z1, losOnly) {
   var w = this;
   var lo = { hit: false };
   var minX = x0 < x1 ? x0 : x1;
@@ -994,6 +1016,7 @@ TacWorld.prototype.segBlocked = function (x0, y0, z0, x1, y1, z1) {
     if (lo.hit) return;
     var b = w.boxes[bi];
     if (!b.alive) return;
+    if (losOnly && b.kind === 5) return; // glass: see through it
     // slab test on x, z, and y (0..b.h)
     var t0 = 0.0, t1 = 1.0;
     if (dx > 0.000001 || dx < -0.000001) {
@@ -1520,7 +1543,7 @@ TacWorld.prototype.updateLock = function () {
     var dot = (fx * tx + fz * tz) / dh;
     if (dot <= cos) return; // outside the aim cone
     if (tier === bestTier && d2 >= bestD2) return; // farther than the current pick
-    if (w.segBlocked(ex, ey, ez, cx, cy, cz)) return;
+    if (w.segBlocked(ex, ey, ez, cx, cy, cz, true)) return; // lock-on sees through glass
     best = i;
     bestKind = kind;
     bestTier = tier;
@@ -1786,7 +1809,7 @@ TacWorld.prototype.squadCorpseCheck = function (en) {
     var dot = fx * dx + fz * dz;
     if (dot <= 0.0) continue;
     if (dot * dot < TAC.VISION_COS2 * d2) continue;
-    if (w.segBlocked(en.x, en.y + tacEnemyH(en) - 0.2, en.z, c.x, c.y + 0.4, c.z)) continue;
+    if (w.segBlocked(en.x, en.y + tacEnemyH(en) - 0.2, en.z, c.x, c.y + 0.4, c.z, true)) continue; // sees corpse through glass
     c.corpseSpotted = true;
     en.state = 1;
     en.tx = c.x;
@@ -1868,8 +1891,18 @@ TacWorld.prototype.stepBullets = function () {
       bu.alive = false;
       continue;
     }
+    // glass: ANY bullet shatters it (one hit) and is consumed; a shatter makes
+    // a gunshot-loud noise so nearby enemies come to investigate — "seen through
+    // it but shooting gives you away". Checked before cracked walls / geometry.
+    var gk = w.segKindHit(5, bu.x, bu.y, bu.z, nx, ny, nz);
+    if (gk >= 0) {
+      w.shatterGlass(gk);
+      bu.alive = false;
+      w.events.bulletWall = true;
+      continue;
+    }
     // cracked walls: any bullet stops on them, only GATLING rounds chip them
-    var ck = w.segCrackedHit(bu.x, bu.y, bu.z, nx, ny, nz);
+    var ck = w.segKindHit(3, bu.x, bu.y, bu.z, nx, ny, nz);
     if (ck >= 0) {
       if (bu.gat) {
         var cb = w.boxes[ck];
@@ -1880,7 +1913,7 @@ TacWorld.prototype.stepBullets = function () {
       w.events.bulletWall = true;
       continue;
     }
-    // static geometry
+    // static geometry (glass is solid here too, but we already handled it above)
     if (w.segBlocked(bu.x, bu.y, bu.z, nx, ny, nz)) {
       bu.alive = false;
       w.events.bulletWall = true;
@@ -2124,15 +2157,16 @@ TacWorld.prototype.explodeAt = function (cx, cy, cz, radius, playerDmg) {
   }
   for (var cw = 0; cw < w.boxes.length; cw++) {
     var cbx = w.boxes[cw];
-    if (cbx.kind !== 3) continue;
+    // explosions raze both cracked walls (kind 3) and glass (kind 5)
+    if (cbx.kind !== 3 && cbx.kind !== 5) continue;
     if (!cbx.alive) continue;
     var qx = cx < cbx.x0 ? cbx.x0 : (cx > cbx.x1 ? cbx.x1 : cx);
-    var qy = cy < 0.0 ? 0.0 : (cy > cbx.h ? cbx.h : cy);
+    var qy = cy < cbx.yb ? cbx.yb : (cy > cbx.h ? cbx.h : cy);
     var qz = cz < cbx.z0 ? cbx.z0 : (cz > cbx.z1 ? cbx.z1 : cz);
     var wx = cx - qx;
     var wy = cy - qy;
     var wz = cz - qz;
-    if (wx * wx + wy * wy + wz * wz <= r2) w.breakWall(cw);
+    if (wx * wx + wy * wy + wz * wz <= r2) { if (cbx.kind === 5) w.shatterGlass(cw); else w.breakWall(cw); }
   }
   for (var m = 0; m < w.mines.length; m++) {
     var mi = w.mines[m];
@@ -2339,7 +2373,7 @@ TacWorld.prototype.playerVisibleFrom = function (en, range2, cos2) {
   if (dd < lim) return -1.0;
   var eyeY = en.y + tacEnemyH(en) - 0.2;
   var chestY = w.playerChestY();
-  if (w.segBlocked(en.x, eyeY, en.z, w.px, chestY, w.pz)) return -1.0;
+  if (w.segBlocked(en.x, eyeY, en.z, w.px, chestY, w.pz, true)) return -1.0; // enemy sees player through glass
   return d2;
 };
 
@@ -2804,7 +2838,7 @@ TacWorld.prototype.stepLights = function () {
     var diff = (toQ - sl.angQ) & 65535;
     if (diff > 32768) diff = 65536 - diff;
     if (diff > TAC.SEARCH_HALF) continue;
-    if (w.segBlocked(sl.x, 3.0, sl.z, w.px, w.playerChestY(), w.pz)) continue;
+    if (w.segBlocked(sl.x, 3.0, sl.z, w.px, w.playerChestY(), w.pz, true)) continue; // searchlight passes through glass
     w.playerLit = true;
     return;
   }

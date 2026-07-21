@@ -87,6 +87,7 @@ public static class TacRenderKit
     public static readonly Color WallCol = new Color(0.33f, 0.36f, 0.41f);
     public static readonly Color PlatformCol = new Color(0.55f, 0.58f, 0.62f);
     public static readonly Color CrackedCol = new Color(0.52f, 0.48f, 0.43f);
+    public static readonly Color GlassCol = new Color(0.60f, 0.80f, 0.88f);
     public static readonly Color StairCol = new Color(0.58f, 0.61f, 0.66f);
     public static readonly Color PitCol = new Color(0.30f, 0.28f, 0.26f);
     public static readonly Color WaterCol = new Color(0.27f, 0.51f, 0.78f, 0.75f);
@@ -200,7 +201,7 @@ public static class TacRenderKit
         // boxes (rock/wall/platform/crackedWall), views kept for break-hiding
         foreach (var b in w.boxes)
         {
-            Color c = b.kind == 0 ? RockCol : (b.kind == 1 ? WallCol : (b.kind == 3 ? CrackedCol : PlatformCol));
+            Color c = b.kind == 0 ? RockCol : (b.kind == 1 ? WallCol : (b.kind == 3 ? CrackedCol : (b.kind == 5 ? GlassCol : PlatformCol)));
             if (b.tint != null && ColorUtility.TryParseHtmlString(b.tint, out var tc)) c = tc;
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             Object.Destroy(go.GetComponent<Collider>());

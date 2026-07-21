@@ -259,6 +259,7 @@ public class TacEvents
     public List<TacExplosion> explosions;
     public List<TacNoise> noises;
     public List<TacWallBreak> wallBreaks;
+    public List<TacWallBreak> glassBreaks;
     public TacXYZ jamZap;
     public TacXZ bomberThrow, bombLand;
     public TacIntelPick intelPick;
@@ -386,6 +387,7 @@ public class TacWorld
             else if (ty == "wall") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 1);
             else if (ty == "platform") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, 2);
             else if (ty == "crackedWall") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 3, p.Has("y0") ? p.Num("y0") : 0.0);
+            else if (ty == "glass") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 5, p.Has("y0") ? p.Num("y0") : 0.0);
             else if (ty == "slope") { w.AddSlope(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, (int)p.Num("dir", 0.0), p.Has("y0") ? p.Num("y0") : 0.0); if (p.Has("tint")) w.slopes[w.slopes.Count - 1].tint = p.Str("tint"); }
             else if (ty == "barrel") w.AddBarrel(p.Num("x"), p.Num("z"));
             else if (ty == "mine") w.mines.Add(new TacMine { x = Q(p.Num("x")), z = Q(p.Num("z")), y = 0.0, fuse = -1, alive = true });
@@ -564,7 +566,7 @@ public class TacWorld
         double cz = Q(z);
         double b0 = Q(yb);
         // yb = bottom, h = ABSOLUTE top. Ground-based parts keep yb 0 => identical.
-        this.boxes.Add(new TacBox { x0 = cx - hw, z0 = cz - hd, x1 = cx + hw, z1 = cz + hd, yb = b0, h = b0 + Q(h), kind = kind, alive = true, hp = kind == 3 ? TAC.CRACKED_HP : 0, tint = null });
+        this.boxes.Add(new TacBox { x0 = cx - hw, z0 = cz - hd, x1 = cx + hw, z1 = cz + hd, yb = b0, h = b0 + Q(h), kind = kind, alive = true, hp = kind == 3 ? TAC.CRACKED_HP : (kind == 5 ? 1 : 0), tint = null });
     }
 
     public void AddSlope(double x, double z, double bw, double bd, double h, int dir, double y0 = 0.0)
@@ -758,7 +760,9 @@ public class TacWorld
         return best;
     }
 
-    public int SegCrackedHit(double x0, double y0, double z0, double x1, double y1, double z1)
+    // first alive box of a given kind the segment hits, or -1. kind 3 =
+    // crackedWall, kind 5 = glass. Both stop the bullet (see StepBullets).
+    public int SegKindHit(int kind, double x0, double y0, double z0, double x1, double y1, double z1)
     {
         var w = this;
         double dx = x1 - x0;
@@ -767,7 +771,7 @@ public class TacWorld
         for (int i = 0; i < w.boxes.Count; i++)
         {
             var b = w.boxes[i];
-            if (b.kind != 3) continue;
+            if (b.kind != kind) continue;
             if (!b.alive) continue;
             double t0 = 0.0, t1 = 1.0;
             if (dx > 0.000001 || dx < -0.000001)
@@ -812,6 +816,20 @@ public class TacWorld
         b.alive = false;
         if (w.events.wallBreaks == null) w.events.wallBreaks = new List<TacWallBreak>();
         w.events.wallBreaks.Add(new TacWallBreak { i = bi, x = (b.x0 + b.x1) / 2.0, y = b.h / 2.0, z = (b.z0 + b.z1) / 2.0 });
+    }
+
+    // Shatter a glass pane (kind 5): removes it, gunshot-loud noise so enemies
+    // investigate, and a glassBreaks event for the shard/tinkle render.
+    public void ShatterGlass(int bi)
+    {
+        var w = this;
+        var b = w.boxes[bi];
+        if (!b.alive) return;
+        b.alive = false;
+        double mx = (b.x0 + b.x1) / 2.0, mz = (b.z0 + b.z1) / 2.0;
+        w.AddNoise(mx, mz, TAC.NOISE_SHOT_R);
+        if (w.events.glassBreaks == null) w.events.glassBreaks = new List<TacWallBreak>();
+        w.events.glassBreaks.Add(new TacWallBreak { i = bi, x = mx, y = (b.yb + b.h) / 2.0, z = mz });
     }
 
     public TacSlopePart SlopeUnder(double x, double z, double y)
@@ -955,7 +973,10 @@ public class TacWorld
         return best;
     }
 
-    public bool SegBlocked(double x0, double y0, double z0, double x1, double y1, double z1)
+    // losOnly: when true, GLASS (kind 5) is transparent (sightlines / vision /
+    // lock-on see through a window). When false, glass is solid (bullets and
+    // grenades stop on it, then the caller shatters it).
+    public bool SegBlocked(double x0, double y0, double z0, double x1, double y1, double z1, bool losOnly = false)
     {
         var w = this;
         bool hit = false;
@@ -972,6 +993,7 @@ public class TacWorld
             if (hit) return;
             var b = w.boxes[bi];
             if (!b.alive) return;
+            if (losOnly && b.kind == 5) return; // glass: see through it
             double t0 = 0.0, t1 = 1.0;
             if (dx > 0.000001 || dx < -0.000001)
             {
@@ -1480,7 +1502,7 @@ public class TacWorld
             double dot = (fx * tx + fz * tz) / dh;
             if (dot <= cos) return;
             if (tier == bestTier && d2 >= bestD2) return;
-            if (w.SegBlocked(ex, ey, ez, cx, cy, cz)) return;
+            if (w.SegBlocked(ex, ey, ez, cx, cy, cz, true)) return; // lock-on sees through glass
             best = i;
             bestKind = kind;
             bestTier = tier;
@@ -1774,7 +1796,7 @@ public class TacWorld
             double dot = fx * dx + fz * dz;
             if (dot <= 0.0) continue;
             if (dot * dot < TAC.VISION_COS2 * d2) continue;
-            if (w.SegBlocked(en.x, en.y + TacEnemyH(en) - 0.2, en.z, c.x, c.y + 0.4, c.z)) continue;
+            if (w.SegBlocked(en.x, en.y + TacEnemyH(en) - 0.2, en.z, c.x, c.y + 0.4, c.z, true)) continue; // sees corpse through glass
             c.corpseSpotted = true;
             en.state = 1;
             en.tx = c.x;
@@ -1865,7 +1887,18 @@ public class TacWorld
                 bu.alive = false;
                 continue;
             }
-            int ck = w.SegCrackedHit(bu.x, bu.y, bu.z, nx, ny, nz);
+            // glass: any bullet shatters it (one hit) and is consumed; the
+            // shatter is gunshot-loud so enemies investigate. Before cracked
+            // walls / geometry.
+            int gk = w.SegKindHit(5, bu.x, bu.y, bu.z, nx, ny, nz);
+            if (gk >= 0)
+            {
+                w.ShatterGlass(gk);
+                bu.alive = false;
+                w.events.bulletWall = true;
+                continue;
+            }
+            int ck = w.SegKindHit(3, bu.x, bu.y, bu.z, nx, ny, nz);
             if (ck >= 0)
             {
                 if (bu.gat)
@@ -2162,15 +2195,16 @@ public class TacWorld
         for (int cw = 0; cw < w.boxes.Count; cw++)
         {
             var cbx = w.boxes[cw];
-            if (cbx.kind != 3) continue;
+            // explosions raze both cracked walls (kind 3) and glass (kind 5)
+            if (cbx.kind != 3 && cbx.kind != 5) continue;
             if (!cbx.alive) continue;
             double qx = cx < cbx.x0 ? cbx.x0 : (cx > cbx.x1 ? cbx.x1 : cx);
-            double qy = cy < 0.0 ? 0.0 : (cy > cbx.h ? cbx.h : cy);
+            double qy = cy < cbx.yb ? cbx.yb : (cy > cbx.h ? cbx.h : cy);
             double qz = cz < cbx.z0 ? cbx.z0 : (cz > cbx.z1 ? cbx.z1 : cz);
             double wx = cx - qx;
             double wy = cy - qy;
             double wz = cz - qz;
-            if (wx * wx + wy * wy + wz * wz <= r2) w.BreakWall(cw);
+            if (wx * wx + wy * wy + wz * wz <= r2) { if (cbx.kind == 5) w.ShatterGlass(cw); else w.BreakWall(cw); }
         }
         for (int m = 0; m < w.mines.Count; m++)
         {
@@ -2361,7 +2395,7 @@ public class TacWorld
         if (dd < lim) return -1.0;
         double eyeY = en.y + TacEnemyH(en) - 0.2;
         double chestY = w.PlayerChestY();
-        if (w.SegBlocked(en.x, eyeY, en.z, w.px, chestY, w.pz)) return -1.0;
+        if (w.SegBlocked(en.x, eyeY, en.z, w.px, chestY, w.pz, true)) return -1.0; // enemy sees player through glass
         return d2;
     }
 
@@ -2984,7 +3018,7 @@ public class TacWorld
             int diff = (toQ - sl.angQ) & 65535;
             if (diff > 32768) diff = 65536 - diff;
             if (diff > TAC.SEARCH_HALF) continue;
-            if (w.SegBlocked(sl.x, 3.0, sl.z, w.px, w.PlayerChestY(), w.pz)) continue;
+            if (w.SegBlocked(sl.x, 3.0, sl.z, w.px, w.PlayerChestY(), w.pz, true)) continue; // searchlight passes through glass
             w.playerLit = true;
             return;
         }

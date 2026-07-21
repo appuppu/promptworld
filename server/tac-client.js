@@ -490,6 +490,8 @@ var COL = {
   slope: [0.58, 0.61, 0.66],
   cracked: [0.52, 0.48, 0.43],
   crackedTop: [0.60, 0.56, 0.51],
+  glass: [0.55, 0.74, 0.82],
+  glassTop: [0.72, 0.88, 0.94],
   bomber: [0.52, 0.32, 0.26],
   slopeTop: [0.68, 0.71, 0.76],
   barrel: [0.92, 0.30, 0.22],
@@ -569,8 +571,8 @@ function bakeStatic(world) {
     return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
   }
   world.boxes.forEach(function (b) {
-    var side = b.kind === 0 ? COL.rock : (b.kind === 1 ? COL.wall : (b.kind === 3 ? COL.cracked : COL.platform));
-    var top = b.kind === 0 ? COL.rockTop : (b.kind === 1 ? COL.wallTop : (b.kind === 3 ? COL.crackedTop : COL.platformTop));
+    var side = b.kind === 0 ? COL.rock : (b.kind === 1 ? COL.wall : (b.kind === 3 ? COL.cracked : (b.kind === 5 ? COL.glass : COL.platform)));
+    var top = b.kind === 0 ? COL.rockTop : (b.kind === 1 ? COL.wallTop : (b.kind === 3 ? COL.crackedTop : (b.kind === 5 ? COL.glassTop : COL.platformTop)));
     var tint = tintRgb(b.tint);
     if (tint) { top = tint; side = [tint[0] * 0.78, tint[1] * 0.78, tint[2] * 0.78]; }
     var first = ix.length;
@@ -708,6 +710,7 @@ var sfx = {
   heal: function () { blip(520, 780, 0.09, 'triangle', 0.45); blip(780, 1040, 0.12, 'triangle', 0.45, 0.09); },
   alarm: function () { blip(700, 1400, 0.28, 'sawtooth', 0.35); },
   crash: function () { blip(1300, 90, 0.85, 'sawtooth', 0.32); },
+  glass: function () { blip(2600, 1800, 0.12, 'triangle', 0.3); blip(3400, 2200, 0.16, 'triangle', 0.22, 0.04); blip(1900, 1200, 0.2, 'sine', 0.18, 0.02); },
   launch: function () { blip(280, 950, 0.3, 'triangle', 0.5); },
   recall: function () { blip(950, 280, 0.2, 'triangle', 0.35); },
   fizzle: function () { blip(600, 70, 0.5, 'square', 0.25); },
@@ -1989,6 +1992,13 @@ function handleEvents(ev) {
     ev.wallBreaks.forEach(function (wb) {
       spawnDebris(wb.x, wb.y, wb.z, COL.cracked, 18, 0.32);
       sfx.crash();
+    });
+  }
+  if (ev.glassBreaks) {
+    ev.glassBreaks.forEach(function (gb) {
+      // brighter, finer, faster shards than a concrete break — reads as glass
+      spawnDebris(gb.x, gb.y, gb.z, COL.glassTop, 24, 0.5);
+      sfx.glass ? sfx.glass() : sfx.crash();
     });
   }
   if (ev.jamZap) {

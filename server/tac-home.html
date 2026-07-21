@@ -591,9 +591,11 @@
         } else if (pt.type === 'pit') {
           c.fillStyle = 'rgba(10,12,15,0.95)';
           c.fillRect(X2(pt.x - w2 / 2), Z2(pt.z + d2 / 2), w2 * sc2, d2 * sc2);
-        } else if (pt.type === 'rock' || pt.type === 'wall' || pt.type === 'platform') {
-          var tp2 = pt.type === 'wall' ? '#454c58' : (pt.type === 'platform' ? '#6f7683' : '#575e6a');
+        } else if (pt.type === 'rock' || pt.type === 'wall' || pt.type === 'platform' || pt.type === 'crackedWall') {
+          var tp2 = pt.type === 'wall' ? '#454c58' : (pt.type === 'platform' ? '#6f7683' : (pt.type === 'crackedWall' ? '#6e6255' : '#575e6a'));
           block3d(pt.x, pt.z, w2, d2, tp2, '#2f353f');
+        } else if (pt.type === 'glass') {
+          block3d(pt.x, pt.z, w2, d2, '#9cc8d6', '#5a7f8a');
         } else if (pt.type === 'slope') {
           block3d(pt.x, pt.z, w2, d2, '#636a76', '#3a4048');
         } else if (pt.type === 'river') {
