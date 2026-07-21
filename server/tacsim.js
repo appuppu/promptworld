@@ -444,8 +444,8 @@ function TacWorld(stage) {
     if (p.type === 'rock') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 1.4 : p.h, 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'wall') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 1); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
     else if (p.type === 'platform') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, 2); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
-    else if (p.type === 'crackedWall') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 3); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
-    else if (p.type === 'slope') { w.addSlope(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, p.dir || 0); if (p.tint) w.slopes[w.slopes.length - 1].tint = String(p.tint); }
+    else if (p.type === 'crackedWall') { w.addBox(p.x, p.z, p.w, p.d, p.h === undefined ? 3.0 : p.h, 3, p.y0 || 0); if (p.tint) w.boxes[w.boxes.length - 1].tint = String(p.tint); }
+    else if (p.type === 'slope') { w.addSlope(p.x, p.z, p.w, p.d, p.h === undefined ? 2.0 : p.h, p.dir || 0, p.y0 || 0); if (p.tint) w.slopes[w.slopes.length - 1].tint = String(p.tint); }
     else if (p.type === 'barrel') w.addBarrel(p.x, p.z);
     else if (p.type === 'mine') w.mines.push({ x: tacQ(p.x), z: tacQ(p.z), y: 0.0, fuse: -1, alive: true });
     else if (p.type === 'medkit') w.medkits.push({ x: tacQ(p.x), z: tacQ(p.z), y: 0.0, alive: true });
@@ -605,7 +605,7 @@ TacWorld.prototype.addBox = function (x, z, bw, bd, h, kind, yb) {
   this.boxes.push({ x0: cx - hw, z0: cz - hd, x1: cx + hw, z1: cz + hd, yb: b0, h: b0 + tacQ(h), kind: kind | 0, alive: true, hp: (kind | 0) === 3 ? TAC.CRACKED_HP : 0, tint: null });
 };
 
-TacWorld.prototype.addSlope = function (x, z, bw, bd, h, dir) {
+TacWorld.prototype.addSlope = function (x, z, bw, bd, h, dir, y0) {
   var hw = tacQ(bw) / 2.0;
   var hd = tacQ(bd) / 2.0;
   var cx = tacQ(x);
@@ -619,7 +619,10 @@ TacWorld.prototype.addSlope = function (x, z, bw, bd, h, dir) {
   var qh = tacQ(h);
   var nSteps = Math.ceil(qh / 0.32);
   if (nSteps < 2) nSteps = 2;
-  this.slopes.push({ x0: cx - hw, z0: cz - hd, x1: cx + hw, z1: cz + hd, h: qh, dir: d, ux: ux, uz: uz, steps: nSteps, rise: tacQ(qh / nSteps) });
+  // y0 = the height the LOW edge starts at (default 0 = ground). A raised
+  // staircase (y0 > 0) climbs from y0 to y0+h, so a slope can bridge floor N to
+  // floor N+1 of a multi-story build. slopeYAt adds y0 to every tread.
+  this.slopes.push({ x0: cx - hw, z0: cz - hd, x1: cx + hw, z1: cz + hd, h: qh, y0: tacQ(y0 || 0), dir: d, ux: ux, uz: uz, steps: nSteps, rise: tacQ(qh / nSteps) });
 };
 
 TacWorld.prototype.addBarrel = function (x, z) {
@@ -736,7 +739,7 @@ TacWorld.prototype.slopeYAt = function (s, x, z) {
   if (t > 1.0) t = 1.0;
   var idx = Math.floor(t * s.steps);
   if (idx >= s.steps) idx = s.steps - 1;
-  return s.rise * (idx + 1);
+  return (s.y0 || 0) + s.rise * (idx + 1);
 };
 
 // highest standable surface at (x,z) not above refY + STEP_UP, for a circle of radius r

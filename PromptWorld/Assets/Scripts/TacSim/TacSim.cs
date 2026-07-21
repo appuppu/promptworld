@@ -203,7 +203,7 @@ public static class TAC
 public class TacInput { public int b, m, yawQ, pitchQ; }
 
 public class TacBox { public double x0, z0, x1, z1, yb, h; public int kind, hp; public bool alive; public string tint; }
-public class TacSlopePart { public double x0, z0, x1, z1, h, ux, uz, rise; public int dir, steps; public string tint; }
+public class TacSlopePart { public double x0, z0, x1, z1, h, y0, ux, uz, rise; public int dir, steps; public string tint; }
 public class TacRect { public double x0, z0, x1, z1; }
 public class TacPit { public double x0, z0, x1, z1, depth; }
 public class TacBarrel { public double x, z, y, dx, dz; public int state, fuse; public bool alive; }
@@ -381,8 +381,8 @@ public class TacWorld
             if (ty == "rock") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 1.4, 0);
             else if (ty == "wall") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 1);
             else if (ty == "platform") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, 2);
-            else if (ty == "crackedWall") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 3);
-            else if (ty == "slope") { w.AddSlope(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, (int)p.Num("dir", 0.0)); if (p.Has("tint")) w.slopes[w.slopes.Count - 1].tint = p.Str("tint"); }
+            else if (ty == "crackedWall") w.AddBox(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 3.0, 3, p.Has("y0") ? p.Num("y0") : 0.0);
+            else if (ty == "slope") { w.AddSlope(p.Num("x"), p.Num("z"), p.Num("w"), p.Num("d"), p.Has("h") ? p.Num("h") : 2.0, (int)p.Num("dir", 0.0), p.Has("y0") ? p.Num("y0") : 0.0); if (p.Has("tint")) w.slopes[w.slopes.Count - 1].tint = p.Str("tint"); }
             else if (ty == "barrel") w.AddBarrel(p.Num("x"), p.Num("z"));
             else if (ty == "mine") w.mines.Add(new TacMine { x = Q(p.Num("x")), z = Q(p.Num("z")), y = 0.0, fuse = -1, alive = true });
             else if (ty == "medkit") w.medkits.Add(new TacMedkit { x = Q(p.Num("x")), z = Q(p.Num("z")), y = 0.0, alive = true });
@@ -560,7 +560,7 @@ public class TacWorld
         this.boxes.Add(new TacBox { x0 = cx - hw, z0 = cz - hd, x1 = cx + hw, z1 = cz + hd, yb = b0, h = b0 + Q(h), kind = kind, alive = true, hp = kind == 3 ? TAC.CRACKED_HP : 0, tint = null });
     }
 
-    public void AddSlope(double x, double z, double bw, double bd, double h, int dir)
+    public void AddSlope(double x, double z, double bw, double bd, double h, int dir, double y0 = 0.0)
     {
         double hw = Q(bw) / 2.0;
         double hd = Q(bd) / 2.0;
@@ -575,7 +575,9 @@ public class TacWorld
         double qh = Q(h);
         int nSteps = (int)Math.Ceiling(qh / 0.32);
         if (nSteps < 2) nSteps = 2;
-        slopes.Add(new TacSlopePart { x0 = cx - hw, z0 = cz - hd, x1 = cx + hw, z1 = cz + hd, h = qh, dir = d, ux = ux, uz = uz, steps = nSteps, rise = Q(qh / nSteps) });
+        // y0 = the height the LOW edge starts at (default 0 = ground). A raised
+        // staircase climbs from y0 to y0+h; SlopeYAt adds y0 to every tread.
+        slopes.Add(new TacSlopePart { x0 = cx - hw, z0 = cz - hd, x1 = cx + hw, z1 = cz + hd, h = qh, y0 = Q(y0), dir = d, ux = ux, uz = uz, steps = nSteps, rise = Q(qh / nSteps) });
     }
 
     public void AddBarrel(double x, double z)
@@ -698,7 +700,7 @@ public class TacWorld
         if (t > 1.0) t = 1.0;
         int idx = (int)Math.Floor(t * s.steps);
         if (idx >= s.steps) idx = s.steps - 1;
-        return s.rise * (idx + 1);
+        return s.y0 + s.rise * (idx + 1);
     }
 
     public double GroundY(double x, double z, double refY, double r)

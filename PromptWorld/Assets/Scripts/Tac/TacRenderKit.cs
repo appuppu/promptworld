@@ -252,7 +252,9 @@ public static class TacRenderKit
                 else sx1 = s.x1 - (s.x1 - s.x0) * t0;
                 var stc = StairCol;
                 if (s.tint != null && ColorUtility.TryParseHtmlString(s.tint, out var stt)) stc = stt;
-                BoxAabb(root, sx0, sz0, sx1, sz1, 0, s.rise * (st + 1), stc);
+                // raised staircase (y0 > 0): each tread runs from y0 up to its
+                // tread line, so the flight sits on a lower floor and reads solid.
+                BoxAabb(root, sx0, sz0, sx1, sz1, s.y0, s.y0 + s.rise * (st + 1), stc);
             }
         }
 

@@ -65,7 +65,7 @@ for (var i4 = 0; i4 < 3000; i4++) {
 
 // ---- full-stage simulation traces ----
 var dir = path.join(process.cwd(), 'scripts', 'tac-crosscheck', 'stages');
-var names = ['kitchen', 'breach', 'expiry', 'extract', 'castle', 'steps', 'armor'];
+var names = ['kitchen', 'breach', 'expiry', 'extract', 'castle', 'steps', 'armor', 'tower'];
 for (var sIdx = 0; sIdx < names.length; sIdx++) {
   var json = fs.readFileSync(path.join(dir, names[sIdx] + '.json'), 'utf8');
   var stage = JSON.parse(json);

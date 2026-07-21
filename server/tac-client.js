@@ -557,7 +557,9 @@ function bakeStatic(world) {
       else if (s.dir === 2) sz1 = s.z1 - (s.z1 - s.z0) * t0;
       else if (s.dir === 1) sx0 = s.x0 + (s.x1 - s.x0) * t0;
       else sx1 = s.x1 - (s.x1 - s.x0) * t0;
-      pushCube(sx0, sz0, sx1, sz1, s.rise * (st + 1), sSide, sTop);
+      // raised staircase (y0 > 0): each tread runs from y0 up to its tread line,
+      // so the whole flight sits on top of a lower floor and reads as solid.
+      pushCube(sx0, sz0, sx1, sz1, (s.y0 || 0) + s.rise * (st + 1), sSide, sTop, s.y0 || 0);
     }
   }
   function tintRgb(hex) {
@@ -615,6 +617,10 @@ var camBaseYaw = 0, camYaw = 0, camPitch = -0.21, lookOffYaw = 0, playerYawR = 0
 // camSmoothY glides toward the feet height so the vertical follow reads continuous.
 // Horizontal (x/z) still tracks exactly — only Y is damped. -1e9 = "snap on first use".
 var camSmoothY = -1e9;
+// smoothed follow distance: indoors the camera pulls in so walls/ceilings never
+// sit between it and the player. Pull-in is instant (no clipping); easing back
+// out is slow so leaving a doorway doesn't pop the view.
+var camDistS = 5.2;
 
 // interpolation snapshots
 var snap = { px: 0, py: 0, pz: 0 }, prev = { px: 0, py: 0, pz: 0 };
@@ -2162,10 +2168,28 @@ function render(alpha) {
   }
   camY = camSmoothY;
   var pivX = camX + rx * shoulder, pivY = camY + (world.scoped ? (world.crouched ? 1.05 : 1.5) : 1.6), pivZ = camZ + rz * shoulder;
+  // camera collision: cast pivot → desired eye against the solid boxes and stop
+  // short of the first wall/ceiling, so indoor stages keep the player in view
+  if (!world.scoped) {
+    var dex = pivX - fx0 * dist, dey = pivY - fy0 * dist, dez = pivZ - fz0 * dist;
+    var camT = 2.0;
+    world.forBoxesIn(Math.min(pivX, dex), Math.min(pivZ, dez), Math.max(pivX, dex), Math.max(pivZ, dez), function (bi) {
+      var cb = world.boxes[bi];
+      if (!cb.alive) return;
+      var t = tacSegBoxT(pivX, pivY, pivZ, dex, dey, dez, cb);
+      if (t < camT) camT = t;
+    });
+    var wantDist = camT <= 1.0 ? Math.max(0.5, dist * camT - 0.35) : dist;
+    if (wantDist < camDistS) camDistS = wantDist;
+    else camDistS += (wantDist - camDistS) * Math.min(1, frameDt * 4);
+    dist = camDistS;
+  }
   eye.x = pivX - fx0 * dist;
   eye.y = pivY - fy0 * dist;
   eye.z = pivZ - fz0 * dist;
-  var minY = world.groundY(eye.x, eye.z, 1000.0, 0.2) + 0.3;
+  // floor clamp referenced to the PLAYER's height, not the sky: under a roof,
+  // refY=1000 made the roof count as "ground" and warped the camera on top of it
+  var minY = world.groundY(eye.x, eye.z, pivY, 0.2) + 0.3;
   if (eye.y < minY) eye.y = minY;
 
 
@@ -2758,7 +2782,7 @@ function drawEnemy(en, x, y, z, yaw, sc, phase, amp) {
   }
 }
 
-// does the segment pass through the box (slab test, y spans 0..h)?
+// does the segment pass through the box (slab test, y spans yb..h)?
 function segHitsBox(x0, y0, z0, x1, y1, z1, b) {
   var dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
   var t0 = 0, t1 = 1;
@@ -2771,9 +2795,9 @@ function segHitsBox(x0, y0, z0, x1, y1, z1, b) {
     t0 = Math.max(t0, Math.min(tc, td)); t1 = Math.min(t1, Math.max(tc, td));
   } else if (z0 <= b.z0 || z0 >= b.z1) return false;
   if (Math.abs(dy) > 1e-6) {
-    var te = (0 - y0) / dy, tf = (b.h - y0) / dy;
+    var te = (b.yb - y0) / dy, tf = (b.h - y0) / dy;
     t0 = Math.max(t0, Math.min(te, tf)); t1 = Math.min(t1, Math.max(te, tf));
-  } else if (y0 <= 0 || y0 >= b.h) return false;
+  } else if (y0 <= b.yb || y0 >= b.h) return false;
   return t0 <= t1;
 }
 
